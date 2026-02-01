@@ -1,0 +1,69 @@
+/* ============================================================================
+   SpecNameBar Component Styles (VS Code Title Bar inspired)
+   ============================================================================ */
+
+.spec-name-bar {
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-primary);
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.spec-name-bar-left {
+  /* Space for Mac window buttons (close, minimize, maximize) */
+  width: 78px;
+  flex-shrink: 0;
+}
+
+.spec-name-bar-center {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spec-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 500px;
+  letter-spacing: 0.2px;
+}
+
+.spec-name-bar-right {
+  padding-right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.theme-toggle-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  -webkit-app-region: no-drag;
+}
+
+.theme-toggle-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.theme-toggle-btn:active {
+  transform: scale(0.95);
+}

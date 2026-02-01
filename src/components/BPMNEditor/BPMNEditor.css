@@ -1,0 +1,449 @@
+/* ============================================================================
+   BPMN Editor Component Styles
+   
+   IMPORTANT: bpmn.io License Compliance
+   - The bpmn.io watermark MUST remain visible at all times
+   - The watermark MUST NOT be overlapped by other elements
+   - See: https://bpmn.io/license/
+   ============================================================================ */
+
+.bpmn-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-primary);
+}
+
+/* ============================================================================
+   Top Bar - Selection Info (VS Code tab bar style)
+   ============================================================================ */
+
+.bpmn-top-bar {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  height: 35px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.selection-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.element-type {
+  padding: 2px 6px;
+  background: var(--bg-active);
+  color: var(--accent-primary);
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+  font-size: 11px;
+}
+
+.element-name {
+  color: var(--text-primary);
+  font-weight: 400;
+}
+
+.element-hint {
+  color: var(--warning);
+  font-size: 11px;
+}
+
+.no-selection {
+  color: var(--text-muted);
+  font-style: normal;
+}
+
+/* ============================================================================
+   Error Display
+   ============================================================================ */
+
+.bpmn-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: rgba(239, 68, 68, 0.1);
+  border-bottom: 1px solid rgba(239, 68, 68, 0.3);
+  color: var(--error);
+  font-size: 13px;
+}
+
+.bpmn-error button {
+  background: none;
+  border: none;
+  color: var(--error);
+  cursor: pointer;
+  padding: 4px 8px;
+  font-size: 16px;
+}
+
+.bpmn-error button:hover {
+  opacity: 0.7;
+}
+
+/* ============================================================================
+   Canvas - WHITE BACKGROUND for BPMN diagrams
+   ============================================================================ */
+
+.bpmn-canvas {
+  flex: 1;
+  min-height: 400px;
+  background: #ffffff;
+  overflow: hidden;
+  position: relative;
+}
+
+.bpmn-canvas .bjs-container {
+  background: #ffffff !important;
+}
+
+/* ============================================================================
+   bpmn.io Watermark - MUST REMAIN VISIBLE (License Requirement)
+   ============================================================================ */
+
+.bpmn-canvas .bjs-powered-by {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  z-index: 100 !important;
+}
+
+/* ============================================================================
+   Palette Styling (Light theme for visibility)
+   ============================================================================ */
+
+.bpmn-canvas .djs-palette {
+  background: #f8fafc !important;
+  border-right: 1px solid #e2e8f0 !important;
+  border-top: none !important;
+  border-bottom: none !important;
+  border-left: none !important;
+}
+
+.bpmn-canvas .djs-palette .entry {
+  color: #1e293b !important;
+}
+
+.bpmn-canvas .djs-palette .entry:hover {
+  background: rgba(99, 102, 241, 0.1) !important;
+  color: #6366f1 !important;
+}
+
+.bpmn-canvas .djs-palette .separator {
+  border-color: #e2e8f0 !important;
+}
+
+.bpmn-canvas .djs-palette-toggle {
+  background: #f8fafc !important;
+}
+
+/* ============================================================================
+   Context Pad Styling - WHITE background with BLACK icons
+   ============================================================================ */
+
+.bpmn-canvas .djs-context-pad {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+.bpmn-canvas .djs-context-pad .entry {
+  background: transparent !important;
+  color: #1e293b !important;
+}
+
+/* Make context pad icons BLACK/dark for visibility on white background */
+.bpmn-canvas .djs-context-pad .entry svg,
+.bpmn-canvas .djs-context-pad .entry path,
+.bpmn-canvas .djs-context-pad .entry circle,
+.bpmn-canvas .djs-context-pad .entry rect,
+.bpmn-canvas .djs-context-pad .entry polygon {
+  fill: #1e293b !important;
+  stroke: #1e293b !important;
+}
+
+.bpmn-canvas .djs-context-pad .entry:hover {
+  background: rgba(99, 102, 241, 0.1) !important;
+}
+
+.bpmn-canvas .djs-context-pad .entry:hover svg,
+.bpmn-canvas .djs-context-pad .entry:hover path,
+.bpmn-canvas .djs-context-pad .entry:hover circle,
+.bpmn-canvas .djs-context-pad .entry:hover rect,
+.bpmn-canvas .djs-context-pad .entry:hover polygon {
+  fill: #6366f1 !important;
+  stroke: #6366f1 !important;
+}
+
+/* ============================================================================
+   Popup Menu Styling - WHITE background with BLACK text/icons
+   ============================================================================ */
+
+.bpmn-canvas .djs-popup {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+.bpmn-canvas .djs-popup .entry {
+  color: #1e293b !important;
+}
+
+.bpmn-canvas .djs-popup .entry svg,
+.bpmn-canvas .djs-popup .entry path,
+.bpmn-canvas .djs-popup .entry circle,
+.bpmn-canvas .djs-popup .entry rect,
+.bpmn-canvas .djs-popup .entry polygon {
+  fill: #1e293b !important;
+  stroke: #1e293b !important;
+}
+
+.bpmn-canvas .djs-popup .entry:hover {
+  background: rgba(99, 102, 241, 0.1) !important;
+  color: #6366f1 !important;
+}
+
+.bpmn-canvas .djs-popup .entry:hover svg,
+.bpmn-canvas .djs-popup .entry:hover path {
+  fill: #6366f1 !important;
+  stroke: #6366f1 !important;
+}
+
+.bpmn-canvas .djs-popup .djs-popup-header {
+  background: #f8fafc !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  color: #1e293b !important;
+}
+
+.bpmn-canvas .djs-popup .djs-popup-title {
+  color: #1e293b !important;
+}
+
+.bpmn-canvas .djs-popup .djs-popup-search input {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #1e293b !important;
+}
+
+/* ============================================================================
+   Selection Styling
+   ============================================================================ */
+
+.bpmn-canvas .djs-selection {
+  stroke: #6366f1 !important;
+  stroke-width: 2px !important;
+}
+
+.bpmn-canvas .djs-outline {
+  stroke: #6366f1 !important;
+  stroke-width: 2px !important;
+}
+
+/* ============================================================================
+   Data Object Highlight
+   ============================================================================ */
+
+.bpmn-canvas .djs-element[data-element-id*="DataObject"] .djs-outline,
+.bpmn-canvas .djs-element[data-element-id*="DataStore"] .djs-outline {
+  stroke: #f59e0b !important;
+}
+
+/* ============================================================================
+   Footer Toolbar with BPMN Tools (VS Code style)
+   ============================================================================ */
+
+.bpmn-footer-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  height: 35px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-primary);
+}
+
+.footer-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.footer-zoom-group {
+  gap: 4px;
+}
+
+.footer-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--border-primary);
+  margin: 0 6px;
+}
+
+.footer-spacer {
+  flex: 1;
+}
+
+.footer-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 6px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.footer-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.footer-btn:active {
+  background: var(--bg-active);
+}
+
+.footer-btn.active {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+
+.footer-btn-export {
+  padding: 4px 8px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+}
+
+.footer-btn-export span {
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.footer-btn-export:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-secondary);
+}
+
+/* Zoom slider (VS Code style) */
+.zoom-slider {
+  width: 70px;
+  height: 4px;
+  background: var(--border-secondary);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+  -webkit-appearance: none;
+}
+
+.zoom-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  background: var(--text-secondary);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.zoom-slider::-webkit-slider-thumb:hover {
+  background: var(--text-primary);
+}
+
+.zoom-slider::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  background: var(--text-secondary);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.zoom-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  min-width: 36px;
+  text-align: center;
+}
+
+/* Attribution */
+.footer-attribution {
+  font-size: 10px;
+}
+
+.footer-attribution a {
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.footer-attribution a:hover {
+  color: var(--accent-primary);
+}
+
+/* ============================================================================
+   Responsive
+   ============================================================================ */
+
+@media (max-width: 768px) {
+  .footer-btn-export span {
+    display: none;
+  }
+
+  .zoom-slider {
+    width: 60px;
+  }
+
+  .zoom-label {
+    display: none;
+  }
+}
+
+/* ============================================================================
+   Data Object Tooltip
+   ============================================================================ */
+
+.data-object-tooltip {
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 12px;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  pointer-events: none;
+  animation: tooltipFadeIn 0.15s ease;
+}
+
+.data-object-tooltip::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid var(--bg-secondary);
+}
+
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -90%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -100%);
+  }
+}

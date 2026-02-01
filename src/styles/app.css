@@ -1,0 +1,409 @@
+/* ============================================================================
+   xPPM-Neo-Seoul Global Styles
+   ============================================================================ */
+
+/* Reset & Base */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #1e1e1e;
+  color: #cccccc;
+  overflow: hidden;
+}
+
+/* Scrollbar Styling (VS Code style) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(121, 121, 121, 0.4);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 100, 100, 0.7);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Selection */
+::selection {
+  background: rgba(99, 102, 241, 0.4);
+  color: white;
+}
+
+/* Consistent Font Styling for All Inputs
+   Forces all text inputs to use system font regardless of pasted content */
+input,
+textarea,
+select,
+[contenteditable="true"] {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: normal;
+  font-style: normal;
+  line-height: 1.4;
+}
+
+/* Explicitly set font for inputs to prevent pasted formatting */
+input[type="text"],
+input[type="number"],
+input[type="email"],
+input[type="url"],
+input[type="search"],
+input[type="password"],
+textarea {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-size: 13px;
+}
+
+/* ============================================================================
+   Theme Variables
+   ============================================================================ */
+
+:root {
+  /* Colors - Dark Theme (VS Code inspired) */
+  --bg-primary: #1e1e1e;
+  --bg-secondary: #252526;
+  --bg-tertiary: #2d2d2d;
+  --bg-card: #333333;
+  --bg-input: #3c3c3c;
+  --bg-hover: #2a2d2e;
+  --bg-active: #37373d;
+  --bg-sidebar: #252526;
+  --bg-activitybar: #333333;
+
+  --border-primary: #3c3c3c;
+  --border-secondary: #454545;
+  --border-focus: #007acc;
+
+  --text-primary: #cccccc;
+  --text-secondary: #9d9d9d;
+  --text-muted: #6d6d6d;
+  --text-bright: #e7e7e7;
+
+  --accent-primary: #007acc;
+  --accent-secondary: #0098ff;
+  --accent-hover: #0587d4;
+  --accent-gradient: linear-gradient(135deg, #007acc, #0098ff);
+
+  --success: #4ec9b0;
+  --warning: #ce9178;
+  --error: #f14c4c;
+  --info: #3794ff;
+
+  /* Activity bar */
+  --activitybar-bg: #333333;
+  --activitybar-inactive: #858585;
+  --activitybar-active: #ffffff;
+  --activitybar-indicator: #007acc;
+
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+
+  /* Border Radius - VS Code uses minimal radius */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-xl: 8px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 0 8px rgba(0, 122, 204, 0.3);
+
+  /* Transitions */
+  --transition-fast: 100ms ease;
+  --transition-normal: 200ms ease;
+  --transition-slow: 300ms ease;
+}
+
+/* Light Theme (VS Code inspired) */
+[data-theme="light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f3f3f3;
+  --bg-tertiary: #ececec;
+  --bg-card: #ffffff;
+  --bg-input: #ffffff;
+  --bg-hover: #e8e8e8;
+  --bg-active: #d4d4d4;
+  --bg-sidebar: #f3f3f3;
+  --bg-activitybar: #2c2c2c;
+
+  --border-primary: #e5e5e5;
+  --border-secondary: #cccccc;
+  --border-focus: #007acc;
+
+  --text-primary: #333333;
+  --text-secondary: #616161;
+  --text-muted: #8e8e8e;
+  --text-bright: #1e1e1e;
+
+  --activitybar-bg: #2c2c2c;
+  --activitybar-inactive: #858585;
+  --activitybar-active: #ffffff;
+  --activitybar-indicator: #007acc;
+}
+
+/* ============================================================================
+   Utility Classes
+   ============================================================================ */
+
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.items-center { align-items: center; }
+.justify-center { justify-content: center; }
+.justify-between { justify-content: space-between; }
+.gap-1 { gap: var(--spacing-xs); }
+.gap-2 { gap: var(--spacing-sm); }
+.gap-3 { gap: var(--spacing-md); }
+.gap-4 { gap: var(--spacing-lg); }
+
+.text-xs { font-size: 12px; }
+.text-sm { font-size: 14px; }
+.text-base { font-size: 16px; }
+.text-lg { font-size: 18px; }
+.text-xl { font-size: 20px; }
+.text-2xl { font-size: 24px; }
+
+.font-medium { font-weight: 500; }
+.font-semibold { font-weight: 600; }
+.font-bold { font-weight: 700; }
+
+.text-primary { color: var(--text-primary); }
+.text-secondary { color: var(--text-secondary); }
+.text-muted { color: var(--text-muted); }
+.text-accent { color: var(--accent-primary); }
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============================================================================
+   Button Styles (VS Code inspired)
+   ============================================================================ */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 400;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  outline: none;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--accent-primary);
+  color: white;
+  border-color: var(--accent-primary);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-secondary);
+  border-color: var(--accent-secondary);
+}
+
+.btn-secondary {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-secondary);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.btn-icon {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+}
+
+/* ============================================================================
+   Input Styles (VS Code inspired)
+   ============================================================================ */
+
+.input {
+  width: 100%;
+  padding: 4px 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.input:focus {
+  border-color: var(--border-focus);
+  outline: 1px solid var(--border-focus);
+  outline-offset: -1px;
+}
+
+.input:hover:not(:focus) {
+  border-color: var(--border-secondary);
+}
+
+.input::placeholder {
+  color: var(--text-muted);
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 60px;
+  font-family: inherit;
+}
+
+.select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239d9d9d' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 28px;
+  cursor: pointer;
+}
+
+.select:focus {
+  border-color: var(--border-focus);
+  outline: 1px solid var(--border-focus);
+  outline-offset: -1px;
+}
+
+/* ============================================================================
+   Card Styles
+   ============================================================================ */
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(10px);
+}
+
+.card-header {
+  padding: var(--spacing-md);
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.card-body {
+  padding: var(--spacing-md);
+}
+
+/* ============================================================================
+   Animation Keyframes
+   ============================================================================ */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.animate-fadeIn {
+  animation: fadeIn var(--transition-normal) ease forwards;
+}
+
+.animate-slideUp {
+  animation: slideUp var(--transition-normal) ease forwards;
+}
+
+.animate-pulse {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* ============================================================================
+   BPMN-JS Overrides
+   ============================================================================ */
+
+.bjs-container {
+  background: white !important;
+}
+
+.djs-palette {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border-primary) !important;
+}
+
+.djs-context-pad {
+  background: var(--bg-secondary) !important;
+}
+
+/* Data Object 선택 시 하이라이트 */
+.djs-visual > rect[data-element-id*="DataObject"] {
+  stroke: var(--warning) !important;
+}
+
+.highlight-data-object {
+  filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.5));
+}
