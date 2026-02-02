@@ -75,7 +75,7 @@ const StartupScreen = ({ onNewBlank, onNewSample, onOpen }) => {
         </div>
 
         <div className="startup-footer">
-          <p>Powered by <a href="https://bpmn.io" target="_blank" rel="noopener noreferrer">bpmn.io</a></p>
+          <p>Powered by <a href="http://big.yonsei.ac.kr/" target="_blank" rel="noopener noreferrer">BIG Yonsei</a></p>
         </div>
       </div>
     </div>

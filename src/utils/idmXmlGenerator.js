@@ -38,6 +38,65 @@ const arrayToString = (value, separator = ', ') => {
 };
 
 /**
+ * Generate XML for figures (images attached to sections)
+ * @param {Array} figures - Array of figure objects with data, caption, type
+ * @param {string} indent - Indentation string
+ * @returns {string[]} Array of XML lines
+ */
+const generateFiguresXml = (figures, indent = '      ') => {
+  const lines = [];
+  if (!figures || !Array.isArray(figures) || figures.length === 0) {
+    return lines;
+  }
+
+  figures.forEach(fig => {
+    const caption = fig.caption || fig.name || 'Figure';
+    const mimeType = fig.type || 'image/png';
+
+    if (fig.data && fig.data.startsWith('data:')) {
+      // Embed base64 data directly
+      const base64Data = fig.data.split(',')[1] || '';
+      lines.push(`${indent}<figure caption="${escapeXml(caption)}" mimeType="${escapeXml(mimeType)}" encoding="base64">`);
+      lines.push(`${indent}  <![CDATA[${base64Data}]]>`);
+      lines.push(`${indent}</figure>`);
+    } else if (fig.filePath) {
+      // Reference external file
+      lines.push(`${indent}<figure caption="${escapeXml(caption)}" filePath="${escapeXml(fig.filePath)}"/>`);
+    }
+  });
+
+  return lines;
+};
+
+/**
+ * Format author object to display string
+ * Handles both Person and Organization types per ISO 29481-3
+ */
+const formatAuthor = (author) => {
+  if (typeof author === 'string') return author;
+  if (!author || typeof author !== 'object') return '';
+
+  if (author.type === 'person') {
+    // ISO 29481-3 Person format: prefix givenName middleInitial familyName suffix postnominalDesignation
+    const parts = [
+      author.prefix,
+      author.givenName || author.firstName,
+      author.middleInitial || author.middleName,
+      author.familyName || author.lastName,
+      author.suffix,
+      author.postnominalDesignation
+    ].filter(Boolean);
+    const name = parts.join(' ');
+    return author.affiliation ? `${name} (${author.affiliation})` : name;
+  } else if (author.type === 'organization') {
+    return author.name || author.organizationName || '';
+  }
+
+  // Fallback for unknown format
+  return author.name || author.givenName || '';
+};
+
+/**
  * Generate Information Unit XML
  */
 const generateInformationUnitXml = (unit, indent = '      ') => {
@@ -58,7 +117,24 @@ const generateInformationUnitXml = (unit, indent = '      ') => {
     }
     if (unit.exampleImages && unit.exampleImages.length > 0) {
       unit.exampleImages.forEach(img => {
-        lines.push(`${indent}    <image caption="${escapeXml(img.name)}" filePath="${escapeXml(img.name)}"/>`);
+        const caption = img.caption || img.name || 'Image';
+        const mimeType = img.type || 'image/png';
+
+        // Embed base64 data directly if available (self-contained idmXML)
+        if (img.data && img.data.startsWith('data:')) {
+          // Extract base64 part from data URL (remove "data:image/png;base64," prefix)
+          const base64Data = img.data.split(',')[1] || '';
+          lines.push(`${indent}    <image caption="${escapeXml(caption)}" mimeType="${escapeXml(mimeType)}" encoding="base64">`);
+          lines.push(`${indent}      <![CDATA[${base64Data}]]>`);
+          lines.push(`${indent}    </image>`);
+        } else if (img.filePath) {
+          // Use filePath for bundle export (separate files)
+          lines.push(`${indent}    <image caption="${escapeXml(caption)}" filePath="${escapeXml(img.filePath)}"/>`);
+        } else {
+          // Fallback to filename reference
+          const filePath = img.name || 'image.png';
+          lines.push(`${indent}    <image caption="${escapeXml(caption)}" filePath="${escapeXml(filePath)}"/>`);
+        }
       });
     }
     lines.push(`${indent}  </examples>`);
@@ -123,6 +199,33 @@ const generateErXml = (er, authorName, indent = '  ') => {
     });
   }
 
+  // Sub-ERs (recursive per ISO 29481-3)
+  if (er.subERs && er.subERs.length > 0) {
+    er.subERs.forEach(subER => {
+      lines.push(`${indent}  <subEr>`);
+      // Generate sub-ER content (nested ER structure)
+      const subErGuid = generateUUID();
+      lines.push(`${indent}    <specId`);
+      lines.push(`${indent}      guid="${subErGuid}"`);
+      lines.push(`${indent}      shortTitle="${escapeXml(subER.name || 'Sub-ER')}"`);
+      lines.push(`${indent}      fullTitle="${escapeXml(subER.name || 'Sub Exchange Requirement')}"`);
+      lines.push(`${indent}      idmCode="ER-${subER.id || Date.now()}"`);
+      lines.push(`${indent}      documentStatus="WD"/>`);
+      lines.push(`${indent}    <authoring`);
+      lines.push(`${indent}      author="${escapeXml(authorName)}"`);
+      lines.push(`${indent}      creationDate="${formatDate()}"/>`);
+      if (subER.description) {
+        lines.push(`${indent}    <description>${escapeXml(subER.description)}</description>`);
+      }
+      if (subER.informationUnits && subER.informationUnits.length > 0) {
+        subER.informationUnits.forEach(unit => {
+          lines.push(generateInformationUnitXml(unit, indent + '    '));
+        });
+      }
+      lines.push(`${indent}  </subEr>`);
+    });
+  }
+
   lines.push(`${indent}</er>`);
 
   return lines.join('\n');
@@ -139,17 +242,21 @@ const generateErXml = (er, authorName, indent = '  ') => {
  * @returns {string} idmXML content
  */
 export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, dataObjects = [] }) => {
-  const idmGuid = generateUUID();
-  const ucGuid = generateUUID();
-  const bcmGuid = generateUUID();
-  const pmId = `PM-${Date.now()}`;
+  // Use persistent GUIDs if available, otherwise generate new ones
+  const idmGuid = headerData?.idmGuid || generateUUID();
+  const ucGuid = headerData?.ucGuid || generateUUID();
+  const bcmGuid = headerData?.bcmGuid || generateUUID();
+  const pmId = headerData?.pmId || `PM-${Date.now()}`;
 
-  // Handle authors array or legacy author string
+  // Handle authors array or legacy author string - FIX: properly format author objects
   const authorsArray = Array.isArray(headerData?.authors) ? headerData.authors :
-    (headerData?.author ? [headerData.author] : ['IDMxPPM User']);
-  const author = authorsArray.join(', ');
+    (headerData?.author ? [headerData.author] : []);
+  const author = authorsArray.length > 0
+    ? authorsArray.map(formatAuthor).filter(Boolean).join(', ')
+    : 'IDMxPPM User';
 
   const title = headerData?.title || 'IDM Specification';
+  const shortTitle = headerData?.shortTitle || title; // Separate shortTitle
   const version = headerData?.version || '1.0';
   const status = headerData?.status || 'WD';
   const language = headerData?.language || 'EN';
@@ -161,19 +268,45 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, dataObjects = [
   lines.push('<?xml version="1.0" encoding="UTF-8"?>');
   lines.push('<idm xmlns="https://standards.buildingsmart.org/IDM/idmXML/0.2">');
 
-  // IDM specId
+  // IDM specId - use separate shortTitle and fullTitle per idmXSD
+  const idmCode = headerData?.idmCode || `IDM-${Date.now()}`;
   lines.push('  <specId');
   lines.push(`    guid="${idmGuid}"`);
-  lines.push(`    shortTitle="${escapeXml(title)}"`);
+  lines.push(`    shortTitle="${escapeXml(shortTitle)}"`);
   lines.push(`    fullTitle="${escapeXml(title)}"`);
-  lines.push(`    idmCode="IDM-${Date.now()}"`);
+  lines.push(`    idmCode="${escapeXml(idmCode)}"`);
   lines.push(`    documentStatus="${escapeXml(status)}"`);
   lines.push(`    version="${escapeXml(version)}"/>`);
 
-  // IDM authoring - include all authors
+  // IDM authoring - include all authors (now properly formatted)
   lines.push('  <authoring');
   lines.push(`    author="${escapeXml(author)}"`);
-  lines.push(`    creationDate="${creationDate}"/>`);
+  lines.push(`    creationDate="${creationDate}">`);
+
+  // Add detailed author information per ISO 29481-3
+  if (authorsArray.length > 0) {
+    authorsArray.forEach(authorObj => {
+      if (authorObj && typeof authorObj === 'object') {
+        if (authorObj.type === 'person') {
+          lines.push('    <person');
+          if (authorObj.givenName) lines.push(`      givenName="${escapeXml(authorObj.givenName)}"`);
+          if (authorObj.familyName) lines.push(`      familyName="${escapeXml(authorObj.familyName)}"`);
+          if (authorObj.uri) lines.push(`      uri="${escapeXml(authorObj.uri)}"`);
+          lines.push('    >');
+          if (authorObj.affiliation) {
+            lines.push(`      <affiliation>${escapeXml(authorObj.affiliation)}</affiliation>`);
+          }
+          lines.push('    </person>');
+        } else if (authorObj.type === 'organization') {
+          lines.push('    <organization');
+          if (authorObj.name) lines.push(`      name="${escapeXml(authorObj.name)}"`);
+          if (authorObj.uri) lines.push(`      uri="${escapeXml(authorObj.uri)}"`);
+          lines.push('    />');
+        }
+      }
+    });
+  }
+  lines.push('  </authoring>');
 
   // Revision history (if any)
   if (headerData?.revisionHistory && headerData.revisionHistory.length > 0) {
@@ -190,9 +323,9 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, dataObjects = [
   // UC specId
   lines.push('    <specId');
   lines.push(`      guid="${ucGuid}"`);
-  lines.push(`      shortTitle="${escapeXml(title)}"`);
+  lines.push(`      shortTitle="${escapeXml(shortTitle)}"`);
   lines.push(`      fullTitle="${escapeXml(title)}"`);
-  lines.push(`      idmCode="UC-${Date.now()}"`);
+  lines.push(`      idmCode="UC-${idmCode.replace('IDM-', '')}"`);
   lines.push(`      documentStatus="${escapeXml(status)}"/>`);
 
   // UC authoring
@@ -200,63 +333,130 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, dataObjects = [
   lines.push(`      author="${escapeXml(author)}"`);
   lines.push(`      creationDate="${creationDate}"/>`);
 
-  // Summary
+  // Summary (required per idmXSD) - with optional figures
   lines.push('    <summary>');
   lines.push(`      <description>${escapeXml(headerData?.summary || 'IDM Specification')}</description>`);
+  if (headerData?.summaryFigures && headerData.summaryFigures.length > 0) {
+    lines.push(...generateFiguresXml(headerData.summaryFigures, '      '));
+  }
   lines.push('    </summary>');
 
-  // Aim and Scope
+  // Aim and Scope (required per idmXSD) - with optional figures
+  const aimAndScopeContent = headerData?.aimAndScope || headerData?.objectives || 'Define exchange requirements for BIM processes';
   lines.push('    <aimAndScope>');
-  lines.push(`      <description>${escapeXml(headerData?.objectives || 'Define exchange requirements for BIM processes')}</description>`);
+  lines.push(`      <description>${escapeXml(aimAndScopeContent)}</description>`);
+  if (headerData?.aimAndScopeFigures && headerData.aimAndScopeFigures.length > 0) {
+    lines.push(...generateFiguresXml(headerData.aimAndScopeFigures, '      '));
+  }
   lines.push('    </aimAndScope>');
 
   // Language
   lines.push(`    <language>${escapeXml(language)}</language>`);
 
-  // Use Categories (can have multiple)
-  const useCategories = Array.isArray(headerData?.useCategories) ? headerData.useCategories :
-    (headerData?.useCategory ? [headerData.useCategory] : ['coordination']);
-  useCategories.forEach(cat => {
-    lines.push(`    <use name="${escapeXml(cat)}"/>`);
+  // Use elements (required per idmXSD, 1..*)
+  // Support new format (uses: [{verb, noun}]) and legacy (useCategories: string[])
+  const uses = Array.isArray(headerData?.uses) && headerData.uses.length > 0
+    ? headerData.uses
+    : (Array.isArray(headerData?.useCategories) && headerData.useCategories.length > 0
+      ? headerData.useCategories.map(cat => ({ verb: 'Perform', noun: cat }))
+      : [{ verb: 'Coordinate', noun: 'Design Model' }]); // Default required value
+
+  uses.forEach(use => {
+    if (typeof use === 'object' && use.verb && use.noun) {
+      lines.push(`    <use name="${escapeXml(use.verb)} ${escapeXml(use.noun)}"/>`);
+    } else if (typeof use === 'string') {
+      lines.push(`    <use name="${escapeXml(use)}"/>`);
+    }
   });
 
-  // Region (required)
-  const region = headerData?.region || 'international';
-  lines.push(`    <region value="${escapeXml(region)}">`);
-  lines.push('      <type>USR</type>');
-  lines.push('    </region>');
+  // Regions (required per idmXSD, 1..*)
+  const regions = Array.isArray(headerData?.regions) && headerData.regions.length > 0
+    ? headerData.regions
+    : (headerData?.region ? [headerData.region] : ['international']);
 
-  // Standard Project Stages (can have multiple)
-  const projectStages = Array.isArray(headerData?.projectStages) ? headerData.projectStages :
-    (headerData?.projectStage ? [headerData.projectStage] : ['design']);
+  regions.forEach(region => {
+    lines.push(`    <region value="${escapeXml(region)}">`);
+    lines.push('      <type>USR</type>');
+    lines.push('    </region>');
+  });
+
+  // Standard Project Stages (required per idmXSD, 1..*)
+  // Use ISO 22263 stages from projectStagesIso, fall back to projectStages, then default
+  const isoStages = Array.isArray(headerData?.projectStagesIso) && headerData.projectStagesIso.length > 0
+    ? headerData.projectStagesIso
+    : (Array.isArray(headerData?.projectStages) && headerData.projectStages.length > 0
+      ? headerData.projectStages
+      : ['design']); // Default required value
+
   const validStages = ['inception', 'brief', 'design', 'production', 'handover', 'operation', 'end-of-life'];
 
-  projectStages.forEach(stage => {
+  isoStages.forEach(stage => {
     const normalizedStage = validStages.includes(stage) ? stage : 'design';
     lines.push('    <standardProjectStage>');
     lines.push(`      <name>${normalizedStage}</name>`);
     lines.push('    </standardProjectStage>');
   });
 
-  // Benefits (optional)
-  if (headerData?.benefits) {
+  // Additional Project Stages - AIA B101 (US) - as userDefinedProjectStage
+  if (Array.isArray(headerData?.projectStagesAia) && headerData.projectStagesAia.length > 0) {
+    headerData.projectStagesAia.forEach(stage => {
+      lines.push('    <userDefinedProjectStage>');
+      lines.push(`      <name>${escapeXml(stage)}</name>`);
+      lines.push('      <classification system="AIA B101" code="US"/>');
+      lines.push('    </userDefinedProjectStage>');
+    });
+  }
+
+  // Additional Project Stages - RIBA Plan of Work (UK) - as userDefinedProjectStage
+  if (Array.isArray(headerData?.projectStagesRiba) && headerData.projectStagesRiba.length > 0) {
+    headerData.projectStagesRiba.forEach(stage => {
+      lines.push('    <userDefinedProjectStage>');
+      lines.push(`      <name>${escapeXml(stage)}</name>`);
+      lines.push('      <classification system="RIBA Plan of Work" code="UK"/>');
+      lines.push('    </userDefinedProjectStage>');
+    });
+  }
+
+  // Benefits (optional) - with optional figures
+  if (headerData?.benefits || (headerData?.benefitsFigures && headerData.benefitsFigures.length > 0)) {
     lines.push('    <benefits>');
-    lines.push(`      <description>${escapeXml(headerData.benefits)}</description>`);
+    if (headerData?.benefits) {
+      lines.push(`      <description>${escapeXml(headerData.benefits)}</description>`);
+    }
+    if (headerData?.benefitsFigures && headerData.benefitsFigures.length > 0) {
+      lines.push(...generateFiguresXml(headerData.benefitsFigures, '      '));
+    }
     lines.push('    </benefits>');
   }
 
-  // Limitations (optional)
-  if (headerData?.limitations) {
+  // Limitations (optional) - with optional figures
+  if (headerData?.limitations || (headerData?.limitationsFigures && headerData.limitationsFigures.length > 0)) {
     lines.push('    <limitations>');
-    lines.push(`      <description>${escapeXml(headerData.limitations)}</description>`);
+    if (headerData?.limitations) {
+      lines.push(`      <description>${escapeXml(headerData.limitations)}</description>`);
+    }
+    if (headerData?.limitationsFigures && headerData.limitationsFigures.length > 0) {
+      lines.push(...generateFiguresXml(headerData.limitationsFigures, '      '));
+    }
     lines.push('    </limitations>');
   }
 
-  // Actors (per ISO 29481-1)
-  if (headerData?.actors) {
-    lines.push('    <actors>');
+  // Actors (per ISO 29481-3 - structured with id/name attributes)
+  if (headerData?.actorsList && headerData.actorsList.length > 0) {
+    headerData.actorsList.forEach(actor => {
+      const actorId = actor.id || `actor-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+      const actorName = actor.name || 'Unnamed Actor';
+      lines.push(`    <actor id="${escapeXml(actorId)}" name="${escapeXml(actorName)}">`);
+      if (actor.role) {
+        lines.push(`      <classification id="role" name="${escapeXml(actor.role)}"/>`);
+      }
+      lines.push('    </actor>');
+    });
+  } else if (headerData?.actors && typeof headerData.actors === 'string') {
+    // Legacy support for text-only actors description
+    lines.push('    <actor id="actor-legacy" name="Actors">');
     lines.push(`      <description>${escapeXml(headerData.actors)}</description>`);
-    lines.push('    </actors>');
+    lines.push('    </actor>');
   }
 
   // Preconditions (per ISO 29481-1)
@@ -353,7 +553,17 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, dataObjects = [
 
   lines.push('</idm>');
 
-  return lines.join('\n');
+  // Return XML content along with generated GUIDs for persistence
+  return {
+    xml: lines.join('\n'),
+    guids: {
+      idmGuid,
+      ucGuid,
+      bcmGuid,
+      pmId,
+      idmCode
+    }
+  };
 };
 
 /**

@@ -8,8 +8,13 @@ import ContentPane from './components/ContentPane/ContentPane';
 import StartupScreen from './components/StartupScreen/StartupScreen';
 import { ThemeProvider } from './hooks/useTheme';
 import { generateIdmXml } from './utils/idmXmlGenerator';
+import { downloadIdmBundle } from './utils/idmBundleExporter';
+import { importIdmBundle, isZipBundle } from './utils/idmBundleImporter';
 import { validateProject, getValidationStatusLabel } from './utils/validation';
 import { parseIdmXml, isIdmXml } from './utils/idmXmlParser';
+import { readFileAsText } from './utils/pdfExporter';
+import { defaultIdmXslt } from './utils/defaultIdmXslt';
+import { generateStandaloneHtml } from './utils/htmlExporter';
 import {
   SAMPLE_BPMN_XML,
   SAMPLE_HEADER_DATA,
@@ -70,7 +75,13 @@ const App = () => {
     postconditions: '',      // Expected outcomes after completion
     triggeringEvents: '',    // Events that trigger the process
     requiredCapabilities: '',// Required software/process capabilities
-    complianceCriteria: ''   // Criteria for compliance verification
+    complianceCriteria: '',  // Criteria for compliance verification
+    // Persistent GUIDs for idmXSD compliance (ISO 29481-3)
+    idmGuid: '',             // IDM specification GUID
+    ucGuid: '',              // Use Case GUID
+    bcmGuid: '',             // Business Context Map GUID
+    pmId: '',                // Process Map ID
+    idmCode: ''              // IDM Code (auto-generated if empty)
   });
 
   // Validation State
@@ -85,12 +96,13 @@ const App = () => {
 
   // Save & Export Dialog State
   const [showExportDialog, setShowExportDialog] = useState(false);
-  const [exportFormat, setExportFormat] = useState('idmxml');
+  const [exportFormat, setExportFormat] = useState('idm');
+  const [exportFilename, setExportFilename] = useState(''); // User-editable filename
   const [exportOptions, setExportOptions] = useState({
     includeBpmn: true,
-    includeImages: true,
-    includeXslt: false
+    includeImages: true
   });
+  const [customXslt, setCustomXslt] = useState(null); // Custom XSLT file for PDF export
 
   // About Dialog State
   const [showAboutDialog, setShowAboutDialog] = useState(false);
@@ -371,6 +383,7 @@ const App = () => {
   }, []);
 
   // Extract swimlanes (Participants and Lanes) from the modeler
+  // Includes ALL swimlanes (even unnamed ones) to enable proper tracking
   const extractSwimlanesFromModeler = useCallback(() => {
     if (!modelerRef.current) return [];
 
@@ -384,13 +397,12 @@ const App = () => {
         if (element.type === 'bpmn:Participant' || element.type === 'bpmn:Lane') {
           const businessObject = element.businessObject;
           const name = businessObject?.name || '';
-          if (name) { // Only include named swimlanes
-            swimlanes.push({
-              id: element.id,
-              name: name,
-              type: element.type === 'bpmn:Participant' ? 'pool' : 'lane'
-            });
-          }
+          // Include ALL swimlanes, even unnamed ones
+          swimlanes.push({
+            id: element.id,
+            name: name,
+            type: element.type === 'bpmn:Participant' ? 'pool' : 'lane'
+          });
         }
       });
 
@@ -433,31 +445,69 @@ const App = () => {
 
       // Sync swimlanes (Participants/Lanes) with Actor Roles
       const swimlanes = extractSwimlanesFromModeler();
-      if (swimlanes.length > 0) {
-        setHeaderData(prevHeaderData => {
-          const currentActors = prevHeaderData.actorsList || [];
-          const currentActorNames = new Set(currentActors.map(a => a.name?.toLowerCase()));
+      setHeaderData(prevHeaderData => {
+        const currentActors = prevHeaderData.actorsList || [];
+        const swimlaneIds = new Set(swimlanes.map(s => s.id));
 
-          // Add new swimlanes that don't exist in actorsList
-          const newActors = [...currentActors];
-          swimlanes.forEach(swimlane => {
-            if (swimlane.name && !currentActorNames.has(swimlane.name.toLowerCase())) {
-              newActors.push({
-                id: `actor-${swimlane.id}`,
-                name: swimlane.name,
-                role: swimlane.type === 'pool' ? 'Pool' : 'Lane',
-                bpmnId: swimlane.id // Track the BPMN element ID for future syncing
-              });
-            }
-          });
-
-          // Only update if there are changes
-          if (newActors.length !== currentActors.length) {
-            return { ...prevHeaderData, actorsList: newActors };
+        // Build a map of current actors by their bpmnId for quick lookup
+        const actorsByBpmnId = {};
+        currentActors.forEach(actor => {
+          if (actor.bpmnId) {
+            actorsByBpmnId[actor.bpmnId] = actor;
           }
-          return prevHeaderData;
         });
-      }
+
+        // Process swimlanes: update existing actors or add new ones
+        let updatedActors = [...currentActors];
+        let hasChanges = false;
+
+        swimlanes.forEach(swimlane => {
+          const existingActor = actorsByBpmnId[swimlane.id];
+
+          if (existingActor) {
+            // Actor exists - update name if swimlane was renamed
+            if (existingActor.name !== swimlane.name) {
+              updatedActors = updatedActors.map(a =>
+                a.bpmnId === swimlane.id ? { ...a, name: swimlane.name } : a
+              );
+              hasChanges = true;
+            }
+          } else {
+            // New swimlane - create corresponding actor
+            updatedActors.push({
+              id: `actor-${swimlane.id}-${Date.now()}`,
+              name: swimlane.name, // May be empty for new unnamed swimlanes
+              role: '', // Leave blank for user to specify
+              bpmnId: swimlane.id
+            });
+            hasChanges = true;
+          }
+        });
+
+        // Remove actors whose linked swimlanes no longer exist (deleted in BPMN)
+        const actorsToRemove = updatedActors.filter(a => a.bpmnId && !swimlaneIds.has(a.bpmnId));
+        if (actorsToRemove.length > 0) {
+          // Filter out actors linked to deleted swimlanes
+          updatedActors = updatedActors.filter(a => !a.bpmnId || swimlaneIds.has(a.bpmnId));
+          hasChanges = true;
+
+          // Notify user about auto-removed actors
+          const removedNames = actorsToRemove.map(a => a.name || 'Unnamed').join(', ');
+          // Use setTimeout to avoid blocking the render
+          setTimeout(() => {
+            console.info(`Actors removed due to swimlane deletion: ${removedNames}`);
+            // Show a brief notification (non-blocking)
+            if (actorsToRemove.some(a => a.name)) {
+              alert(`The following actors were automatically removed because their linked swimlanes were deleted:\n\n${removedNames}`);
+            }
+          }, 100);
+        }
+
+        if (hasChanges) {
+          return { ...prevHeaderData, actorsList: updatedActors };
+        }
+        return prevHeaderData;
+      });
     }, 100);
   }, [extractDataObjectsFromModeler, extractSwimlanesFromModeler]);
 
@@ -467,11 +517,155 @@ const App = () => {
     setSelectedDataObject(null);
   }, []);
 
-  // Handle Header Data change
-  const handleHeaderChange = useCallback((newHeaderData) => {
-    setHeaderData(newHeaderData);
-    setIsDirty(true);
+  // Create a swimlane (Pool) in BPMN for a given actor
+  const createSwimlanForActor = useCallback((actorName) => {
+    if (!modelerRef.current) return null;
+
+    try {
+      const modeling = modelerRef.current.get('modeling');
+      const elementFactory = modelerRef.current.get('elementFactory');
+      const canvas = modelerRef.current.get('canvas');
+      const elementRegistry = modelerRef.current.get('elementRegistry');
+
+      if (!modeling || !elementFactory || !canvas) return null;
+
+      // Get canvas dimensions and find good position for new pool
+      const viewbox = canvas.viewbox();
+      let yPosition = 100;
+
+      // Find the lowest existing pool to position new one below it
+      elementRegistry.forEach(element => {
+        if (element.type === 'bpmn:Participant') {
+          const bottom = (element.y || 0) + (element.height || 150);
+          if (bottom > yPosition) {
+            yPosition = bottom + 50; // Add some margin
+          }
+        }
+      });
+
+      // Create the participant (pool)
+      const participantShape = elementFactory.createParticipantShape({
+        type: 'bpmn:Participant'
+      });
+
+      // Add to canvas
+      const newShape = modeling.createShape(
+        participantShape,
+        { x: viewbox.x + 200, y: yPosition },
+        canvas.getRootElement()
+      );
+
+      // Set the name if provided
+      if (actorName && newShape) {
+        modeling.updateProperties(newShape, { name: actorName });
+      }
+
+      return newShape?.id || null;
+    } catch (error) {
+      console.error('Error creating swimlane for actor:', error);
+      return null;
+    }
   }, []);
+
+  // Remove a swimlane from BPMN by its ID
+  const removeSwimlanFromBpmn = useCallback((bpmnId) => {
+    if (!modelerRef.current || !bpmnId) return false;
+
+    try {
+      const modeling = modelerRef.current.get('modeling');
+      const elementRegistry = modelerRef.current.get('elementRegistry');
+
+      const element = elementRegistry.get(bpmnId);
+      if (element && (element.type === 'bpmn:Participant' || element.type === 'bpmn:Lane')) {
+        modeling.removeShape(element);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error removing swimlane:', error);
+      return false;
+    }
+  }, []);
+
+  // Update swimlane name in BPMN
+  const updateSwimlaneName = useCallback((bpmnId, newName) => {
+    if (!modelerRef.current || !bpmnId) return false;
+
+    try {
+      const modeling = modelerRef.current.get('modeling');
+      const elementRegistry = modelerRef.current.get('elementRegistry');
+
+      const element = elementRegistry.get(bpmnId);
+      if (element && (element.type === 'bpmn:Participant' || element.type === 'bpmn:Lane')) {
+        modeling.updateProperties(element, { name: newName || '' });
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error updating swimlane name:', error);
+      return false;
+    }
+  }, []);
+
+  // Handle Header Data change with actor-to-swimlane sync
+  const handleHeaderChange = useCallback((newHeaderData) => {
+    // Detect actor changes and sync to BPMN
+    const oldActors = headerData.actorsList || [];
+    const newActors = newHeaderData.actorsList || [];
+
+    // Build a map of old actors by id for comparison
+    const oldActorsById = {};
+    oldActors.forEach(a => {
+      oldActorsById[a.id] = a;
+    });
+
+    // Find newly added actors (actors without bpmnId that weren't in old list)
+    const oldActorIds = new Set(oldActors.map(a => a.id));
+    const newlyAddedActors = newActors.filter(a => !a.bpmnId && !oldActorIds.has(a.id));
+
+    // Find actors that were renamed (have bpmnId and name changed)
+    const renamedActors = newActors.filter(a => {
+      if (!a.bpmnId) return false;
+      const oldActor = oldActorsById[a.id];
+      return oldActor && oldActor.name !== a.name;
+    });
+
+    // Update swimlane names for renamed actors
+    renamedActors.forEach(actor => {
+      updateSwimlaneName(actor.bpmnId, actor.name);
+    });
+
+    // Create swimlanes for newly added actors
+    if (newlyAddedActors.length > 0 && modelerRef.current) {
+      const updatedActors = newActors.map(actor => {
+        if (newlyAddedActors.includes(actor)) {
+          const bpmnId = createSwimlanForActor(actor.name);
+          if (bpmnId) {
+            return { ...actor, bpmnId };
+          }
+        }
+        return actor;
+      });
+
+      // Update with bpmnIds
+      setHeaderData({ ...newHeaderData, actorsList: updatedActors });
+    } else {
+      setHeaderData(newHeaderData);
+    }
+
+    // Find actors that were removed (with bpmnId) - handled by deletion with warning
+    const newActorBpmnIds = new Set(newActors.filter(a => a.bpmnId).map(a => a.bpmnId));
+    const removedActors = oldActors.filter(a => a.bpmnId && !newActorBpmnIds.has(a.bpmnId));
+
+    // Remove corresponding swimlanes for deleted actors
+    removedActors.forEach(actor => {
+      if (actor.bpmnId) {
+        removeSwimlanFromBpmn(actor.bpmnId);
+      }
+    });
+
+    setIsDirty(true);
+  }, [headerData.actorsList, createSwimlanForActor, removeSwimlanFromBpmn, updateSwimlaneName]);
 
   // Handle menu item click
   const handleMenuItemClick = useCallback((pane) => {
@@ -551,15 +745,54 @@ const App = () => {
       // Browser fallback: use file input
       const input = document.createElement('input');
       input.type = 'file';
-      input.accept = '.json,.idm,.bpmn,.xml';
+      input.accept = '.json,.idm,.bpmn,.xml,.zip,.idmx';
 
       input.onchange = async (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
         try {
-          const content = await file.text();
           const fileName = file.name.toLowerCase();
+
+          // Handle ZIP bundles (.zip or .idmx)
+          if (isZipBundle(file)) {
+            try {
+              isLoadingProjectRef.current = true;
+              const bundleData = await importIdmBundle(file);
+
+              if (bundleData.headerData) {
+                setHeaderData(bundleData.headerData);
+              }
+              if (bundleData.erDataMap) {
+                setErDataMap(bundleData.erDataMap);
+              }
+              if (bundleData.erLibrary) {
+                setErLibrary(bundleData.erLibrary);
+              }
+              if (bundleData.bpmnXml) {
+                setBpmnXml(bundleData.bpmnXml);
+                setIsDirty(false);
+              } else {
+                setBpmnXml('DEFAULT');
+                setIsDirty(true);
+                alert('Bundle imported successfully. Note: No BPMN diagram found in the bundle. The process map needs to be recreated manually.');
+              }
+
+              setCurrentFilePath(file.name);
+              setValidationResults(null);
+              setHasActiveProject(true);
+              setActivePane('specification');
+              setTimeout(() => { isLoadingProjectRef.current = false; }, 300);
+              extractDataObjectsAfterLoad();
+            } catch (zipErr) {
+              console.error('Failed to import ZIP bundle:', zipErr);
+              alert('Failed to import ZIP bundle: ' + zipErr.message);
+              isLoadingProjectRef.current = false;
+            }
+            return;
+          }
+
+          const content = await file.text();
 
           if (fileName.endsWith('.json') || fileName.endsWith('.idm')) {
             // Parse as project file (.json or .idm)
@@ -658,7 +891,7 @@ const App = () => {
   }, [isDirty, hasActiveProject]);
 
   // Create new project based on user selection
-  const createNewProject = useCallback((projectType) => {
+  const createNewProject = useCallback(async (projectType) => {
     setShowNewProjectDialog(false);
 
     // Reset to initial state
@@ -672,11 +905,38 @@ const App = () => {
     setHasActiveProject(true);
 
     if (projectType === 'sample') {
-      // Load GDE-IDM sample project data
-      setHeaderData({ ...SAMPLE_HEADER_DATA });
-      setErDataMap({ ...SAMPLE_ER_DATA_MAP });
-      setErLibrary([...SAMPLE_ER_LIBRARY]);
-      setBpmnXml(SAMPLE_BPMN_XML);
+      // Load GDE-IDM sample project from file
+      try {
+        isLoadingProjectRef.current = true;
+        const response = await fetch('/samples/GDE-IDM.idm');
+        if (!response.ok) {
+          throw new Error(`Failed to fetch sample: ${response.status}`);
+        }
+        const content = await response.text();
+        const projectData = JSON.parse(content);
+
+        if (projectData.bpmnXml) {
+          setBpmnXml(projectData.bpmnXml);
+        }
+        if (projectData.headerData) {
+          setHeaderData(projectData.headerData);
+        }
+        if (projectData.erDataMap) {
+          setErDataMap(projectData.erDataMap);
+        }
+        if (projectData.erLibrary) {
+          setErLibrary(projectData.erLibrary);
+        }
+        setTimeout(() => { isLoadingProjectRef.current = false; }, 300);
+      } catch (err) {
+        console.error('Failed to load sample project:', err);
+        // Fallback to embedded sample data
+        setHeaderData({ ...SAMPLE_HEADER_DATA });
+        setErDataMap({ ...SAMPLE_ER_DATA_MAP });
+        setErLibrary([...SAMPLE_ER_LIBRARY]);
+        setBpmnXml(SAMPLE_BPMN_XML);
+        isLoadingProjectRef.current = false;
+      }
     } else {
       // Blank project
       setHeaderData({
@@ -793,21 +1053,21 @@ const App = () => {
 
         // Generate idmXML
         const dataObjects = Object.keys(erDataMap).map(id => ({ id, name: id }));
-        const idmXml = generateIdmXml({
+        const result = generateIdmXml({
           headerData,
           bpmnXml: currentBpmnXml,
           erDataMap,
           dataObjects
         });
 
-        // Download the file
-        const blob = new Blob([idmXml], { type: 'application/xml' });
+        // Download the file - use shortTitle as default filename
+        const blob = new Blob([result.xml], { type: 'application/xml' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        const fileName = headerData.title
-          ? `${headerData.title.replace(/\s+/g, '_')}.idm.xml`
-          : 'idm_specification.idm.xml';
+        const fileName = (headerData.shortTitle || headerData.title)
+          ? `${(headerData.shortTitle || headerData.title).replace(/[/\\?%*:|"<>]/g, '_').trim()}.xml`
+          : 'idm_specification.xml';
         a.download = fileName;
         document.body.appendChild(a);
         a.click();
@@ -884,6 +1144,12 @@ const App = () => {
     });
     setValidationResults(results);
 
+    // Set default filename from shortTitle, fallback to title, then default
+    const defaultName = (headerData.shortTitle || headerData.title || 'idm-specification')
+      .replace(/[^a-zA-Z0-9가-힣\s.-]/g, '') // Allow Korean characters, spaces, dots, hyphens
+      .trim();
+    setExportFilename(defaultName);
+
     // Show export dialog regardless of validation result
     // Users may want to save incomplete work to continue later
     setShowExportDialog(true);
@@ -902,7 +1168,10 @@ const App = () => {
     }
 
     const dataObjects = Object.keys(erDataMap).map(id => ({ id, name: id }));
-    const fileName = (headerData.title || 'idm-specification').replace(/[^a-zA-Z0-9.-]/g, '_');
+    // Use user-provided filename, sanitize for filesystem
+    const fileName = (exportFilename || 'idm-specification')
+      .replace(/[/\\?%*:|"<>]/g, '_') // Remove filesystem-invalid characters only
+      .trim();
 
     const downloadFile = (content, filename, mimeType) => {
       const blob = new Blob([content], { type: mimeType });
@@ -918,13 +1187,19 @@ const App = () => {
       switch (exportFormat) {
         case 'idmxml': {
           // ISO 29481-3 compliant idmXML
-          const idmXmlContent = generateIdmXml({
+          const result = generateIdmXml({
             headerData,
             bpmnXml: exportOptions.includeBpmn ? currentBpmnXml : null,
             erDataMap,
             dataObjects
           });
-          downloadFile(idmXmlContent, `${fileName}.xml`, 'application/xml');
+
+          // Persist GUIDs if this is the first generation
+          if (!headerData.idmGuid && result.guids) {
+            setHeaderData(prev => ({ ...prev, ...result.guids }));
+          }
+
+          downloadFile(result.xml, `${fileName}.xml`, 'application/xml');
           break;
         }
 
@@ -947,38 +1222,58 @@ const App = () => {
         }
 
         case 'zip': {
-          // ZIP archive with multiple files
-          // Note: Full ZIP support would require a library like JSZip
-          // For now, create a JSON bundle that can be used
-          const bundle = {
-            'manifest.json': JSON.stringify({
-              version: '1.0.0',
-              format: 'idm-bundle',
-              files: ['idm-specification.xml', 'process-map.bpmn'],
-              createdAt: new Date().toISOString()
-            }, null, 2),
-            'idm-specification.xml': generateIdmXml({
-              headerData,
-              bpmnXml: null, // BPMN in separate file
-              erDataMap,
-              dataObjects
-            }),
-            'process-map.bpmn': currentBpmnXml,
-            'project.json': JSON.stringify({
-              headerData,
-              erDataMap,
-              erLibrary
-            }, null, 2)
-          };
-          // Download as JSON bundle (in production, use JSZip for actual ZIP)
-          downloadFile(JSON.stringify(bundle, null, 2), `${fileName}-bundle.json`, 'application/json');
-          alert('Note: For full ZIP support, use the desktop app. Downloaded as JSON bundle.');
+          // ZIP archive with multiple files including images
+          // Uses JSZip for proper ZIP bundle export
+          await downloadIdmBundle({
+            headerData,
+            bpmnXml: currentBpmnXml,
+            erDataMap,
+            dataObjects,
+            erLibrary
+          }, `${fileName}.zip`);
           break;
         }
 
         case 'bpmn': {
           // BPMN file only
           downloadFile(currentBpmnXml, `${fileName}.bpmn`, 'application/xml');
+          break;
+        }
+
+        case 'html': {
+          // HTML export with embedded images and BPMN diagram
+
+          // Get BPMN as SVG if modeler is available
+          let bpmnSvg = null;
+          if (modelerRef.current) {
+            try {
+              const { svg } = await modelerRef.current.saveSVG();
+              bpmnSvg = svg;
+            } catch (err) {
+              console.error('Failed to export BPMN as SVG:', err);
+              // Continue without BPMN diagram
+            }
+          }
+
+          // Read custom XSLT if provided
+          let customXsltContent = null;
+          if (customXslt) {
+            try {
+              customXsltContent = await readFileAsText(customXslt);
+            } catch (err) {
+              console.error('Failed to read custom XSLT:', err);
+            }
+          }
+
+          // Generate standalone HTML
+          const htmlContent = generateStandaloneHtml({
+            headerData,
+            erDataMap,
+            bpmnSvg,
+            customXsltContent
+          });
+
+          downloadFile(htmlContent, `${fileName}.html`, 'text/html');
           break;
         }
 
@@ -991,7 +1286,7 @@ const App = () => {
       console.error('Export failed:', err);
       alert('Export failed: ' + err.message);
     }
-  }, [bpmnXml, headerData, erDataMap, erLibrary, exportFormat, exportOptions]);
+  }, [bpmnXml, headerData, erDataMap, erLibrary, exportFormat, exportFilename, exportOptions, customXslt]);
 
   // Save project
   const saveProject = async (saveAs = false) => {
@@ -1019,6 +1314,11 @@ const App = () => {
 
     const content = JSON.stringify(projectData, null, 2);
 
+    // Use shortTitle as default filename, fallback to title
+    const defaultFileName = (headerData.shortTitle || headerData.title || 'idm-project')
+      .replace(/[/\\?%*:|"<>]/g, '_')
+      .trim() + '.json';
+
     if (currentFilePath && !saveAs) {
       const result = await window.electronAPI.saveFile({ content, filePath: currentFilePath });
       if (result.success) {
@@ -1027,7 +1327,7 @@ const App = () => {
     } else {
       const result = await window.electronAPI.saveProject({
         content,
-        defaultName: 'idm-project.json'
+        defaultName: defaultFileName
       });
       if (result.success) {
         setCurrentFilePath(result.filePath);
@@ -1386,21 +1686,32 @@ const App = () => {
                 <h3>Save & Export</h3>
               </div>
               <div className="export-dialog-body">
+                {/* Filename input */}
+                <div className="export-filename-section">
+                  <label className="export-filename-label" htmlFor="export-filename">
+                    File name:
+                  </label>
+                  <div className="export-filename-input-wrapper">
+                    <input
+                      type="text"
+                      id="export-filename"
+                      className="export-filename-input"
+                      value={exportFilename}
+                      onChange={(e) => setExportFilename(e.target.value)}
+                      placeholder="Enter file name"
+                    />
+                    <span className="export-filename-ext">
+                      {exportFormat === 'idm' ? '.idm' :
+                       exportFormat === 'idmxml' ? '.xml' :
+                       exportFormat === 'html' ? '.html' :
+                       exportFormat === 'zip' ? '.zip' :
+                       exportFormat === 'bpmn' ? '.bpmn' : ''}
+                    </span>
+                  </div>
+                </div>
+
                 <p className="export-dialog-subtitle">Choose an export format:</p>
                 <div className="export-format-options">
-                  <label className={`export-format-option ${exportFormat === 'idmxml' ? 'selected' : ''}`}>
-                    <input
-                      type="radio"
-                      name="exportFormat"
-                      value="idmxml"
-                      checked={exportFormat === 'idmxml'}
-                      onChange={(e) => setExportFormat(e.target.value)}
-                    />
-                    <div className="export-format-content">
-                      <span className="export-format-title">idmXML (.xml)</span>
-                      <span className="export-format-desc">ISO 29481-3 compliant XML with embedded BPMN</span>
-                    </div>
-                  </label>
                   <label className={`export-format-option ${exportFormat === 'idm' ? 'selected' : ''}`}>
                     <input
                       type="radio"
@@ -1414,6 +1725,32 @@ const App = () => {
                       <span className="export-format-desc">Full project file with all data and library</span>
                     </div>
                   </label>
+                  <label className={`export-format-option ${exportFormat === 'idmxml' ? 'selected' : ''}`}>
+                    <input
+                      type="radio"
+                      name="exportFormat"
+                      value="idmxml"
+                      checked={exportFormat === 'idmxml'}
+                      onChange={(e) => setExportFormat(e.target.value)}
+                    />
+                    <div className="export-format-content">
+                      <span className="export-format-title">idmXML (.xml)</span>
+                      <span className="export-format-desc">ISO 29481-3 compliant XML with embedded BPMN and images (base64)</span>
+                    </div>
+                  </label>
+                  <label className={`export-format-option ${exportFormat === 'html' ? 'selected' : ''}`}>
+                    <input
+                      type="radio"
+                      name="exportFormat"
+                      value="html"
+                      checked={exportFormat === 'html'}
+                      onChange={(e) => setExportFormat(e.target.value)}
+                    />
+                    <div className="export-format-content">
+                      <span className="export-format-title">HTML Document (.html)</span>
+                      <span className="export-format-desc">Self-contained HTML with embedded images and BPMN diagram</span>
+                    </div>
+                  </label>
                   <label className={`export-format-option ${exportFormat === 'zip' ? 'selected' : ''}`}>
                     <input
                       type="radio"
@@ -1423,8 +1760,8 @@ const App = () => {
                       onChange={(e) => setExportFormat(e.target.value)}
                     />
                     <div className="export-format-content">
-                      <span className="export-format-title">Archive Bundle (.json)</span>
-                      <span className="export-format-desc">Separate files: idmXML + BPMN + project data</span>
+                      <span className="export-format-title">ZIP Bundle (.zip)</span>
+                      <span className="export-format-desc">idmXML + BPMN + images + project data in one archive</span>
                     </div>
                   </label>
                   <label className={`export-format-option ${exportFormat === 'bpmn' ? 'selected' : ''}`}>
@@ -1442,24 +1779,57 @@ const App = () => {
                   </label>
                 </div>
 
-                {exportFormat === 'idmxml' && (
-                  <div className="export-options">
-                    <label className="export-option-checkbox">
+                {exportFormat === 'html' && (
+                  <div className="export-html-options">
+                    <p className="export-option-label">Stylesheet:</p>
+                    <div className="export-xslt-options">
+                      <label className="export-xslt-option">
+                        <input
+                          type="radio"
+                          name="xsltSource"
+                          value="default"
+                          checked={!customXslt}
+                          onChange={() => setCustomXslt(null)}
+                        />
+                        <span>Use default IDM stylesheet</span>
+                      </label>
+                      <label className="export-xslt-option">
+                        <input
+                          type="radio"
+                          name="xsltSource"
+                          value="custom"
+                          checked={!!customXslt}
+                          onChange={() => document.getElementById('xslt-upload').click()}
+                        />
+                        <span>{customXslt ? customXslt.name : 'Upload custom XSLT...'}</span>
+                      </label>
                       <input
-                        type="checkbox"
-                        checked={exportOptions.includeBpmn}
-                        onChange={(e) => setExportOptions({ ...exportOptions, includeBpmn: e.target.checked })}
+                        type="file"
+                        id="xslt-upload"
+                        accept=".xsl,.xslt"
+                        style={{ display: 'none' }}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setCustomXslt(file);
+                          }
+                        }}
                       />
-                      <span>Include embedded BPMN diagram</span>
-                    </label>
-                    <label className="export-option-checkbox">
-                      <input
-                        type="checkbox"
-                        checked={exportOptions.includeXslt}
-                        onChange={(e) => setExportOptions({ ...exportOptions, includeXslt: e.target.checked })}
-                      />
-                      <span>Include XSLT stylesheet reference</span>
-                    </label>
+                    </div>
+                    <button
+                      className="download-xslt-btn"
+                      onClick={() => {
+                        const blob = new Blob([defaultIdmXslt], { type: 'application/xslt+xml' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'idm-default-stylesheet.xslt';
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      }}
+                    >
+                      Download default XSLT template
+                    </button>
                   </div>
                 )}
               </div>
@@ -1517,7 +1887,7 @@ const App = () => {
               onClick={() => setShowAboutDialog(true)}
               title="About IDMxPPM"
             >
-              IDMxPPM neo-Seoul v0.1.0
+              IDMxPPM neo-Seoul v1.0.0
             </button>
           </div>
         </div>
@@ -1540,7 +1910,7 @@ const App = () => {
                   </svg>
                 </div>
                 <div className="about-info">
-                  <p className="about-version">Version 0.1.0</p>
+                  <p className="about-version">Version 1.0.0</p>
                   <p className="about-description">
                     Information Delivery Manual (IDM) Authoring Tool<br />
                     Compliant with ISO 29481-1 and ISO 29481-3 (idmXML)
@@ -1950,6 +2320,54 @@ const App = () => {
             color: var(--text-secondary);
           }
 
+          .export-filename-section {
+            margin-bottom: 20px;
+          }
+
+          .export-filename-label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-primary);
+          }
+
+          .export-filename-input-wrapper {
+            display: flex;
+            align-items: center;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 6px;
+            overflow: hidden;
+          }
+
+          .export-filename-input-wrapper:focus-within {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 2px var(--accent-primary-transparent, rgba(0, 122, 204, 0.2));
+          }
+
+          .export-filename-input {
+            flex: 1;
+            padding: 10px 12px;
+            font-size: 14px;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            outline: none;
+          }
+
+          .export-filename-input::placeholder {
+            color: var(--text-muted);
+          }
+
+          .export-filename-ext {
+            padding: 10px 12px;
+            font-size: 14px;
+            color: var(--text-muted);
+            background: var(--bg-tertiary);
+            border-left: 1px solid var(--border-primary);
+          }
+
           .export-format-options {
             display: flex;
             flex-direction: column;
@@ -2019,6 +2437,65 @@ const App = () => {
           }
 
           .export-option-checkbox input[type="checkbox"] {
+            accent-color: var(--accent-primary);
+          }
+
+          .export-html-options {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border-primary);
+          }
+
+          .download-xslt-btn {
+            margin-top: 12px;
+            padding: 8px 14px;
+            font-size: 12px;
+            color: var(--accent-primary);
+            background: transparent;
+            border: 1px solid var(--accent-primary);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+          }
+
+          .download-xslt-btn:hover {
+            background: var(--accent-primary);
+            color: white;
+          }
+
+          .export-option-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin: 0 0 10px 0;
+          }
+
+          .export-xslt-options {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+          }
+
+          .export-xslt-option {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 6px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            transition: all 0.15s ease;
+          }
+
+          .export-xslt-option:hover {
+            background: var(--bg-tertiary);
+            border-color: var(--accent-primary);
+          }
+
+          .export-xslt-option input[type="radio"] {
             accent-color: var(--accent-primary);
           }
 

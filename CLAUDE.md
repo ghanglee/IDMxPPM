@@ -131,13 +131,24 @@ Other schemas: Manual entry
 
 **Note:** IFC 5 has been removed as IFC 4.3 ADD2 is the latest official release.
 
-### File Formats
+### File Formats (Export Order)
 | Format | Extension | Purpose |
 |--------|-----------|---------|
-| IDMxPPM Project | `.json` | Full project with BPMN + all ERs |
-| BPMN Diagram | `.bpmn` | BPMN 2.0 XML format |
+| IDM Project | `.idm` | Full project file with all data and ER library |
+| idmXML | `.xml` | ISO 29481-3 compliant export with embedded BPMN and images (base64) |
+| HTML Document | `.html` | Self-contained HTML with embedded images and BPMN diagram (SVG); printable via browser |
+| ZIP Bundle | `.zip` | idmXML + BPMN + images + project data in one archive |
+| BPMN Only | `.bpmn` | BPMN 2.0 XML format (process map only) |
 | Exchange Requirement | `.erxml` | Individual ER export/import |
-| idmXML | `.xml` | ISO 29481-3 compliant export |
+
+### Export Features
+- **Customizable Filename**: Default from Short Title, user can modify before export
+- **XSLT Styling**: HTML export supports custom XSLT stylesheets for customization
+- **XSLT Template Download**: Users can download the default XSLT template and modify it to create custom stylesheets
+- **Embedded Images**: idmXML and HTML include base64-encoded figures
+- **BPMN as SVG**: HTML export converts BPMN to inline SVG vector graphics
+- **Section Figures**: Support for images attached to Summary, Aim & Scope, Benefits, Limitations
+- **Print to PDF**: Users can print the HTML export to PDF via browser print dialog (Ctrl/Cmd+P)
 
 ## Repository Structure
 
@@ -272,19 +283,29 @@ npm run build:all    # Build both platforms
 - **New Project** - Creates blank project with default BPMN diagram
 - **Open Project** - Browser file input fallback (Electron IPC support)
 - **Close Project** - Proper cleanup with unsaved changes confirmation
-- **Save/Export** - idmXML 2.0 compliant export, allows saving incomplete specifications
+- **Save/Export** - Multiple format export with customizable filename (default from Short Title)
 - **Dirty state tracking** with visual indicator
 
 #### Validation
-- Project validation against ISO 29481 requirements
+- Project validation against ISO 29481 requirements (including idmXSD compliance)
 - Visual validation panel with error details
 - Validation runs but does not block saving (users can save incomplete work)
+
+#### Export Formats
+- **IDM Project (.idm)** - Full project file with all data and library
+- **idmXML (.xml)** - ISO 29481-3 compliant with embedded BPMN and images (base64)
+- **HTML (.html)** - Self-contained document with embedded images and BPMN (SVG); printable to PDF via browser
+- **ZIP Bundle (.zip)** - Archive with all project files and images
+- **BPMN Only (.bpmn)** - Process map diagram export
+- **XSLT Template Download** - Download default stylesheet for customization
 
 #### idmXML Generation
 - Full ISO 29481-3 compliant XML generation
 - **BPMN Embedding** - BPMN diagram XML is embedded directly in idmXML within CDATA section
 - **BPMN Restoration** - Embedded BPMN is automatically restored when loading idmXML files
-- Proper XML escaping and UUID generation
+- **Image Embedding** - Base64 encoded images for section figures and examples
+- **Figure Support** - Images for Summary, Aim & Scope, Benefits, Limitations sections
+- Proper XML escaping and UUID generation (persistent GUIDs)
 - Support for all IDM elements: UC, BCM, PM, ER, IU
 
 ### Architecture
@@ -320,9 +341,14 @@ src/
 │   └── icons/
 │       └── index.jsx           # SVG icon components
 ├── utils/
-│   ├── idmXmlGenerator.js      # idmXML 2.0 generation
+│   ├── idmXmlGenerator.js      # idmXML 2.0 generation with embedded images
+│   ├── idmXmlParser.js         # idmXML import with figure parsing
+│   ├── idmBundleExporter.js    # ZIP bundle export with JSZip
+│   ├── htmlExporter.js         # Self-contained HTML export with XSLT transformation
+│   ├── pdfExporter.js          # XSLT transformation utilities
+│   ├── defaultIdmXslt.js       # Default XSLT stylesheet for HTML export (downloadable)
 │   ├── schemaSearch.js         # Schema search + bSDD API
-│   └── validation.js           # Project validation
+│   └── validation.js           # Project validation (including idmXSD compliance)
 └── schemas/
     └── schemaData.js           # Local schema data
 ```

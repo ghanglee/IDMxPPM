@@ -116,6 +116,7 @@
 
 /* ============================================================================
    Palette Styling (Light theme for visibility)
+   Position palette to avoid overlap with diagram content
    ============================================================================ */
 
 .bpmn-canvas .djs-palette {
@@ -124,6 +125,9 @@
   border-top: none !important;
   border-bottom: none !important;
   border-left: none !important;
+  left: 0 !important;
+  top: 0 !important;
+  z-index: 10 !important;
 }
 
 .bpmn-canvas .djs-palette .entry {

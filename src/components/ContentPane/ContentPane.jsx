@@ -1572,10 +1572,19 @@ const ContentPane = ({
                   type="button"
                   className="actor-remove-btn"
                   onClick={() => {
+                    // Warn user if the actor is linked to a BPMN swimlane
+                    if (actor.bpmnId) {
+                      const confirmed = window.confirm(
+                        `This actor "${actor.name || 'Unnamed'}" is linked to a swimlane in the BPMN diagram.\n\n` +
+                        `Removing this actor will also delete the corresponding swimlane in the process map.\n\n` +
+                        `Do you want to continue?`
+                      );
+                      if (!confirmed) return;
+                    }
                     const newActors = headerData.actorsList.filter((_, i) => i !== index);
                     handleHeaderFieldChange('actorsList', newActors);
                   }}
-                  title="Remove actor"
+                  title={actor.bpmnId ? "Remove actor (will also remove linked swimlane)" : "Remove actor"}
                 >
                   ×
                 </button>

@@ -105,9 +105,26 @@ const BPMNEditor = ({
           console.warn('BPMN import warnings:', warnings);
         }
 
-        // Fit diagram to viewport
+        // Fit diagram to viewport, accounting for palette width
         const canvas = modeler.get('canvas');
         canvas.zoom('fit-viewport');
+
+        // Shift viewport to account for palette width (48px)
+        // This prevents the diagram from overlapping with the palette
+        setTimeout(() => {
+          try {
+            const viewbox = canvas.viewbox();
+            const paletteOffset = 48 / (viewbox.scale || 1);
+            canvas.viewbox({
+              x: viewbox.x - paletteOffset / 2,
+              y: viewbox.y,
+              width: viewbox.width,
+              height: viewbox.height
+            });
+          } catch (e) {
+            // Ignore errors - viewport adjustment is optional
+          }
+        }, 100);
 
         setIsReady(true);
         setError(null);

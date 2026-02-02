@@ -73,6 +73,120 @@ export const validateHeader = (headerData) => {
 };
 
 /**
+ * Validate idmXSD compliance (ISO 29481-3 required elements)
+ * @param {Object} headerData
+ * @returns {ValidationError[]}
+ */
+export const validateIdmXsdCompliance = (headerData) => {
+  const errors = [];
+
+  // shortTitle - required per idmXSD specId
+  if (!headerData?.shortTitle || headerData.shortTitle.trim() === '') {
+    // Only warn if title exists but shortTitle doesn't (shortTitle defaults to title)
+    if (headerData?.title && headerData.title.trim() !== '') {
+      // This is OK - shortTitle will default to title
+    } else {
+      errors.push({
+        category: 'header',
+        field: 'shortTitle',
+        path: 'header.shortTitle',
+        message: 'Short Title is required for idmXSD compliance',
+        severity: 'error'
+      });
+    }
+  }
+
+  // aimAndScope - required per idmXSD uc element
+  const aimAndScope = headerData?.aimAndScope || headerData?.objectives;
+  if (!aimAndScope || aimAndScope.trim() === '') {
+    errors.push({
+      category: 'header',
+      field: 'aimAndScope',
+      path: 'header.aimAndScope',
+      message: 'Aim and Scope is required for idmXSD compliance',
+      severity: 'error'
+    });
+  }
+
+  // summary - required per idmXSD uc element
+  if (!headerData?.summary || headerData.summary.trim() === '') {
+    errors.push({
+      category: 'header',
+      field: 'summary',
+      path: 'header.summary',
+      message: 'Summary is required for idmXSD compliance',
+      severity: 'error'
+    });
+  }
+
+  // standardProjectStage - required per idmXSD (1..*)
+  const projectStages = headerData?.projectStagesIso || headerData?.projectStages || [];
+  if (!Array.isArray(projectStages) || projectStages.length === 0) {
+    errors.push({
+      category: 'header',
+      field: 'projectStagesIso',
+      path: 'header.projectStagesIso',
+      message: 'At least one ISO 22263 Project Stage is required for idmXSD compliance',
+      severity: 'warning' // Warning because generator will add default
+    });
+  }
+
+  // use - required per idmXSD (1..*)
+  const uses = headerData?.uses || headerData?.useCategories || [];
+  if (!Array.isArray(uses) || uses.length === 0) {
+    errors.push({
+      category: 'header',
+      field: 'uses',
+      path: 'header.uses',
+      message: 'At least one Use (Verb + Noun) is required for idmXSD compliance',
+      severity: 'warning' // Warning because generator will add default
+    });
+  }
+
+  // region - required per idmXSD (1..*)
+  const regions = headerData?.regions || (headerData?.region ? [headerData.region] : []);
+  if (!Array.isArray(regions) || regions.length === 0) {
+    errors.push({
+      category: 'header',
+      field: 'regions',
+      path: 'header.regions',
+      message: 'At least one Region is required for idmXSD compliance',
+      severity: 'warning' // Warning because generator will add default
+    });
+  }
+
+  return errors;
+};
+
+/**
+ * Validate ER per ISO 29481-3 Clause 10
+ * An ER shall not be empty and shall have at least one information unit or a sub-ER
+ * @param {Object} er
+ * @param {string} dataObjectId
+ * @returns {ValidationError[]}
+ */
+export const validateERIdmXsd = (er, dataObjectId) => {
+  const errors = [];
+  const erPath = `er.${dataObjectId}`;
+
+  // ER must have at least one informationUnit OR subEr (Clause 10)
+  const hasInfoUnits = er.informationUnits && er.informationUnits.length > 0;
+  const hasSubERs = er.subERs && er.subERs.length > 0;
+
+  if (!hasInfoUnits && !hasSubERs) {
+    errors.push({
+      category: 'er',
+      field: 'content',
+      path: `${erPath}.content`,
+      message: `ER "${er.name || 'unnamed'}" must have at least one Information Unit or Sub-ER (ISO 29481-3 Clause 10)`,
+      severity: 'error'
+    });
+  }
+
+  return errors;
+};
+
+/**
  * Validate Information Unit
  * @param {Object} unit
  * @param {string} erPath - Path to parent ER
@@ -231,8 +345,11 @@ export const validateDiagram = (bpmnXml) => {
 export const validateProject = ({ headerData, bpmnXml, erDataMap }) => {
   const errors = [];
 
-  // Validate header
+  // Validate header (basic required fields)
   errors.push(...validateHeader(headerData));
+
+  // Validate idmXSD compliance (ISO 29481-3 required elements)
+  errors.push(...validateIdmXsdCompliance(headerData));
 
   // Validate diagram
   errors.push(...validateDiagram(bpmnXml));
@@ -241,6 +358,7 @@ export const validateProject = ({ headerData, bpmnXml, erDataMap }) => {
   if (erDataMap && Object.keys(erDataMap).length > 0) {
     Object.entries(erDataMap).forEach(([dataObjectId, er]) => {
       errors.push(...validateER(er, dataObjectId));
+      errors.push(...validateERIdmXsd(er, dataObjectId)); // ISO 29481-3 Clause 10
     });
   } else {
     errors.push({
@@ -296,7 +414,9 @@ export const getValidationStatusLabel = (validationResult) => {
 
 export default {
   validateHeader,
+  validateIdmXsdCompliance,
   validateER,
+  validateERIdmXsd,
   validateInformationUnit,
   validateDiagram,
   validateProject,
