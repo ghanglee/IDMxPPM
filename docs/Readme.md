@@ -68,10 +68,12 @@ npm run build:all     # All platforms
 📁 File Formats
 
 Format	Extension	Description
-IDMxPPM Project	.json	Full project including BPMN and ERs
+IDMxPPM Project	.idm	Full project including BPMN, ERs, and ER library
+idmXML Specification	.xml	ISO 29481-3 compliant with embedded BPMN and images
+HTML Document	.html	Self-contained HTML with embedded SVG BPMN (printable)
+ZIP Bundle	.zip	Archive with idmXML, BPMN, images, and project data
 BPMN Diagram	.bpmn	BPMN 2.0 XML process map
 Exchange Requirement	.erxml	Individual ER export/import
-IDM Specification	.xml	ISO 29481-3 compliant idmXML
 
 
 ⸻

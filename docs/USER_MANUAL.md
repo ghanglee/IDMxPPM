@@ -1,6 +1,6 @@
 # IDMxPPM neo-Seoul User Manual
 
-**Version 0.1.0**
+**Version 1.0.0**
 
 An Information Delivery Manual (IDM) Authoring Tool compliant with ISO 29481-1 and ISO 29481-3
 
@@ -67,8 +67,10 @@ When you launch IDMxPPM, you'll see the **Startup Screen** with three options:
 
 | Format | Extension | Description |
 |--------|-----------|-------------|
-| IDMxPPM Project | `.json` or `.idm` | Full project with BPMN diagram and all ER data |
+| IDMxPPM Project | `.idm` | Full project with BPMN diagram and all ER data |
 | idmXML | `.xml` | ISO 29481-3 compliant export (includes embedded BPMN) |
+| HTML Document | `.html` | Self-contained HTML with embedded images and BPMN (SVG) |
+| ZIP Bundle | `.zip` | Archive containing idmXML, BPMN, images, and project data |
 | BPMN Diagram | `.bpmn` | BPMN 2.0 XML format (diagram only) |
 | Exchange Requirement | `.erxml` | Individual ER for import/export |
 
@@ -139,11 +141,13 @@ Click the sun/moon icon in the top-right corner to switch between **Light** and 
 <!-- SCREENSHOT: blank-project.png -->
 <!-- Caption: A new blank project with empty BPMN canvas -->
 
-### Sample Project
+### Sample Project (GDE-IDM)
 
 1. Click **Sample Project** on the Startup Screen
-2. A pre-configured diagram with two pools (Sender/Receiver) appears
-3. Sample header data is pre-filled
+2. The **Graphical Data Exchange IDM** (GDE-IDM) sample loads
+3. Pre-configured BPMN diagram with multiple actors and data objects
+4. Complete header data and Exchange Requirements included
+5. Use this as a reference for creating your own IDM specifications
 
 <!-- SCREENSHOT: sample-project.png -->
 <!-- Caption: Sample project with pre-configured BPMN diagram -->
@@ -202,9 +206,20 @@ Located at the bottom of the BPMN editor:
 | Export BPMN | Export as BPMN XML |
 | Export PNG | Export as PNG image |
 
-### Actor Synchronization
+### Bidirectional Actor Synchronization
 
-Named Pools and Lanes are automatically synchronized to the Actor Roles list in the Use Case panel.
+Actors and BPMN swimlanes (Pools/Lanes) are **bidirectionally synchronized**:
+
+| Action | Result |
+|--------|--------|
+| Add named Pool/Lane in BPMN | Actor automatically added to Actor Roles list |
+| Rename Pool/Lane in BPMN | Actor name updated in Actor Roles list |
+| Delete Pool/Lane in BPMN | Actor removed (with notification) |
+| Add Actor in Use Case panel | New Pool created in BPMN diagram |
+| Rename Actor in Use Case panel | Swimlane name updated in BPMN |
+| Delete Actor linked to swimlane | Confirmation dialog appears; swimlane removed if confirmed |
+
+This ensures your process diagram and actor list always stay in sync.
 
 ---
 
@@ -272,14 +287,17 @@ Define the use case in **Verb + Noun** format:
 
 ### Actor Roles
 
-Actors are automatically populated from BPMN swimlanes (Pools/Lanes):
+Actors are **bidirectionally synchronized** with BPMN swimlanes (Pools/Lanes):
 
 <!-- SCREENSHOT: actor-roles.png -->
 <!-- Caption: Actor Roles list with BPMN-synced actors -->
 
-- Named swimlanes appear automatically
-- Manually add additional actors with the **+ Add Actor** button
+- Named swimlanes appear automatically as actors
+- Add actors with the **+ Add Actor** button (creates a new Pool in BPMN)
+- Edit actor names to update the corresponding swimlane
 - Each actor has a Name and Role field
+- Deleting an actor linked to a swimlane shows a confirmation dialog
+- The link icon indicates which actors are synced to BPMN swimlanes
 
 ### Target Project Phases
 
@@ -474,15 +492,38 @@ Click the **Save & Export** icon in the vertical menu:
 
 | Format | Description |
 |--------|-------------|
-| **idmXML (.xml)** | ISO 29481-3 compliant XML with embedded BPMN |
-| **IDM Project (.idm)** | Full project file with all data |
-| **Archive Bundle (.json)** | Separate files bundled together |
+| **IDM Project (.idm)** | Full project file with all data and ER library |
+| **idmXML (.xml)** | ISO 29481-3 compliant XML with embedded BPMN and images |
+| **HTML Document (.html)** | Self-contained HTML with embedded images and SVG BPMN |
+| **ZIP Bundle (.zip)** | Archive with idmXML, BPMN, images, and project data |
 | **BPMN Only (.bpmn)** | Process diagram only |
+| **XSLT Template** | Download default stylesheet for customization |
 
-### idmXML Options
+### idmXML Export
 
-- **Include embedded BPMN diagram**: Embed the BPMN XML in the idmXML file
-- **Include XSLT stylesheet reference**: Add stylesheet for viewing
+The idmXML format is fully compliant with ISO 29481-3:
+- BPMN diagram embedded in CDATA section
+- Images (figures, examples) embedded as base64
+- Persistent GUIDs for all elements
+- Complete header, use case, and ER data
+
+### HTML Export
+
+Self-contained HTML document ideal for sharing and printing:
+- BPMN diagram rendered as inline SVG (vector graphics)
+- All images embedded as base64
+- Printable to PDF via browser (Ctrl/Cmd + P)
+- Supports custom XSLT stylesheets for formatting
+- Download the default XSLT template to create custom styles
+
+### ZIP Bundle Export
+
+Complete archive containing:
+- `idmXML.xml` - ISO 29481-3 compliant XML
+- `process-map.bpmn` - BPMN 2.0 diagram file
+- `project.json` - Full project data
+- `manifest.json` - Bundle metadata
+- `images/` folder - All referenced images
 
 ### Quick Export
 
@@ -540,8 +581,9 @@ You can save incomplete work even with validation errors. This allows you to:
 
 | Format | What's Imported |
 |--------|-----------------|
-| `.json` / `.idm` | Full project (BPMN + all data) |
+| `.idm` | Full project (BPMN + all data + ER library) |
 | `.xml` (idmXML) | Header, Use Case, ERs, embedded BPMN |
+| `.zip` (ZIP Bundle) | Complete project with all assets |
 | `.bpmn` | BPMN diagram only |
 
 ### idmXML Import
@@ -550,7 +592,16 @@ When importing idmXML:
 - Header data is restored
 - Exchange Requirements are restored
 - **Embedded BPMN** is automatically restored (if present)
+- Base64-encoded images are extracted
 - If no BPMN is embedded, a default diagram is created
+
+### ZIP Bundle Import
+
+When importing a ZIP bundle:
+- Project data is restored from `project.json`
+- BPMN diagram loaded from multiple sources (project.json, .bpmn file, or embedded in idmXML)
+- All images are restored from the `images/` folder
+- ER library is preserved
 
 ---
 
