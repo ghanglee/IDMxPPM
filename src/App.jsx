@@ -746,7 +746,9 @@ const App = () => {
       // Browser fallback: use file input
       const input = document.createElement('input');
       input.type = 'file';
-      input.accept = '.json,.idm,.bpmn,.xml,.zip,.idmx,.xppm';
+      // Accept all files - browsers may not show custom extensions like .xppm otherwise
+      // Supported formats: .idm, .json, .xml, .bpmn, .zip, .idmx, .xppm
+      input.accept = '*';
 
       input.onchange = async (e) => {
         const file = e.target.files?.[0];
