@@ -15,6 +15,7 @@ import { parseIdmXml, isIdmXml } from './utils/idmXmlParser';
 import { readFileAsText } from './utils/pdfExporter';
 import { defaultIdmXslt } from './utils/defaultIdmXslt';
 import { generateStandaloneHtml } from './utils/htmlExporter';
+import { importXppm, isXppmFile } from './utils/xppmImporter';
 import {
   SAMPLE_BPMN_XML,
   SAMPLE_HEADER_DATA,
@@ -745,7 +746,7 @@ const App = () => {
       // Browser fallback: use file input
       const input = document.createElement('input');
       input.type = 'file';
-      input.accept = '.json,.idm,.bpmn,.xml,.zip,.idmx';
+      input.accept = '.json,.idm,.bpmn,.xml,.zip,.idmx,.xppm';
 
       input.onchange = async (e) => {
         const file = e.target.files?.[0];
@@ -787,6 +788,49 @@ const App = () => {
             } catch (zipErr) {
               console.error('Failed to import ZIP bundle:', zipErr);
               alert('Failed to import ZIP bundle: ' + zipErr.message);
+              isLoadingProjectRef.current = false;
+            }
+            return;
+          }
+
+          // Handle xPPM files (legacy format)
+          if (isXppmFile(fileName)) {
+            try {
+              isLoadingProjectRef.current = true;
+              const content = await file.text();
+              const xppmData = importXppm(content, null, {});
+
+              if (xppmData.headerData) {
+                setHeaderData(xppmData.headerData);
+              }
+              if (xppmData.erDataMap) {
+                setErDataMap(xppmData.erDataMap);
+              }
+              if (xppmData.erLibrary) {
+                setErLibrary(xppmData.erLibrary);
+              }
+              if (xppmData.bpmnXml) {
+                setBpmnXml(xppmData.bpmnXml);
+                setIsDirty(false);
+              } else {
+                setBpmnXml('DEFAULT');
+                setIsDirty(true);
+                alert('xPPM imported successfully. Note: BPMN diagram was not embedded. If you have a separate .bpmn file, please load it using "Open Project" and select the BPMN file from the Diagram folder.');
+              }
+
+              setCurrentFilePath(file.name);
+              setValidationResults(null);
+              setHasActiveProject(true);
+              setActivePane('specification');
+              setTimeout(() => { isLoadingProjectRef.current = false; }, 300);
+              extractDataObjectsAfterLoad();
+
+              // Show import summary
+              const erCount = Object.keys(xppmData.erDataMap || {}).length;
+              console.log(`xPPM imported: ${xppmData.headerData?.fullTitle || 'Untitled'}, ${erCount} ERs`);
+            } catch (xppmErr) {
+              console.error('Failed to import xPPM:', xppmErr);
+              alert('Failed to import xPPM file: ' + xppmErr.message);
               isLoadingProjectRef.current = false;
             }
             return;

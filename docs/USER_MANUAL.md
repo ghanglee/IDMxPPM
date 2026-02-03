@@ -61,7 +61,7 @@ When you launch IDMxPPM, you'll see the **Startup Screen** with three options:
 |--------|-------------|
 | **Blank Project** | Start with an empty BPMN canvas |
 | **Sample Project** | Start with a pre-configured sample IDM specification |
-| **Open Project** | Open an existing project file (.json, .idm, .xml, .bpmn) |
+| **Open Project** | Open an existing project file (.idm, .xml, .xppm, .bpmn) |
 
 ### Supported File Formats
 
@@ -71,6 +71,7 @@ When you launch IDMxPPM, you'll see the **Startup Screen** with three options:
 | idmXML | `.xml` | ISO 29481-3 compliant export (includes embedded BPMN) |
 | HTML Document | `.html` | Self-contained HTML with embedded images and BPMN (SVG) |
 | ZIP Bundle | `.zip` | Archive containing idmXML, BPMN, images, and project data |
+| Legacy xPPM | `.xppm` | Import from previous xPPM tool (header, ERs, use case) |
 | BPMN Diagram | `.bpmn` | BPMN 2.0 XML format (diagram only) |
 | Exchange Requirement | `.erxml` | Individual ER for import/export |
 
@@ -584,7 +585,16 @@ You can save incomplete work even with validation errors. This allows you to:
 | `.idm` | Full project (BPMN + all data + ER library) |
 | `.xml` (idmXML) | Header, Use Case, ERs, embedded BPMN |
 | `.zip` (ZIP Bundle) | Complete project with all assets |
+| `.xppm` (Legacy xPPM) | Header, Use Case, ERs from legacy xPPM format |
 | `.bpmn` | BPMN diagram only |
+
+### xPPM Import (Legacy Format)
+
+xPPM is the legacy format from a previous version of the IDM authoring tool. When importing xPPM:
+- Header data (title, authors, version) is converted
+- Use Case data (summary, aim/scope, actors) is imported
+- Exchange Requirements with Information Units are converted
+- **Note**: BPMN diagrams are stored separately in xPPM. If available, load the `.bpmn` file from the `Diagram/` folder after importing.
 
 ### idmXML Import
 

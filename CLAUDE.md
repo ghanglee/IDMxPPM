@@ -282,6 +282,8 @@ npm run build:all    # Build both platforms
 #### Project Management
 - **New Project** - Creates blank project with default BPMN diagram
 - **Open Project** - Browser file input fallback (Electron IPC support)
+- **Import Formats** - IDM project (.idm), idmXML (.xml), ZIP bundle (.zip), legacy xPPM (.xppm), BPMN (.bpmn)
+- **xPPM Import** - Import from legacy xPPM format with header, use case, and ER conversion
 - **Close Project** - Proper cleanup with unsaved changes confirmation
 - **Save/Export** - Multiple format export with customizable filename (default from Short Title)
 - **Dirty state tracking** with visual indicator
@@ -344,6 +346,8 @@ src/
 │   ├── idmXmlGenerator.js      # idmXML 2.0 generation with embedded images
 │   ├── idmXmlParser.js         # idmXML import with figure parsing
 │   ├── idmBundleExporter.js    # ZIP bundle export with JSZip
+│   ├── idmBundleImporter.js    # ZIP bundle import with JSZip
+│   ├── xppmImporter.js         # Legacy xPPM format import
 │   ├── htmlExporter.js         # Self-contained HTML export with XSLT transformation
 │   ├── pdfExporter.js          # XSLT transformation utilities
 │   ├── defaultIdmXslt.js       # Default XSLT stylesheet for HTML export (downloadable)

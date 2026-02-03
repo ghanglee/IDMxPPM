@@ -69,7 +69,7 @@ const StartupScreen = ({ onNewBlank, onNewSample, onOpen }) => {
             </div>
             <div className="startup-option-text">
               <span className="startup-option-title">Open Project</span>
-              <span className="startup-option-desc">Open an existing IDM project, idmXML, or BPMN file</span>
+              <span className="startup-option-desc">Open an existing IDM project, idmXML, xPPM, or BPMN file</span>
             </div>
           </button>
         </div>
