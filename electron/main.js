@@ -2,8 +2,8 @@ const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
-// 개발 모드 확인
-const isDev = !app.isPackaged;
+// 개발 모드 확인 (Node.js version compatibility)
+const isDev = app && app.isPackaged !== undefined ? !app.isPackaged : process.env.NODE_ENV !== 'production';
 
 let mainWindow;
 
@@ -183,14 +183,16 @@ function createWindow() {
   });
 }
 
-// 프로젝트 열기 (.json, .idm, .xml for idmXML, .bpmn)
+// 프로젝트 열기 (.json, .idm, .xml for idmXML, .bpmn, .zip)
 async function handleOpenProject() {
   const result = await dialog.showOpenDialog(mainWindow, {
-    title: 'Open IDMxPPM Project or idmXML',
+    title: 'Open IDMxPPM Project',
     filters: [
-      { name: 'IDMxPPM Project', extensions: ['json', 'idm'] },
-      { name: 'idmXML (ISO 29481-3)', extensions: ['xml'] },
-      { name: 'BPMN Files', extensions: ['bpmn'] },
+      { name: 'IDMxPPM Project (.idm)', extensions: ['idm', 'json'] },
+      { name: 'idmXML - ISO 29481-3 (.xml)', extensions: ['xml'] },
+      { name: 'ZIP Bundle (.zip)', extensions: ['zip', 'idmx'] },
+      { name: 'BPMN Diagram (.bpmn)', extensions: ['bpmn'] },
+      { name: 'All Supported Formats', extensions: ['idm', 'json', 'xml', 'zip', 'idmx', 'bpmn'] },
       { name: 'All Files', extensions: ['*'] }
     ],
     properties: ['openFile']
@@ -204,6 +206,8 @@ async function handleOpenProject() {
     let type = 'project';
     if (ext === '.bpmn') {
       type = 'bpmn';
+    } else if (ext === '.zip' || ext === '.idmx') {
+      type = 'zip';
     } else if (ext === '.xml') {
       // Check if it's an idmXML file or BPMN
       const isIdmXml = content.includes('idmXML') ||
@@ -356,6 +360,46 @@ ipcMain.handle('dialog:exportIdmXML', async (event, { content, defaultName }) =>
     return { success: true, filePath: result.filePath };
   }
   return { success: false };
+});
+
+// Show save location dialog (returns path only)
+ipcMain.handle('dialog:showSaveLocation', async (event, { defaultName, format }) => {
+  const filters = {
+    'idm': [{ name: 'IDM Project', extensions: ['idm'] }],
+    'idmxml': [{ name: 'idmXML Files', extensions: ['xml'] }],
+    'idmxml-v2': [{ name: 'idmXML 2.0 Files', extensions: ['xml'] }],
+    'idmxml-v1': [{ name: 'idmXML 1.0 Files', extensions: ['xml'] }],
+    'html': [{ name: 'HTML Files', extensions: ['html'] }],
+    'zip': [{ name: 'ZIP Archives', extensions: ['zip'] }],
+    'bpmn': [{ name: 'BPMN Files', extensions: ['bpmn'] }]
+  };
+
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: 'Choose Save Location',
+    defaultPath: defaultName || 'idm-specification',
+    filters: filters[format] || [{ name: 'All Files', extensions: ['*'] }]
+  });
+
+  if (!result.canceled && result.filePath) {
+    return { success: true, filePath: result.filePath };
+  }
+  return { success: false, canceled: true };
+});
+
+// Save content to specified path
+ipcMain.handle('dialog:saveToPath', async (event, { content, filePath, isBinary }) => {
+  try {
+    if (isBinary) {
+      // For binary content (e.g., ZIP), expect base64 encoded string
+      const buffer = Buffer.from(content, 'base64');
+      fs.writeFileSync(filePath, buffer);
+    } else {
+      fs.writeFileSync(filePath, content, 'utf-8');
+    }
+    return { success: true, filePath };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
 });
 
 // 앱 이벤트

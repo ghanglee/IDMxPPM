@@ -221,6 +221,17 @@ export const ExportBPMNIcon = (props) => (
   </Icon>
 );
 
+// Import BPMN - folder with upload arrow and BPMN elements
+export const ImportBPMNIcon = (props) => (
+  <Icon {...props}>
+    {/* Folder shape */}
+    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+    {/* Upload arrow */}
+    <line x1="12" y1="11" x2="12" y2="17" />
+    <polyline points="9 14 12 11 15 14" />
+  </Icon>
+);
+
 export const ExportPNGIcon = (props) => (
   <Icon {...props}>
     <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -352,6 +363,93 @@ export const CopyIcon = (props) => (
 );
 
 // ============================================================================
+// ER TREE TABLE ICONS
+// ============================================================================
+
+// Folder icon for ER nodes in tree view
+export const FolderIcon = (props) => (
+  <Icon {...props}>
+    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+  </Icon>
+);
+
+// Folder Open icon for expanded ER nodes
+export const FolderOpenIcon = (props) => (
+  <Icon {...props}>
+    <path d="M5 19a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4l2 2h9a2 2 0 0 1 2 2v1" />
+    <path d="M5 19h14a2 2 0 0 0 2-2l1-6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2l-1 6a2 2 0 0 0 2 2z" />
+  </Icon>
+);
+
+// Document icon for Information Unit nodes
+export const DocumentIcon = (props) => (
+  <Icon {...props}>
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <polyline points="14 2 14 8 20 8" />
+    <line x1="16" y1="13" x2="8" y2="13" />
+    <line x1="16" y1="17" x2="8" y2="17" />
+  </Icon>
+);
+
+// Indent icon for nesting ER as sub-ER (>ER action)
+export const IndentIcon = (props) => (
+  <Icon {...props}>
+    <polyline points="3 8 7 12 3 16" />
+    <line x1="21" y1="12" x2="11" y2="12" />
+  </Icon>
+);
+
+// Outdent icon for un-nesting (optional)
+export const OutdentIcon = (props) => (
+  <Icon {...props}>
+    <polyline points="7 8 3 12 7 16" />
+    <line x1="21" y1="12" x2="11" y2="12" />
+  </Icon>
+);
+
+// Expand All - Double chevron down
+export const ExpandAllIcon = (props) => (
+  <Icon {...props}>
+    <polyline points="7 8 12 13 17 8" />
+    <polyline points="7 14 12 19 17 14" />
+  </Icon>
+);
+
+// Collapse All - Double chevron up
+export const CollapseAllIcon = (props) => (
+  <Icon {...props}>
+    <polyline points="17 14 12 9 7 14" />
+    <polyline points="17 20 12 15 7 20" />
+  </Icon>
+);
+
+// Toggle Panel - Split layout icon for BPMN toggle
+export const TogglePanelIcon = (props) => (
+  <Icon {...props}>
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <line x1="9" y1="3" x2="9" y2="21" />
+  </Icon>
+);
+
+// Hide Panel - Panel with arrow pointing left
+export const HidePanelIcon = (props) => (
+  <Icon {...props}>
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <line x1="9" y1="3" x2="9" y2="21" />
+    <polyline points="15 9 12 12 15 15" />
+  </Icon>
+);
+
+// Show Panel - Panel with arrow pointing right
+export const ShowPanelIcon = (props) => (
+  <Icon {...props}>
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <line x1="9" y1="3" x2="9" y2="21" />
+    <polyline points="13 9 16 12 13 15" />
+  </Icon>
+);
+
+// ============================================================================
 // UTILITY ICONS
 // ============================================================================
 
@@ -447,6 +545,7 @@ export default {
   RedoIcon,
   ExportSVGIcon,
   ExportBPMNIcon,
+  ImportBPMNIcon,
   ExportPNGIcon,
   AutoLayoutIcon,
   // ER Editor
@@ -462,6 +561,17 @@ export default {
   LinkIcon,
   EditIcon,
   CopyIcon,
+  // ER Tree Table
+  FolderIcon,
+  FolderOpenIcon,
+  DocumentIcon,
+  IndentIcon,
+  OutdentIcon,
+  ExpandAllIcon,
+  CollapseAllIcon,
+  TogglePanelIcon,
+  HidePanelIcon,
+  ShowPanelIcon,
   // Utility
   CloseIcon,
   ChevronRightIcon,

@@ -12,7 +12,7 @@ const parseFigures = (sectionElement) => {
   const figures = [];
   if (!sectionElement) return figures;
 
-  const figureElements = sectionElement.querySelectorAll(':scope > figure');
+  const figureElements = getDirectChildren(sectionElement, 'figure');
   figureElements.forEach((fig, index) => {
     const caption = fig.getAttribute('caption') || `Figure ${index + 1}`;
     const mimeType = fig.getAttribute('mimeType') || 'image/png';
@@ -45,6 +45,70 @@ const parseFigures = (sectionElement) => {
 };
 
 /**
+ * Helper: get direct child elements by tag name (namespace-safe).
+ * querySelectorAll can be unreliable in namespaced XML documents,
+ * so we manually filter childNodes by localName.
+ */
+const getDirectChildren = (parent, tagName) => {
+  const results = [];
+  if (!parent) return results;
+  for (let i = 0; i < parent.childNodes.length; i++) {
+    const child = parent.childNodes[i];
+    if (child.nodeType === 1 && child.localName === tagName) {
+      results.push(child);
+    }
+  }
+  return results;
+};
+
+/**
+ * Helper: get first direct child element by tag name (namespace-safe).
+ */
+const getFirstChild = (parent, tagName) => {
+  if (!parent) return null;
+  for (let i = 0; i < parent.childNodes.length; i++) {
+    const child = parent.childNodes[i];
+    if (child.nodeType === 1 && child.localName === tagName) {
+      return child;
+    }
+  }
+  return null;
+};
+
+/**
+ * Helper: find first descendant element by tag name (namespace-safe).
+ * Searches all levels, not just direct children.
+ */
+const findDescendant = (parent, tagName) => {
+  if (!parent) return null;
+  for (let i = 0; i < parent.childNodes.length; i++) {
+    const child = parent.childNodes[i];
+    if (child.nodeType === 1) {
+      if (child.localName === tagName) return child;
+      const found = findDescendant(child, tagName);
+      if (found) return found;
+    }
+  }
+  return null;
+};
+
+/**
+ * Helper: find all descendant elements by tag name (namespace-safe).
+ */
+const findAllDescendants = (parent, tagName) => {
+  const results = [];
+  if (!parent) return results;
+  for (let i = 0; i < parent.childNodes.length; i++) {
+    const child = parent.childNodes[i];
+    if (child.nodeType === 1) {
+      if (child.localName === tagName) results.push(child);
+      results.push(...findAllDescendants(child, tagName));
+    }
+  }
+  return results;
+};
+
+/**
  * Parse an idmXML document into application state
  * @param {string} xmlContent - The idmXML content as string
  * @returns {Object} Parsed project data with headerData, bpmnXml, erDataMap
@@ -67,62 +131,196 @@ export const parseIdmXml = (xmlContent) => {
       erLibrary: []
     };
 
-    // Get root element (should be <idm>)
-    const idmRoot = xmlDoc.querySelector('idm');
-    if (!idmRoot) {
+    // Get root element (should be <idm>) - use documentElement for namespace safety
+    const idmRoot = xmlDoc.documentElement;
+    if (!idmRoot || (idmRoot.localName !== 'idm' && idmRoot.tagName !== 'idm')) {
       throw new Error('Not a valid idmXML file: missing <idm> root element');
     }
 
     // Parse specId (IDM metadata) - including GUIDs for persistence
-    const specId = idmRoot.querySelector(':scope > specId');
+    const specId = getFirstChild(idmRoot, 'specId');
     if (specId) {
       result.headerData.idmGuid = specId.getAttribute('guid') || '';
       result.headerData.shortTitle = specId.getAttribute('shortTitle') || '';
       result.headerData.title = specId.getAttribute('fullTitle') || specId.getAttribute('shortTitle') || '';
+      result.headerData.subTitle = specId.getAttribute('subTitle') || '';
       result.headerData.idmCode = specId.getAttribute('idmCode') || '';
+      result.headerData.localCode = specId.getAttribute('localCode') || '';
       result.headerData.version = specId.getAttribute('version') || '1.0';
       result.headerData.status = specId.getAttribute('documentStatus') || 'WD';
+      result.headerData.localDocumentStatus = specId.getAttribute('localDocumentStatus') || '';
     }
 
-    // Parse authoring
-    const authoring = idmRoot.querySelector(':scope > authoring');
+    // Parse authoring section (use getFirstChild for namespace safety)
+    const authoring = getFirstChild(idmRoot, 'authoring');
     if (authoring) {
       result.headerData.creationDate = authoring.getAttribute('creationDate') || '';
+      result.headerData.copyright = authoring.getAttribute('copyright') || '';
 
-      // Parse structured author information (person, organization)
-      const personElements = authoring.querySelectorAll('person');
-      const orgElements = authoring.querySelectorAll('organization');
+      // Parse change logs using namespace-safe child traversal
+      const changeLogs = getDirectChildren(authoring, 'changeLog');
+      if (changeLogs.length > 0) {
+        result.headerData.changeLogs = [];
+        result.headerData.revisionHistory = [];
+        changeLogs.forEach(log => {
+          const changeEntries = [];
+          getDirectChildren(log, 'change').forEach(ch => {
+            changeEntries.push({
+              changedElement: ch.getAttribute('changedElement') || '',
+              changedFrom: ch.getAttribute('changedFrom') || ''
+            });
+          });
+          const changeLogEntry = {
+            id: log.getAttribute('id') || '',
+            changeDateTime: log.getAttribute('changeDateTime') || '',
+            changeSummary: log.getAttribute('changeSummary') || '',
+            changedBy: log.getAttribute('changedBy') || '',
+            changes: changeEntries
+          };
+          result.headerData.changeLogs.push(changeLogEntry);
 
-      if (personElements.length > 0 || orgElements.length > 0) {
-        result.headerData.authors = [];
+          // Also add to revisionHistory for ContentPane compatibility
+          const dateTime = log.getAttribute('changeDateTime') || '';
+          const date = dateTime.split('T')[0] || dateTime.split(' ')[0] || dateTime;
+          const changedElements = changeEntries.map(c => c.changedElement).filter(Boolean);
+          const summary = log.getAttribute('changeSummary')?.trim() ||
+            (changedElements.length > 0 ? `Modified: ${changedElements.join(', ')}` : 'Modified');
 
-        personElements.forEach(person => {
+          result.headerData.revisionHistory.push({
+            date: date,
+            description: summary
+          });
+        });
+      }
+
+      // Parse authors using namespace-safe child traversal
+      const authorElements = getDirectChildren(authoring, 'author');
+
+      result.headerData.authors = [];
+
+      if (authorElements.length > 0) {
+        authorElements.forEach(author => {
+          const authorId = author.getAttribute('id') || '';
+
+          // v2.0 format: <author id="..."><person .../></author> or <author id="..."><organization .../></author>
+          const personChild = getFirstChild(author, 'person');
+          const orgChild = getFirstChild(author, 'organization');
+
+          if (personChild) {
+            const firstName = personChild.getAttribute('firstName') || personChild.getAttribute('givenName') || '';
+            const lastName = personChild.getAttribute('lastName') || personChild.getAttribute('familyName') || '';
+            const middleName = personChild.getAttribute('middleName') || personChild.getAttribute('middleInitial') || '';
+            const affiliation = personChild.getAttribute('affiliation') || '';
+            const email = personChild.getAttribute('emailAddress') || personChild.getAttribute('uri') || '';
+            const prefix = personChild.getAttribute('prefix') || '';
+            const suffix = personChild.getAttribute('suffix') || '';
+            const postnominal = personChild.getAttribute('postnominalDesignation') || '';
+
+            result.headerData.authors.push({
+              type: 'person',
+              id: authorId,
+              givenName: firstName,
+              familyName: lastName,
+              middleInitial: middleName,
+              affiliation: affiliation,
+              uri: email,
+              prefix,
+              suffix,
+              postnominalDesignation: postnominal
+            });
+          } else if (orgChild) {
+            result.headerData.authors.push({
+              type: 'organization',
+              id: authorId,
+              name: orgChild.getAttribute('name') || '',
+              uri: orgChild.getAttribute('uri') || ''
+            });
+          } else {
+            // Legacy format: attributes directly on <author> element
+            const firstName = author.getAttribute('firstName') || author.getAttribute('givenName') || '';
+            const lastName = author.getAttribute('lastName') || author.getAttribute('familyName') || '';
+            const middleName = author.getAttribute('middleName') || author.getAttribute('middleInitial') || '';
+            const affiliation = author.getAttribute('affiliation') || '';
+            const digitalSignature = author.getAttribute('digitalSignature') || '';
+
+            if (firstName || lastName) {
+              result.headerData.authors.push({
+                type: 'person',
+                id: authorId,
+                givenName: firstName,
+                familyName: lastName,
+                middleInitial: middleName,
+                affiliation: affiliation,
+                uri: digitalSignature
+              });
+            }
+          }
+        });
+      }
+
+      // Fallback: standalone <person>/<organization> elements not inside <author> (rare)
+      if (result.headerData.authors.length === 0) {
+        getDirectChildren(authoring, 'person').forEach(person => {
+          const firstName = person.getAttribute('firstName') || person.getAttribute('givenName') || '';
+          const lastName = person.getAttribute('lastName') || person.getAttribute('familyName') || '';
           result.headerData.authors.push({
             type: 'person',
-            givenName: person.getAttribute('givenName') || '',
-            familyName: person.getAttribute('familyName') || '',
-            uri: person.getAttribute('uri') || '',
-            affiliation: person.querySelector('affiliation')?.textContent || ''
+            givenName: firstName,
+            familyName: lastName,
+            uri: person.getAttribute('uri') || person.getAttribute('emailAddress') || '',
+            affiliation: person.getAttribute('affiliation') || ''
           });
         });
 
-        orgElements.forEach(org => {
+        getDirectChildren(authoring, 'organization').forEach(org => {
           result.headerData.authors.push({
             type: 'organization',
             name: org.getAttribute('name') || '',
             uri: org.getAttribute('uri') || ''
           });
         });
-      } else {
-        // Fallback to legacy author string
+      }
+
+      // Fallback to legacy author string attribute
+      if (result.headerData.authors.length === 0) {
         const authorStr = authoring.getAttribute('author') || '';
-        // Split authors by comma if multiple
-        result.headerData.authors = authorStr.split(',').map(a => a.trim()).filter(Boolean);
+        if (authorStr) {
+          authorStr.split(',').map(a => a.trim()).filter(Boolean).forEach(name => {
+            result.headerData.authors.push({
+              type: 'person',
+              givenName: name,
+              familyName: ''
+            });
+          });
+        }
+      }
+
+      // Parse committee (legacy format)
+      const committee = getFirstChild(authoring, 'committee');
+      if (committee) {
+        const members = [];
+        getDirectChildren(committee, 'member').forEach(m => members.push(m.textContent));
+        const leader = getFirstChild(committee, 'leader');
+        result.headerData.committee = {
+          name: committee.getAttribute('name') || '',
+          members,
+          leader: leader?.textContent || ''
+        };
+      }
+
+      // Parse publisher (legacy format)
+      const publisher = getFirstChild(authoring, 'publisher');
+      if (publisher) {
+        result.headerData.publisher = {
+          name: publisher.getAttribute('name') || '',
+          location: publisher.getAttribute('location') || ''
+        };
       }
     }
 
     // Parse revision history if present
-    const revisionHistory = idmRoot.querySelectorAll('revisionHistory revision');
+    const revHistoryEl = getFirstChild(idmRoot, 'revisionHistory');
+    const revisionHistory = revHistoryEl ? getDirectChildren(revHistoryEl, 'revision') : [];
     if (revisionHistory.length > 0) {
       result.headerData.revisionHistory = [];
       revisionHistory.forEach(rev => {
@@ -133,20 +331,20 @@ export const parseIdmXml = (xmlContent) => {
       });
     }
 
-    // Parse Use Case (uc)
-    const uc = idmRoot.querySelector('uc');
+    // Parse Use Case (uc) - all namespace-safe
+    const uc = getFirstChild(idmRoot, 'uc');
     if (uc) {
       // Parse UC specId for GUID
-      const ucSpecId = uc.querySelector('specId');
+      const ucSpecId = getFirstChild(uc, 'specId');
       if (ucSpecId) {
         result.headerData.ucGuid = ucSpecId.getAttribute('guid') || '';
       }
 
       // Summary - with optional figures
-      const summarySection = uc.querySelector('summary');
+      const summarySection = getFirstChild(uc, 'summary');
       if (summarySection) {
-        const summaryDesc = summarySection.querySelector('description');
-        result.headerData.summary = summaryDesc?.textContent || '';
+        const summaryDesc = getFirstChild(summarySection, 'description');
+        result.headerData.summary = summaryDesc?.getAttribute('title') || summaryDesc?.textContent || '';
         const summaryFigs = parseFigures(summarySection);
         if (summaryFigs.length > 0) {
           result.headerData.summaryFigures = summaryFigs;
@@ -154,12 +352,12 @@ export const parseIdmXml = (xmlContent) => {
       }
 
       // Aim and Scope - with optional figures
-      const aimAndScopeSection = uc.querySelector('aimAndScope');
+      const aimAndScopeSection = getFirstChild(uc, 'aimAndScope');
       if (aimAndScopeSection) {
-        const aimAndScopeDesc = aimAndScopeSection.querySelector('description');
-        const aimAndScopeContent = aimAndScopeDesc?.textContent || '';
+        const aimAndScopeDesc = getFirstChild(aimAndScopeSection, 'description');
+        const aimAndScopeContent = aimAndScopeDesc?.getAttribute('title') || aimAndScopeDesc?.textContent || '';
         result.headerData.aimAndScope = aimAndScopeContent;
-        result.headerData.objectives = aimAndScopeContent; // Legacy field
+        result.headerData.objectives = aimAndScopeContent;
         const aimAndScopeFigs = parseFigures(aimAndScopeSection);
         if (aimAndScopeFigs.length > 0) {
           result.headerData.aimAndScopeFigures = aimAndScopeFigs;
@@ -167,16 +365,16 @@ export const parseIdmXml = (xmlContent) => {
       }
 
       // Language
-      const language = uc.querySelector('language');
+      const language = getFirstChild(uc, 'language');
       if (language) {
         result.headerData.language = language.textContent || 'EN';
       }
 
       // Benefits - with optional figures
-      const benefitsSection = uc.querySelector('benefits');
+      const benefitsSection = getFirstChild(uc, 'benefits');
       if (benefitsSection) {
-        const benefitsDesc = benefitsSection.querySelector('description');
-        result.headerData.benefits = benefitsDesc?.textContent || '';
+        const benefitsDesc = getFirstChild(benefitsSection, 'description');
+        result.headerData.benefits = benefitsDesc?.getAttribute('title') || benefitsDesc?.textContent || '';
         const benefitsFigs = parseFigures(benefitsSection);
         if (benefitsFigs.length > 0) {
           result.headerData.benefitsFigures = benefitsFigs;
@@ -184,67 +382,109 @@ export const parseIdmXml = (xmlContent) => {
       }
 
       // Limitations - with optional figures
-      const limitationsSection = uc.querySelector('limitations');
+      const limitationsSection = getFirstChild(uc, 'limitations');
       if (limitationsSection) {
-        const limitationsDesc = limitationsSection.querySelector('description');
-        result.headerData.limitations = limitationsDesc?.textContent || '';
+        const limitationsDesc = getFirstChild(limitationsSection, 'description');
+        result.headerData.limitations = limitationsDesc?.getAttribute('title') || limitationsDesc?.textContent || '';
         const limitationsFigs = parseFigures(limitationsSection);
         if (limitationsFigs.length > 0) {
           result.headerData.limitationsFigures = limitationsFigs;
         }
       }
 
-      // Actors - support both structured (ISO 29481-3) and legacy text format
-      const actorElements = uc.querySelectorAll('actor');
+      // Actors - support IDM 2.0 structure with actorType, bpmnShapeName, and subActors
+      const actorElements = getDirectChildren(uc, 'actor');
       if (actorElements.length > 0) {
         result.headerData.actorsList = [];
-        actorElements.forEach(actor => {
-          const actorId = actor.getAttribute('id') || `actor-${Date.now()}`;
-          const actorName = actor.getAttribute('name') || '';
-          const classification = actor.querySelector('classification');
+
+        const parseActor = (actorEl) => {
+          const actorId = actorEl.getAttribute('id') || `actor-${Date.now()}`;
+          const actorName = actorEl.getAttribute('name') || '';
+          const actorType = actorEl.getAttribute('actorType') || 'group';
+
+          const bpmnShapeEl = getFirstChild(actorEl, 'bpmnShapeName');
+          const bpmnShapeName = bpmnShapeEl ? bpmnShapeEl.textContent.trim() : '';
+
+          const classification = getFirstChild(actorEl, 'classification');
           const role = classification ? classification.getAttribute('name') : '';
-          result.headerData.actorsList.push({ id: actorId, name: actorName, role });
+
+          // Get subActor elements (per IDM 2.0)
+          const subActorContainers = getDirectChildren(actorEl, 'subActor');
+          const subActors = [];
+          subActorContainers.forEach(container => {
+            const subActorEl = getFirstChild(container, 'actor');
+            if (subActorEl) {
+              const subActorId = subActorEl.getAttribute('id') || `subactor-${Date.now()}`;
+              const subActorName = subActorEl.getAttribute('name') || '';
+              const subBpmnShapeEl = getFirstChild(subActorEl, 'bpmnShapeName');
+              const subBpmnShapeName = subBpmnShapeEl ? subBpmnShapeEl.textContent.trim() : '';
+              subActors.push({
+                id: subActorId,
+                name: subActorName,
+                bpmnShapeName: subBpmnShapeName
+              });
+            }
+          });
+
+          return {
+            id: actorId,
+            name: actorName,
+            actorType,
+            bpmnShapeName,
+            role,
+            subActors
+          };
+        };
+
+        actorElements.forEach(actorEl => {
+          result.headerData.actorsList.push(parseActor(actorEl));
         });
       }
 
-      // Also check for legacy text-based actors description
-      const actorsDesc = uc.querySelector('actors description');
+      // Legacy text-based actors description
+      const actorsEl = getFirstChild(uc, 'actors');
+      const actorsDesc = actorsEl ? getFirstChild(actorsEl, 'description') : null;
       if (actorsDesc) {
-        result.headerData.actors = actorsDesc.textContent || '';
+        result.headerData.actors = actorsDesc.getAttribute('title') || actorsDesc.textContent || '';
       }
 
       // Preconditions
-      const preconditions = uc.querySelector('preconditions description');
+      const preconditionsEl = getFirstChild(uc, 'preconditions');
+      const preconditions = preconditionsEl ? getFirstChild(preconditionsEl, 'description') : null;
       if (preconditions) {
-        result.headerData.preconditions = preconditions.textContent || '';
+        result.headerData.preconditions = preconditions.getAttribute('title') || preconditions.textContent || '';
       }
 
       // Postconditions
-      const postconditions = uc.querySelector('postconditions description');
+      const postconditionsEl = getFirstChild(uc, 'postconditions');
+      const postconditions = postconditionsEl ? getFirstChild(postconditionsEl, 'description') : null;
       if (postconditions) {
-        result.headerData.postconditions = postconditions.textContent || '';
+        result.headerData.postconditions = postconditions.getAttribute('title') || postconditions.textContent || '';
       }
 
       // Triggering Events
-      const triggeringEvents = uc.querySelector('triggeringEvents description');
+      const triggeringEventsEl = getFirstChild(uc, 'triggeringEvents');
+      const triggeringEvents = triggeringEventsEl ? getFirstChild(triggeringEventsEl, 'description') : null;
       if (triggeringEvents) {
-        result.headerData.triggeringEvents = triggeringEvents.textContent || '';
+        result.headerData.triggeringEvents = triggeringEvents.getAttribute('title') || triggeringEvents.textContent || '';
       }
 
       // Required Capabilities
-      const requiredCapabilities = uc.querySelector('requiredCapabilities description');
+      const requiredCapabilitiesEl = getFirstChild(uc, 'requiredCapabilities');
+      const requiredCapabilities = requiredCapabilitiesEl ? getFirstChild(requiredCapabilitiesEl, 'description') : null;
       if (requiredCapabilities) {
-        result.headerData.requiredCapabilities = requiredCapabilities.textContent || '';
+        result.headerData.requiredCapabilities = requiredCapabilities.getAttribute('title') || requiredCapabilities.textContent || '';
       }
 
       // Compliance Criteria
-      const complianceCriteria = uc.querySelector('complianceCriteria description');
+      const complianceCriteriaEl = getFirstChild(uc, 'complianceCriteria');
+      const complianceCriteria = complianceCriteriaEl ? getFirstChild(complianceCriteriaEl, 'description') : null;
       if (complianceCriteria) {
-        result.headerData.complianceCriteria = complianceCriteria.textContent || '';
+        result.headerData.complianceCriteria = complianceCriteria.getAttribute('title') || complianceCriteria.textContent || '';
       }
 
       // Regions (can have multiple per idmXSD)
-      const regionElements = uc.querySelectorAll('region');
+      const regionElements = getDirectChildren(uc, 'region');
       if (regionElements.length > 0) {
         result.headerData.regions = [];
         regionElements.forEach(region => {
@@ -253,57 +493,119 @@ export const parseIdmXml = (xmlContent) => {
             result.headerData.regions.push(value);
           }
         });
-        // Keep single region for backward compat
         result.headerData.region = result.headerData.regions[0] || 'international';
       } else {
         result.headerData.region = 'international';
         result.headerData.regions = ['international'];
       }
 
-      // Project Stages (can have multiple) - store in both projectStagesIso and legacy projectStages
-      const projectStages = uc.querySelectorAll('standardProjectStage name');
-      if (projectStages.length > 0) {
-        result.headerData.projectStagesIso = [];
-        result.headerData.projectStages = []; // Legacy
-        projectStages.forEach(stage => {
-          const stageValue = stage.textContent?.trim();
-          if (stageValue) {
-            result.headerData.projectStagesIso.push(stageValue);
-            result.headerData.projectStages.push(stageValue);
+      // Project Stages - support both legacy (standardProjectPhase) and new (standardProjectStage) formats
+      result.headerData.projectStagesIso = [];
+      result.headerData.projectStages = [];
+
+      // New format: standardProjectStage
+      const projectStages = getDirectChildren(uc, 'standardProjectStage');
+      projectStages.forEach(stage => {
+        const nameEl = getFirstChild(stage, 'name');
+        const stageValue = nameEl?.textContent?.trim();
+        if (stageValue) {
+          result.headerData.projectStagesIso.push(stageValue.toLowerCase());
+          result.headerData.projectStages.push(stageValue.toLowerCase());
+        }
+      });
+
+      // Legacy format: standardProjectPhase (xPPM uses this)
+      const legacyProjectPhases = getDirectChildren(uc, 'standardProjectPhase');
+      legacyProjectPhases.forEach(phase => {
+        const nameEl = getFirstChild(phase, 'name');
+        const stageValue = nameEl?.textContent?.trim();
+        if (stageValue) {
+          const normalizedStage = stageValue.toLowerCase().replace(/\s+/g, '');
+          const stageMap = {
+            'design': 'design',
+            'production': 'production',
+            'construction': 'production',
+            'handover': 'handover',
+            'operation': 'operation',
+            'inception': 'inception',
+            'brief': 'brief',
+            'end-of-life': 'end-of-life'
+          };
+          const mappedStage = stageMap[normalizedStage] || stageValue.toLowerCase();
+          if (!result.headerData.projectStagesIso.includes(mappedStage)) {
+            result.headerData.projectStagesIso.push(mappedStage);
+            result.headerData.projectStages.push(mappedStage);
           }
-        });
-      }
+        }
+      });
 
-      // User-defined Project Stages (AIA B101, RIBA Plan of Work, etc.)
-      const userDefinedStages = uc.querySelectorAll('userDefinedProjectStage');
-      if (userDefinedStages.length > 0) {
-        result.headerData.projectStagesAia = [];
-        result.headerData.projectStagesRiba = [];
+      // Also check for localProjectPhase (legacy xPPM)
+      const localProjectPhases = getDirectChildren(uc, 'localProjectPhase');
+      localProjectPhases.forEach(phase => {
+        const nameEl = getFirstChild(phase, 'name');
+        const stageValue = nameEl?.textContent?.trim();
+        if (stageValue && !result.headerData.projectStages.includes(stageValue)) {
+          result.headerData.projectStages.push(stageValue);
+        }
+      });
 
-        userDefinedStages.forEach(stage => {
-          const stageName = stage.querySelector('name')?.textContent?.trim();
-          const classification = stage.querySelector('classification');
-          const system = classification?.getAttribute('system') || '';
+      // Local project stages (v2.0)
+      const localStages = getDirectChildren(uc, 'localProjectStage');
+      localStages.forEach(stage => {
+        const nameEl = getFirstChild(stage, 'name');
+        const stageName = nameEl?.textContent?.trim();
+        const classification = getFirstChild(stage, 'classification');
+        const classSystem = classification?.getAttribute('name') || '';
 
-          if (stageName) {
-            if (system.includes('AIA')) {
-              result.headerData.projectStagesAia.push(stageName);
-            } else if (system.includes('RIBA')) {
-              result.headerData.projectStagesRiba.push(stageName);
-            }
+        if (stageName) {
+          if (classSystem.includes('AIA')) {
+            if (!result.headerData.projectStagesAia) result.headerData.projectStagesAia = [];
+            result.headerData.projectStagesAia.push(stageName);
+          } else if (classSystem.includes('RIBA')) {
+            if (!result.headerData.projectStagesRiba) result.headerData.projectStagesRiba = [];
+            result.headerData.projectStagesRiba.push(stageName);
           }
-        });
-      }
+        }
+      });
 
-      // Use elements (can have multiple) - parse as structured objects and legacy array
-      const useElements = uc.querySelectorAll('use');
+      // User-defined Project Stages (AIA B101, RIBA Plan of Work, etc.) - legacy
+      result.headerData.projectStagesAia = result.headerData.projectStagesAia || [];
+      result.headerData.projectStagesRiba = result.headerData.projectStagesRiba || [];
+
+      const userDefinedStages = getDirectChildren(uc, 'userDefinedProjectStage');
+      userDefinedStages.forEach(stage => {
+        const stageName = getFirstChild(stage, 'name')?.textContent?.trim();
+        const classification = getFirstChild(stage, 'classification');
+        const system = classification?.getAttribute('system') || '';
+
+        if (stageName) {
+          if (system.includes('AIA')) {
+            result.headerData.projectStagesAia.push(stageName);
+          } else if (system.includes('RIBA')) {
+            result.headerData.projectStagesRiba.push(stageName);
+          }
+        }
+      });
+
+      // Use elements (can have multiple) - parse as structured objects with classification
+      const useElements = getDirectChildren(uc, 'use');
       if (useElements.length > 0) {
         result.headerData.uses = [];
-        result.headerData.useCategories = []; // Legacy
+        result.headerData.useCategories = [];
+        result.headerData.useClassification = null;
         useElements.forEach(use => {
           const useName = use.getAttribute('name')?.trim();
+
+          const classification = getFirstChild(use, 'classification');
+          if (classification && !result.headerData.useClassification) {
+            result.headerData.useClassification = {
+              name: classification.getAttribute('name') || '',
+              version: classification.getAttribute('version') || '',
+              publicationYear: classification.getAttribute('publicationYear') || ''
+            };
+          }
+
           if (useName) {
-            // Try to parse "Verb Noun" format into structured object
             const parts = useName.split(' ');
             if (parts.length >= 2) {
               result.headerData.uses.push({
@@ -319,19 +621,18 @@ export const parseIdmXml = (xmlContent) => {
       }
     }
 
-    // Parse Business Context Map (bcm) -> Process Map (pm)
-    const bcm = idmRoot.querySelector('businessContextMap');
+    // Parse Business Context Map (bcm) -> Process Map (pm) - namespace-safe
+    const bcm = getFirstChild(idmRoot, 'businessContextMap');
     if (bcm) {
-      // Parse BCM specId for GUID
-      const bcmSpecId = bcm.querySelector(':scope > specId');
+      const bcmSpecId = getFirstChild(bcm, 'specId');
       if (bcmSpecId) {
         result.headerData.bcmGuid = bcmSpecId.getAttribute('guid') || '';
       }
     }
 
-    const pm = idmRoot.querySelector('businessContextMap pm');
+    const pm = bcm ? getFirstChild(bcm, 'pm') : null;
     if (pm) {
-      const diagram = pm.querySelector('diagram');
+      const diagram = getFirstChild(pm, 'diagram');
       if (diagram) {
         result.headerData.pmId = diagram.getAttribute('id') || '';
         const diagramFilePath = diagram.getAttribute('diagramFilePath');
@@ -340,9 +641,8 @@ export const parseIdmXml = (xmlContent) => {
         }
 
         // Extract embedded BPMN content from diagramContent element
-        const diagramContent = diagram.querySelector('diagramContent');
+        const diagramContent = getFirstChild(diagram, 'diagramContent');
         if (diagramContent) {
-          // Get the text content which should contain the BPMN XML (from CDATA)
           const bpmnContent = diagramContent.textContent;
           if (bpmnContent && bpmnContent.trim()) {
             result.bpmnXml = bpmnContent.trim();
@@ -351,10 +651,10 @@ export const parseIdmXml = (xmlContent) => {
       }
 
       // Parse dataObjectAndEr links
-      const doErLinks = pm.querySelectorAll('dataObjectAndEr');
+      const doErLinks = getDirectChildren(pm, 'dataObjectAndEr');
       doErLinks.forEach(link => {
-        const doId = link.querySelector('associatedDataObject')?.textContent;
-        const erId = link.querySelector('associatedEr')?.textContent;
+        const doId = getFirstChild(link, 'associatedDataObject')?.textContent;
+        const erId = getFirstChild(link, 'associatedEr')?.textContent;
         if (doId && erId) {
           result.dataObjectErLinks = result.dataObjectErLinks || {};
           result.dataObjectErLinks[doId] = erId;
@@ -363,41 +663,92 @@ export const parseIdmXml = (xmlContent) => {
     }
 
     // Parse Exchange Requirements (er)
-    // First, collect all ERs by their ID
-    const ersById = {};
-    const erElements = idmRoot.querySelectorAll(':scope > er');
-    erElements.forEach((erElement) => {
+    // Collect all ERs (including nested ones) by their GUID for linking
+    const ersById = {}; // Keyed by GUID - flat map of all ERs
+    const ersByShortTitle = {}; // Also index by shortTitle for name-based matching
+    const topLevelERs = []; // Track top-level ERs for hierarchy (with nested subERs)
+
+    // Helper function to recursively add an ER and all its sub-ERs to the flat map
+    const addErToMap = (er, depth = 0) => {
+      // Store by GUID (primary key used in dataObjectErLinks)
+      if (er.guid) {
+        ersById[er.guid] = er;
+      }
+
+      // Also store by id (which might be from idmCode)
+      if (er.id && er.id !== er.guid) {
+        ersById[er.id] = er;
+      }
+
+      // Store by shortTitle for name-based matching
+      if (er.shortTitle) {
+        ersByShortTitle[er.shortTitle] = er;
+      }
+
+      // Recursively add all sub-ERs to the flat map
+      if (er.subERs && er.subERs.length > 0) {
+        er.subERs.forEach(subEr => {
+          addErToMap(subEr, depth + 1);
+        });
+      }
+    };
+
+    // Parse top-level ERs from root (parseErElement is recursive and includes all sub-ERs)
+    const topLevelErElements = getDirectChildren(idmRoot, 'er');
+    topLevelErElements.forEach(erElement => {
       const er = parseErElement(erElement);
-      ersById[er.id] = er;
+      topLevelERs.push(er);
+      addErToMap(er, 0);
     });
 
+    // Store the top-level (root) ER name for display
+    if (topLevelERs.length > 0) {
+      const rootER = topLevelERs[0];
+      result.headerData.rootERName = rootER.name || rootER.shortTitle || '';
+      result.headerData.rootERId = rootER.guid || rootER.id || '';
+    }
+
     // Now map ERs to data object IDs using the dataObjectErLinks
-    // This ensures ERs are keyed by the correct data object ID from the BPMN
+    // Note: Multiple Data Objects can reference the same ER (many-to-one relationship)
+    const linkedErGuids = new Set(); // Track which ERs are linked to Data Objects
     if (result.dataObjectErLinks && Object.keys(result.dataObjectErLinks).length > 0) {
       // Use the links from the PM to map data objects to ERs
       Object.entries(result.dataObjectErLinks).forEach(([dataObjectId, erId]) => {
-        if (ersById[erId]) {
-          result.erDataMap[dataObjectId] = ersById[erId];
+        // Try to find ER by GUID first, then by id
+        const er = ersById[erId];
+        if (er) {
+          result.erDataMap[dataObjectId] = er;
+          linkedErGuids.add(er.guid);
+          linkedErGuids.add(er.id);
+        } else {
+          console.warn(`ER not found for link: dataObject=${dataObjectId}, erId=${erId}`);
         }
       });
-    } else {
-      // Fallback: assign ERs to generated data object IDs
-      erElements.forEach((erElement, index) => {
-        const er = parseErElement(erElement);
-        const dataObjectId = `DataObject_${index + 1}`;
-        result.erDataMap[dataObjectId] = er;
-      });
     }
+
+    // Store the top-level ER hierarchy (with full nesting) for display
+    // Sub-ERs are accessed through their parent's subERs array, not as separate entries
+    result.erHierarchy = topLevelERs;
+
+    // Store all ERs in library for reference (flattened for lookups)
+    result.erLibrary = Object.values(ersById);
+
+    // Log parsing statistics
+    console.log(`Parsed ${topLevelERs.length} top-level ER(s) with total ${Object.keys(ersById).length} ERs at all levels`);
+    console.log(`Linked ${linkedErGuids.size} unique ER(s) to ${Object.keys(result.erDataMap).length} Data Object(s)`);
 
     // Set default values for missing required fields
     result.headerData = {
       title: '',
       shortTitle: '',
+      subTitle: '',
       authors: [],
       organization: '',
       version: '1.0',
       creationDate: new Date().toISOString().split('T')[0],
       status: 'WD',
+      localDocumentStatus: '',
+      localCode: '',
       language: 'EN',
       projectStages: [],
       projectStagesIso: [],
@@ -405,10 +756,12 @@ export const parseIdmXml = (xmlContent) => {
       projectStagesRiba: [],     // RIBA Plan of Work stages (UK)
       useCategories: [],
       uses: [],
+      useClassification: null,   // Classification metadata for uses
       region: 'international',
       regions: [],
       summary: '',
       revisionHistory: [],
+      changeLogs: [],            // Raw change logs from legacy xPPM
       contributors: [],
       copyright: '',
       keywords: [],
@@ -436,6 +789,9 @@ export const parseIdmXml = (xmlContent) => {
       bcmGuid: '',
       pmId: '',
       idmCode: '',
+      // Root ER info (for hierarchy display)
+      rootERName: '',
+      rootERId: '',
       ...result.headerData // Override with parsed values
     };
 
@@ -452,67 +808,46 @@ export const parseIdmXml = (xmlContent) => {
 const parseErElement = (erElement) => {
   const er = {
     id: '',
+    guid: '',           // GUID for linking (primary key in dataObjectErLinks)
+    shortTitle: '',     // Short title for name-based matching
     name: '',
     description: '',
     informationUnits: [],
     subERs: []
   };
 
-  // Parse specId
-  const specId = erElement.querySelector('specId');
+  // Parse specId - namespace-safe
+  const specId = getFirstChild(erElement, 'specId');
   if (specId) {
-    // The idmCode contains the original ER id (used in dataObjectAndEr links)
-    // Format is "ER-{originalId}" so we extract just the id part
+    er.guid = specId.getAttribute('guid') || '';
+    er.shortTitle = specId.getAttribute('shortTitle') || '';
+
     const idmCode = specId.getAttribute('idmCode') || '';
     const idFromCode = idmCode.startsWith('ER-') ? idmCode.substring(3) : idmCode;
-    er.id = idFromCode || specId.getAttribute('guid') || `ER-${Date.now()}`;
-    er.name = specId.getAttribute('shortTitle') || specId.getAttribute('fullTitle') || '';
+    er.id = idFromCode || er.guid || `ER-${Date.now()}`;
+    er.name = er.shortTitle || specId.getAttribute('fullTitle') || '';
   }
 
-  // Parse description
-  const description = erElement.querySelector('description');
+  // Parse description - namespace-safe
+  const description = getFirstChild(erElement, 'description');
   if (description) {
-    er.description = description.textContent || '';
+    er.description = description.getAttribute('title') || description.textContent || '';
   }
 
-  // Parse information units
-  const infoUnits = erElement.querySelectorAll(':scope > informationUnit');
+  // Parse information units - namespace-safe
+  const infoUnits = getDirectChildren(erElement, 'informationUnit');
   infoUnits.forEach(iu => {
     er.informationUnits.push(parseInformationUnit(iu));
   });
 
-  // Parse sub-ERs (recursive per ISO 29481-3)
-  const subErElements = erElement.querySelectorAll(':scope > subEr');
-  subErElements.forEach(subErElement => {
-    const subEr = {
-      id: '',
-      name: '',
-      description: '',
-      informationUnits: []
-    };
-
-    // Parse sub-ER specId
-    const subSpecId = subErElement.querySelector('specId');
-    if (subSpecId) {
-      const idmCode = subSpecId.getAttribute('idmCode') || '';
-      const idFromCode = idmCode.startsWith('ER-') ? idmCode.substring(3) : idmCode;
-      subEr.id = idFromCode || subSpecId.getAttribute('guid') || `SubER-${Date.now()}`;
-      subEr.name = subSpecId.getAttribute('shortTitle') || subSpecId.getAttribute('fullTitle') || '';
+  // Parse sub-ERs recursively (handles unlimited nesting depth per ISO 29481-3)
+  const subErContainers = getDirectChildren(erElement, 'subEr');
+  subErContainers.forEach(subErContainer => {
+    const nestedErElement = getFirstChild(subErContainer, 'er');
+    if (nestedErElement) {
+      const subEr = parseErElement(nestedErElement);
+      er.subERs.push(subEr);
     }
-
-    // Parse sub-ER description
-    const subDesc = subErElement.querySelector('description');
-    if (subDesc) {
-      subEr.description = subDesc.textContent || '';
-    }
-
-    // Parse sub-ER information units
-    const subInfoUnits = subErElement.querySelectorAll(':scope > informationUnit');
-    subInfoUnits.forEach(iu => {
-      subEr.informationUnits.push(parseInformationUnit(iu));
-    });
-
-    er.subERs.push(subEr);
   });
 
   return er;
@@ -534,22 +869,24 @@ const parseInformationUnit = (iuElement) => {
     subInformationUnits: []
   };
 
-  // Parse examples
-  const examples = iuElement.querySelector('examples description');
-  if (examples) {
-    unit.examples = examples.textContent || '';
+  // Parse examples - namespace-safe
+  const examplesEl = getFirstChild(iuElement, 'examples');
+  const examplesDesc = examplesEl ? getFirstChild(examplesEl, 'description') : null;
+  if (examplesDesc) {
+    unit.examples = examplesDesc.getAttribute('title') || examplesDesc.textContent || '';
   }
 
   // Parse example images (both embedded base64 and file references)
-  const images = iuElement.querySelectorAll('examples image');
-  images.forEach((img, index) => {
+  const images = examplesEl ? getDirectChildren(examplesEl, 'image') : [];
+  // Also check for images inside description element
+  const descImages = examplesDesc ? getDirectChildren(examplesDesc, 'image') : [];
+  [...images, ...descImages].forEach((img, index) => {
     const caption = img.getAttribute('caption') || `Image ${index + 1}`;
     const mimeType = img.getAttribute('mimeType') || 'image/png';
     const encoding = img.getAttribute('encoding');
     const filePath = img.getAttribute('filePath');
 
     if (encoding === 'base64') {
-      // Embedded base64 image - extract from CDATA or text content
       const base64Data = img.textContent?.trim() || '';
       if (base64Data) {
         unit.exampleImages.push({
@@ -561,7 +898,6 @@ const parseInformationUnit = (iuElement) => {
         });
       }
     } else if (filePath) {
-      // File reference - store path for potential loading
       unit.exampleImages.push({
         id: `img-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         name: filePath,
@@ -572,20 +908,25 @@ const parseInformationUnit = (iuElement) => {
     }
   });
 
-  // Parse corresponding external elements
-  const mappings = iuElement.querySelectorAll('correspondingExternalElement');
+  // Parse corresponding external elements (skip empty mappings) - namespace-safe
+  const mappings = getDirectChildren(iuElement, 'correspondingExternalElement');
   mappings.forEach(m => {
-    unit.correspondingExternalElements.push({
-      id: `CEE-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      basis: m.getAttribute('basis') || 'IFC',
-      name: m.getAttribute('name') || ''
-    });
+    const name = m.getAttribute('name') || '';
+    if (name.trim()) {
+      unit.correspondingExternalElements.push({
+        id: `CEE-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        basis: m.getAttribute('basis') || 'IFC',
+        name: name
+      });
+    }
   });
 
-  // Parse sub information units (recursive)
-  const subUnits = iuElement.querySelectorAll(':scope > subInformationUnit > informationUnit');
-  subUnits.forEach(su => {
-    unit.subInformationUnits.push(parseInformationUnit(su));
+  // Parse sub information units (recursive) - namespace-safe
+  const subIuContainers = getDirectChildren(iuElement, 'subInformationUnit');
+  subIuContainers.forEach(container => {
+    getDirectChildren(container, 'informationUnit').forEach(su => {
+      unit.subInformationUnits.push(parseInformationUnit(su));
+    });
   });
 
   return unit;
@@ -606,7 +947,87 @@ export const isIdmXml = (content) => {
   return hasIdmNamespace || hasIdmRoot || (hasUseCase && hasEr);
 };
 
+/**
+ * Detect idmXML schema version (v1.0 or v2.0)
+ * Based on ISO 29481-3 idmXSD schema differences
+ *
+ * @param {string} content - The idmXML content as string
+ * @returns {Object} Version info: { version: '1.0'|'2.0'|'unknown', confidence: 'high'|'medium'|'low', details: string }
+ */
+export const detectIdmXmlVersion = (content) => {
+  if (!content || typeof content !== 'string') {
+    return { version: 'unknown', confidence: 'low', details: 'No content provided' };
+  }
+
+  const result = {
+    version: 'unknown',
+    confidence: 'low',
+    details: '',
+    indicators: []
+  };
+
+  // Check for namespace indicators (most reliable)
+  // v1.0: xmlns:idm="https://standards.buildingsmart.org/IDM/idmXML/0.2" version="1.0"
+  // v2.0: xmlns:idm="https://standards.buildingsmart.org/IDM/idmXML/2.0"
+  const hasV1Namespace = content.includes('idmXML/0.2') || content.includes('idmXML/1.0');
+  const hasV2Namespace = content.includes('idmXML/2.0');
+
+  // Check for version attribute in schema declaration
+  const hasV1VersionAttr = /version\s*=\s*["']1\.0["']/.test(content);
+  const hasV2VersionAttr = /version\s*=\s*["']2\.0["']/.test(content);
+
+  // Check for element naming differences
+  // v1.0 uses "standardProjectPhase", v2.0 uses "standardProjectStage"
+  const hasProjectPhase = content.includes('<standardProjectPhase') || content.includes('standardProjectPhase>');
+  const hasProjectStage = content.includes('<standardProjectStage') || content.includes('standardProjectStage>');
+
+  // v1.0 uses "localProjectPhase", v2.0 uses "localProjectStage"
+  const hasLocalPhase = content.includes('<localProjectPhase') || content.includes('localProjectPhase>');
+  const hasLocalStage = content.includes('<localProjectStage') || content.includes('localProjectStage>');
+
+  // Build indicators list
+  if (hasV1Namespace) result.indicators.push('v1.0 namespace (idmXML/0.2)');
+  if (hasV2Namespace) result.indicators.push('v2.0 namespace (idmXML/2.0)');
+  if (hasV1VersionAttr) result.indicators.push('version="1.0" attribute');
+  if (hasV2VersionAttr) result.indicators.push('version="2.0" attribute');
+  if (hasProjectPhase) result.indicators.push('standardProjectPhase element (v1.0)');
+  if (hasProjectStage) result.indicators.push('standardProjectStage element (v2.0)');
+  if (hasLocalPhase) result.indicators.push('localProjectPhase element (v1.0)');
+  if (hasLocalStage) result.indicators.push('localProjectStage element (v2.0)');
+
+  // Determine version based on indicators
+  const v1Score = (hasV1Namespace ? 3 : 0) + (hasV1VersionAttr ? 2 : 0) + (hasProjectPhase ? 1 : 0) + (hasLocalPhase ? 1 : 0);
+  const v2Score = (hasV2Namespace ? 3 : 0) + (hasV2VersionAttr ? 2 : 0) + (hasProjectStage ? 1 : 0) + (hasLocalStage ? 1 : 0);
+
+  if (v1Score > v2Score && v1Score > 0) {
+    result.version = '1.0';
+    result.confidence = v1Score >= 3 ? 'high' : 'medium';
+    result.details = `Detected idmXSD v1.0 (score: ${v1Score})`;
+  } else if (v2Score > v1Score && v2Score > 0) {
+    result.version = '2.0';
+    result.confidence = v2Score >= 3 ? 'high' : 'medium';
+    result.details = `Detected idmXSD v2.0 (score: ${v2Score})`;
+  } else if (v1Score === v2Score && v1Score > 0) {
+    // Tie - likely mixed or transitional
+    result.version = '2.0'; // Default to newer
+    result.confidence = 'low';
+    result.details = 'Mixed indicators - defaulting to v2.0';
+  } else {
+    // No clear indicators - check for basic idmXML structure
+    if (isIdmXml(content)) {
+      result.version = '2.0'; // Default to newer version for new files
+      result.confidence = 'low';
+      result.details = 'No version indicators found - assuming v2.0';
+    } else {
+      result.details = 'Not a valid idmXML file';
+    }
+  }
+
+  return result;
+};
+
 export default {
   parseIdmXml,
-  isIdmXml
+  isIdmXml,
+  detectIdmXmlVersion
 };

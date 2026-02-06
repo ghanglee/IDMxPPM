@@ -213,6 +213,7 @@ export const SAMPLE_BPMN_XML = `<?xml version="1.0" encoding="UTF-8"?>
 
 export const SAMPLE_HEADER_DATA = {
   title: "Information Delivery Manual for the Generic Data Exchange",
+  shortTitle: "GDE-IDM",
   authors: [
     { type: 'person', givenName: 'Sample', familyName: 'Author', affiliation: 'Sample Organization' }
   ],
@@ -221,9 +222,14 @@ export const SAMPLE_HEADER_DATA = {
   creationDate: new Date().toISOString().split('T')[0],
   status: "NP",
   language: "EN",
-  region: "international",
+  regions: ['international'],  // Array of region codes (ISO 3166-1)
+  region: "international",     // Legacy single value for backward compatibility
   projectStages: [],
+  projectStagesIso: [],
+  projectStagesAia: [],
+  projectStagesRiba: [],
   useCategories: [],
+  uses: [],
   summary: `The Generic Data Exchange Information Delivery Manual (GDE-IDM) aims to define a standardized, domain-agnostic framework for specifying information exchange requirements across the lifecycle of built assets and related digital systems. It provides a structured method to describe what information is required, when it is required, and in what form it should be delivered, independent of specific software platforms, data schemas, or organizational practices.
 
 The GDE-IDM is intended to support interoperability, automation, and consistent information management by enabling clear and machine-interpretable definitions of exchange requirements for diverse applications, including design, construction, operation, and digital twin environments.
@@ -254,8 +260,10 @@ This manual does not prescribe specific software tools, proprietary data formats
   requiredCapabilities: "",
   complianceCriteria: "",
   actorsList: [
-    { id: "actor-Participant_Sender", name: "Sender", role: "Pool", bpmnId: "Participant_Sender" },
-    { id: "actor-Participant_Receiver", name: "Receiver", role: "Pool", bpmnId: "Participant_Receiver" }
+    // Pools (Participants) represent groups/organizations for external exchanges
+    // Lanes within Pools represent individuals for internal exchanges
+    { id: "actor-Participant_Sender", name: "Sender", role: "", actorType: "group", bpmnId: "Participant_Sender", bpmnShapeName: "Sender", subActors: [] },
+    { id: "actor-Participant_Receiver", name: "Receiver", role: "", actorType: "group", bpmnId: "Participant_Receiver", bpmnShapeName: "Receiver", subActors: [] }
   ]
 };
 
@@ -348,6 +356,62 @@ export const SAMPLE_ER_DATA_MAP = {
   }
 };
 
+export const SAMPLE_ER_HIERARCHY = [
+  {
+    id: "er-sample-root",
+    guid: "db387697-ab4c-4827-ab96-f3ecd3969570",
+    name: "er_GDE-IDM",
+    description: "IDM for the generic data exchange",
+    informationUnits: [
+      {
+        id: "iu-project-definition",
+        name: "project definition",
+        dataType: "String / Text",
+        isMandatory: true,
+        definition: "project definition",
+        examples: "",
+        exampleImages: [],
+        correspondingExternalElements: [
+          {
+            id: "cee-root-1",
+            basis: "IFC 4x3 ADD2",
+            name: "IfcProject",
+            description: "Root element of IFC model",
+            uri: "",
+            category: "Project"
+          }
+        ],
+        subInformationUnits: []
+      }
+    ],
+    subERs: [
+      {
+        ...SAMPLE_ER_DATA_MAP["DataObject_Exchange"],
+        guid: "ER-PrepData"
+      },
+      {
+        ...SAMPLE_ER_DATA_MAP["DataObjectReference_1owrwqd"],
+        guid: "ER-SubmissionPackage",
+        subERs: [
+          {
+            id: "sub-er-prepdata-copy",
+            name: "er_PrepData",
+            description: SAMPLE_ER_DATA_MAP["DataObject_Exchange"].description,
+            informationUnits: SAMPLE_ER_DATA_MAP["DataObject_Exchange"].informationUnits,
+            linkedTo: "DataObject_Exchange",
+            sourceERId: "ER-PrepData"
+          }
+        ]
+      }
+    ]
+  }
+];
+
+export const SAMPLE_DATA_OBJECT_ER_MAP = {
+  "DataObject_Exchange": "ER-PrepData",
+  "DataObjectReference_1owrwqd": "ER-SubmissionPackage"
+};
+
 export const SAMPLE_ER_LIBRARY = [
   {
     id: "ER-PrepData",
@@ -369,5 +433,7 @@ export default {
   SAMPLE_BPMN_XML,
   SAMPLE_HEADER_DATA,
   SAMPLE_ER_DATA_MAP,
+  SAMPLE_ER_HIERARCHY,
+  SAMPLE_DATA_OBJECT_ER_MAP,
   SAMPLE_ER_LIBRARY
 };

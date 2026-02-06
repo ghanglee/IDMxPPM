@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:idm="https://standards.buildingsmart.org/IDM/idmXML/0.2" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+	<xs:element name="specId">
+		<xs:complexType>
+			<xs:attribute name="guid" type="uuid" use="required"/>
+			<xs:attribute name="shortTitle" type="xs:string" use="required"/>
+			<xs:attribute name="localShortTitle" type="xs:string" use="optional"/>
+			<xs:attribute name="fullTitle" type="xs:string" use="required"/>
+			<xs:attribute name="subTitle" type="xs:string" use="optional"/>
+			<xs:attribute name="idmCode" type="xs:string" use="required"/>
+			<xs:attribute name="localCode" type="xs:string" use="optional"/>
+			<xs:attribute name="documentStatus" type="xs:string" use="required"/>
+			<xs:attribute name="localDocumentStatus" type="xs:string" use="optional"/>
+			<xs:attribute name="version" type="xs:string" use="optional"/>
+		</xs:complexType>
+		<xs:key name="key_guid">
+			<xs:selector xpath="."/>
+			<xs:field xpath="@guid"/>
+		</xs:key>
+	</xs:element>
+	<xs:simpleType name="uuid">
+		<xs:restriction base="xs:normalizedString">
+			<xs:length value="36" fixed="true"/>
+			<xs:pattern value="[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}"/>
+		</xs:restriction>
+	</xs:simpleType>
+</xs:schema>

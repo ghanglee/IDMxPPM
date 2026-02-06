@@ -1,0 +1,212 @@
+.file-picker-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  backdrop-filter: blur(2px);
+}
+
+.file-picker-modal {
+  background: var(--bg-secondary, #1e293b);
+  border: 1px solid var(--border-color, #334155);
+  border-radius: 12px;
+  width: 480px;
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+
+.file-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color, #334155);
+  background: var(--bg-tertiary, #0f172a);
+}
+
+.file-picker-header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #f1f5f9);
+}
+
+.file-picker-close {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary, #94a3b8);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.file-picker-close:hover {
+  background: var(--bg-hover, #334155);
+  color: var(--text-primary, #f1f5f9);
+}
+
+.file-picker-content {
+  padding: 16px 20px;
+  overflow-y: auto;
+  max-height: calc(80vh - 60px);
+}
+
+.file-picker-subtitle {
+  margin: 0 0 16px 0;
+  font-size: 13px;
+  color: var(--text-secondary, #94a3b8);
+}
+
+.file-format-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.file-format-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: var(--bg-tertiary, #0f172a);
+  border: 1px solid var(--border-color, #334155);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+  width: 100%;
+}
+
+.file-format-item:hover {
+  background: var(--bg-hover, #334155);
+  border-color: var(--accent-color, #3b82f6);
+  transform: translateX(2px);
+}
+
+.file-format-item:active {
+  transform: translateX(2px) scale(0.99);
+}
+
+.file-format-icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-color, #3b82f6);
+  border-radius: 8px;
+  color: white;
+}
+
+.file-format-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.file-format-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #f1f5f9);
+}
+
+.file-format-ext {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--accent-color, #3b82f6);
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+}
+
+.file-format-desc {
+  font-size: 12px;
+  color: var(--text-secondary, #94a3b8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Different icon colors for different formats */
+.file-format-item:nth-child(1) .file-format-icon {
+  background: #3b82f6; /* Blue for IDM Project */
+}
+
+.file-format-item:nth-child(2) .file-format-icon {
+  background: #8b5cf6; /* Purple for idmXML */
+}
+
+.file-format-item:nth-child(3) .file-format-icon {
+  background: #f59e0b; /* Amber for ZIP */
+}
+
+.file-format-item:nth-child(4) .file-format-icon {
+  background: #6366f1; /* Indigo for xPPM */
+}
+
+.file-format-item:nth-child(5) .file-format-icon {
+  background: #10b981; /* Emerald for BPMN */
+}
+
+.file-format-item:nth-child(6) .file-format-icon {
+  background: #64748b; /* Slate for All Formats */
+}
+
+/* Light theme support */
+[data-theme="light"] .file-picker-modal {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .file-picker-header {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .file-picker-header h2 {
+  color: #1e293b;
+}
+
+[data-theme="light"] .file-picker-close {
+  color: #64748b;
+}
+
+[data-theme="light"] .file-picker-close:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+[data-theme="light"] .file-picker-subtitle {
+  color: #64748b;
+}
+
+[data-theme="light"] .file-format-item {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .file-format-item:hover {
+  background: #f1f5f9;
+  border-color: #3b82f6;
+}
+
+[data-theme="light"] .file-format-name {
+  color: #1e293b;
+}
+
+[data-theme="light"] .file-format-desc {
+  color: #64748b;
+}

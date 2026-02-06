@@ -159,15 +159,71 @@ export const searchSchema = (schema, query, matchType = 'exact', limit = 20) => 
   }
 };
 
-// bSDD API Client ID for authenticated access
-const BSDD_CLIENT_ID = 'b222e220-1f71-4962-9184-05e0481a390d';
+// bSDD API configuration
+// Search endpoints are unsecured (no auth required), only need User-Agent header
+const BSDD_API_BASE = 'https://api.bsdd.buildingsmart.org';
+const BSDD_IFC_DICTIONARY_URI = 'https://identifier.buildingsmart.org/uri/buildingsmart/ifc/4.3';
+const BSDD_USER_AGENT = 'IDMxPPM-NeoSeoul/1.1';
+const BSDD_TIMEOUT = 10000; // 10 seconds
 
 /**
- * Search bSDD API for elements
- * Based on buildingSMART API documentation:
- * https://technical.buildingsmart.org/services/bsdd/using-the-bsdd-api/
+ * Helper: make a bSDD API request with timeout and error handling
+ */
+const bsddFetch = async (url) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), BSDD_TIMEOUT);
+
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': BSDD_USER_AGENT
+      },
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    if (!response.ok) {
+      throw new Error(`bSDD API error: ${response.status} ${response.statusText}`);
+    }
+    return await response.json();
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
+};
+
+/**
+ * Map bSDD class items to our result format
+ */
+const mapBsddResults = (classes, matchType, defaultCategory = 'bSDD (IFC 4.3)') => {
+  const results = [];
+  for (const item of classes) {
+    if (!item) continue;
+    const name = item.name || item.Name || '';
+    if (!name) continue;
+    // referenceCode is the IFC entity name (e.g. "IfcDoor", "IfcWall")
+    const code = item.referenceCode || item.code || item.Code || name;
+    results.push({
+      name: code !== name ? `${code} (${name})` : name,
+      code,
+      description: item.definition || item.Definition || item.description || item.Description || '',
+      category: item.dictionaryName || item.DictionaryName || defaultCategory,
+      uri: item.uri || item.Uri || '',
+      score: matchType === 'exact' ? 1 : 0.8,
+      matchType
+    });
+  }
+  return results;
+};
+
+/**
+ * Search bSDD API for IFC elements
+ * Uses SearchInDictionary/v1 (primary) with Class/Search/v1 fallback
  *
- * @param {string} query - Search query
+ * API docs: https://github.com/buildingSMART/bSDD/blob/master/Documentation/bSDD%20API.md
+ *
+ * @param {string} query - Search query (min 2 characters)
  * @param {string} matchType - 'exact' or 'semantic'
  * @returns {Promise<Array>} Search results
  */
@@ -176,148 +232,49 @@ export const searchBsdd = async (query, matchType = 'exact') => {
     return [];
   }
 
-  try {
-    // bSDD API v1 SearchInDictionary endpoint
-    // API documentation: https://app.swaggerhub.com/apis/buildingSMART/Dictionaries/v1
-    const baseUrl = 'https://api.bsdd.buildingsmart.org/api/SearchInDictionary/v1';
+  const searchText = query.trim();
 
-    // Search specifically in IFC dictionary for better results
+  // Primary: SearchInDictionary/v1 — searches within IFC 4.3 dictionary
+  try {
     const params = new URLSearchParams({
-      SearchText: query.trim(),
-      DictionaryUri: 'https://identifier.buildingsmart.org/uri/buildingsmart/ifc/4.3',
+      SearchText: searchText,
+      DictionaryUri: BSDD_IFC_DICTIONARY_URI,
       Offset: '0',
       Limit: '25'
     });
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    const data = await bsddFetch(`${BSDD_API_BASE}/api/SearchInDictionary/v1?${params}`);
+    // SearchInDictionary/v1 nests classes under data.dictionary.classes
+    const classes = data?.dictionary?.classes || data?.classes || data?.Classes || [];
 
-    const response = await fetch(`${baseUrl}?${params}`, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'X-User-Agent': 'IDMxPPM-NeoSeoul/1.0',
-        'X-Client-Id': BSDD_CLIENT_ID
-      },
-      signal: controller.signal
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      console.error('bSDD API error:', response.status, response.statusText);
-      // Try alternative SearchList endpoint
-      return await searchBsddAlternative(query, matchType);
+    if (classes.length > 0) {
+      return mapBsddResults(classes, matchType);
     }
-
-    const data = await response.json();
-
-    // Map bSDD results to our format with defensive null checks
-    const classes = data?.classes || data?.Classes || [];
-    const results = [];
-
-    for (const item of classes) {
-      if (!item) continue;
-
-      const name = item.name || item.Name || item.code || item.Code || '';
-      if (!name) continue; // Skip items with no name
-
-      results.push({
-        name,
-        code: item.code || item.Code || name,
-        description: item.definition || item.Definition || item.description || item.Description || '',
-        category: item.dictionaryName || item.DictionaryName || 'bSDD (IFC 4.3)',
-        uri: item.uri || item.Uri || '',
-        score: matchType === 'exact' ? 1 : 0.8,
-        matchType
-      });
-    }
-
-    return results;
   } catch (error) {
     if (error.name === 'AbortError') {
-      console.warn('bSDD API request timed out');
+      console.warn('bSDD SearchInDictionary timed out');
       return [];
     }
-    console.error('bSDD search error:', error);
-    // Try alternative endpoint
-    try {
-      return await searchBsddAlternative(query, matchType);
-    } catch (altError) {
-      console.error('bSDD alternative search also failed:', altError);
-      return [];
-    }
+    console.warn('bSDD SearchInDictionary failed, trying Class/Search fallback:', error.message);
   }
-};
 
-/**
- * Alternative bSDD search using general SearchList endpoint
- */
-const searchBsddAlternative = async (query, matchType = 'exact') => {
+  // Fallback: Class/Search/v1 — class-specific search filtered to IFC
   try {
-    const baseUrl = 'https://api.bsdd.buildingsmart.org/api/SearchList/v1';
     const params = new URLSearchParams({
-      SearchText: query.trim(),
+      SearchText: searchText,
+      DictionaryUris: BSDD_IFC_DICTIONARY_URI,
       Offset: '0',
       Limit: '25'
     });
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-
-    const response = await fetch(`${baseUrl}?${params}`, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'X-User-Agent': 'IDMxPPM-NeoSeoul/1.0',
-        'X-Client-Id': BSDD_CLIENT_ID
-      },
-      signal: controller.signal
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      console.error('bSDD SearchList API error:', response.status);
-      return [];
-    }
-
-    const data = await response.json();
-
-    // Handle both camelCase and PascalCase responses with defensive null checks
-    const dictionaries = data?.dictionaries || data?.Dictionaries || [];
-    const results = [];
-
-    for (const dict of dictionaries) {
-      if (!dict) continue;
-
-      const classes = dict.classes || dict.Classes || [];
-      const dictName = dict.name || dict.Name || 'bSDD';
-
-      for (const item of classes) {
-        if (!item) continue;
-
-        const name = item.name || item.Name || '';
-        if (!name) continue; // Skip items with no name
-
-        results.push({
-          name,
-          code: item.code || item.Code || name,
-          description: item.definition || item.Definition || '',
-          category: dictName,
-          uri: item.uri || item.Uri || '',
-          score: matchType === 'exact' ? 1 : 0.8,
-          matchType
-        });
-      }
-    }
-
-    return results.slice(0, 25);
+    const data = await bsddFetch(`${BSDD_API_BASE}/api/Class/Search/v1?${params}`);
+    const classes = data?.classes || data?.Classes || [];
+    return mapBsddResults(classes, matchType);
   } catch (error) {
     if (error.name === 'AbortError') {
-      console.warn('bSDD SearchList API request timed out');
+      console.warn('bSDD Class/Search timed out');
     } else {
-      console.error('bSDD alternative search error:', error);
+      console.error('bSDD Class/Search also failed:', error.message);
     }
     return [];
   }

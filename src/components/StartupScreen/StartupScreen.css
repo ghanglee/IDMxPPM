@@ -137,6 +137,13 @@
   color: var(--text-muted);
 }
 
+.startup-footer .startup-version {
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.7;
+  margin-bottom: 8px;
+}
+
 .startup-footer a {
   color: var(--accent-primary);
   text-decoration: none;

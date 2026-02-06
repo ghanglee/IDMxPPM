@@ -387,6 +387,43 @@ export const generateStandaloneHtml = ({
       margin: 3px;
     }
 
+    .tag.small {
+      padding: 2px 6px;
+      font-size: 8pt;
+    }
+
+    .actors-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      font-size: 10pt;
+    }
+
+    .actors-table th,
+    .actors-table td {
+      border: 1px solid #ddd;
+      padding: 10px 12px;
+      text-align: left;
+    }
+
+    .actors-table th {
+      background: #0066cc;
+      color: white;
+      font-weight: 600;
+    }
+
+    .actors-table tr:nth-child(even) {
+      background: #f9f9f9;
+    }
+
+    .sub-actor-row {
+      background: #f5f5f5 !important;
+    }
+
+    .sub-actor-row td:first-child {
+      color: #666;
+    }
+
     .external-mapping {
       font-size: 9pt;
       color: #666;
@@ -692,9 +729,48 @@ const generateActorsSection = (actors) => {
   return `
   <div class="section">
     <h3>Actors</h3>
-    <ul>
-      ${actors.map(a => `<li><strong>${escapeHtml(a.name)}</strong>${a.role ? ` - ${escapeHtml(a.role)}` : ''}</li>`).join('')}
-    </ul>
+    <table class="actors-table">
+      <thead>
+        <tr>
+          <th>Actor Name</th>
+          <th>Type</th>
+          <th>BPMN Shape</th>
+          <th>Role</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${actors.map(actor => {
+          const actorType = actor.actorType || 'group';
+          const actorTypeLabel = actorType === 'group' ? 'Organization' : 'Individual';
+          const bpmnShape = actor.bpmnShapeName || actor.bpmnId || '-';
+          const role = actor.role || '-';
+          const subActors = actor.subActors || [];
+
+          let rows = `
+            <tr>
+              <td><strong>${escapeHtml(actor.name)}</strong></td>
+              <td><span class="tag">${escapeHtml(actorTypeLabel)}</span></td>
+              <td>${escapeHtml(bpmnShape)}</td>
+              <td>${escapeHtml(role)}</td>
+            </tr>
+          `;
+
+          // Add sub-actors (lanes) if present
+          if (subActors.length > 0) {
+            rows += subActors.map(sub => `
+              <tr class="sub-actor-row">
+                <td>&nbsp;&nbsp;&nbsp;&nbsp;└ ${escapeHtml(sub.name)}</td>
+                <td><span class="tag small">Lane</span></td>
+                <td>${escapeHtml(sub.bpmnShapeName || '-')}</td>
+                <td>-</td>
+              </tr>
+            `).join('');
+          }
+
+          return rows;
+        }).join('')}
+      </tbody>
+    </table>
   </div>
   `;
 };

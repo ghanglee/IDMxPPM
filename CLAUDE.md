@@ -101,7 +101,13 @@ IDM Specification
 |-------|---------------|-------------|
 | **Header Panel** | Hidden | Click "Header" button in toolbar |
 | **ER Panel** | Hidden | Click "ER List" button OR double-click Data Object |
-| **BPMN Editor** | Visible | Always visible (main workspace) |
+| **BPMN Editor** | Visible | Collapsible via ER Panel toolbar when editing ERs |
+
+### Collapsible BPMN Editor
+When the ER Panel is open, users can toggle BPMN visibility:
+- **Toggle Button**: Located in ER Panel toolbar ("Hide BPMN" / "Show BPMN")
+- **Expanded Mode**: When BPMN is hidden, ER Panel expands to fill available width
+- **Use Case**: Maximize workspace when focusing on Information Units and Sub-ERs
 
 ## Key Functionalities
 
@@ -115,10 +121,25 @@ Required: Full Title, Short Title, Status
 Displayed by default (optional): Version
 Optional: Sub-Title, Local Code, Copyright, License
 
-### Exchange Requirement (ER) Panel
-- ER List View and ER Detail View
+### Exchange Requirement (ER) Panel - Table-Based Tree View
+- **Hierarchical Tree Table** - ERs and Information Units displayed in a table with tree structure
+- **Table Columns**: Name (with tree indent), Data Type, Definition, Mandatory, Examples, Constraints, Ext. Elm.
+- **ERToolbar** - Actions: +ER, -ER, >ER (nest as sub-ER), Expand All, Collapse All, Toggle BPMN
+- **ERDetailPanel** - Form panel below table for editing selected item
+- **Collapsible BPMN** - BPMN editor can be hidden to maximize ER workspace
 - Double-click Data Object to open with that ER selected
 - Components: id, name, definition, informationUnits, constraints, correspondingMvd, subEr
+
+#### ER Table Columns
+| Column | Description |
+|--------|-------------|
+| Name | ER/IU name with tree indentation and icons |
+| Data Type | Information Unit data type (dropdown) |
+| Definition | IU definition (truncated in table, full in detail) |
+| Mandatory | IU mandatory flag (checkbox) |
+| Examples | IU examples (truncated) |
+| Constraints | IU constraints indicator |
+| Ext. Elm. | External element mapping count badge |
 
 ### Information Unit Components
 Required: id, name, dataType, isMandatory, definition
@@ -227,9 +248,13 @@ npm run build:all    # Build both platforms
 - **Data Object tooltip** showing "Double-click to specify this Exchange Requirement"
 - Fixed default diagram to avoid overlapping elements
 
-#### Exchange Requirement (ER) Editor
-- **Individual ER Panel** (right side) for detailed editing
-- **ER name display** in panel header (instead of Data Object UID)
+#### Exchange Requirement (ER) Editor - Table-Based Tree View
+- **Hierarchical Tree Table** - ERs and Information Units in spreadsheet-like view
+- **Table Columns**: Name (with tree), Data Type, Definition, Mandatory, Examples, Constraints, Ext. Elm.
+- **ERToolbar** - +ER (add), -ER (delete), >ER (nest as sub-ER), Expand/Collapse All, Toggle BPMN
+- **ERDetailPanel** - Form below table for editing selected item (ER or IU)
+- **Collapsible BPMN** - Hide BPMN editor to maximize ER workspace
+- **Tree Structure**: ERs as folder icons, Sub-ERs nested, Information Units as document icons
 - **ER List** in Content Pane showing all ERs in project
 - **Information Units** with hierarchical support (sub-units)
 - **Flexible data types**: String/Text, Numeric, Boolean, Date/Time, Image, Audio, Video, 2D Vector Drawing, 3D Model, Document, Structured (list, graph, table, JSON), or custom
@@ -283,7 +308,13 @@ npm run build:all    # Build both platforms
 - **New Project** - Creates blank project with default BPMN diagram
 - **Open Project** - Browser file input fallback (Electron IPC support)
 - **Import Formats** - IDM project (.idm), idmXML (.xml), ZIP bundle (.zip), legacy xPPM (.xppm), BPMN (.bpmn)
-- **xPPM Import** - Import from legacy xPPM format with header, use case, and ER conversion
+- **xPPM Import** - Import from legacy xPPM format with full data conversion:
+  - Header data (title, authors, version, status)
+  - Use Case information (summary, aim & scope, actors, project phases)
+  - Exchange Requirements with Information Units
+  - BPMN diagram path detection (auto-detects Diagram folder reference)
+  - Image references parsed (displayed as placeholders until loaded)
+  - Data object to ER mappings preserved
 - **Close Project** - Proper cleanup with unsaved changes confirmation
 - **Save/Export** - Multiple format export with customizable filename (default from Short Title)
 - **Dirty state tracking** with visual indicator
@@ -301,14 +332,23 @@ npm run build:all    # Build both platforms
 - **BPMN Only (.bpmn)** - Process map diagram export
 - **XSLT Template Download** - Download default stylesheet for customization
 
-#### idmXML Generation
-- Full ISO 29481-3 compliant XML generation
+#### idmXML Generation (idmXSD v2.0 Compliant)
+- Full **idmXSD v2.0** compliant XML generation (namespace: `idmXML/2.0`)
+- **Version Detection** - Automatic detection of idmXSD v1.0 vs v2.0 files on import
 - **BPMN Embedding** - BPMN diagram XML is embedded directly in idmXML within CDATA section
 - **BPMN Restoration** - Embedded BPMN is automatically restored when loading idmXML files
 - **Image Embedding** - Base64 encoded images for section figures and examples
 - **Figure Support** - Images for Summary, Aim & Scope, Benefits, Limitations sections
 - Proper XML escaping and UUID generation (persistent GUIDs)
 - Support for all IDM elements: UC, BCM, PM, ER, IU
+
+#### idmXSD v2.0 Structure Compliance
+- **authoring** element with `copyright` attribute (required)
+- **changeLog** elements under authoring (with `id`, `changeDateTime`, `changeSummary`, `changedBy`)
+- **author** elements with `id` attribute containing `<person>` or `<organization>` children
+- **standardProjectStage** (v2.0) instead of standardProjectPhase (v1.0)
+- **localProjectStage** (v2.0) instead of localProjectPhase (v1.0)
+- **classification** elements with required `id` and `name` attributes
 
 ### Architecture
 
@@ -365,22 +405,45 @@ src/
 +----+-------------------------------------------------------------+
 |    |                                                             |
 | V  |  ContentPane   |     BPMNEditor      |      ERPanel        |
-| E  |  (toggled)     |     (always)        |      (on select)    |
+| E  |  (toggled)     |    (collapsible)    |  (table tree view)  |
 | R  |                |                     |                     |
-| T  |  - Basic Info  |     BPMN canvas     |      ER details     |
-| I  |  - Use Case    |     with toolbar    |      Info Units     |
-| C  |  - ER List     |     in footer       |      Sub-ERs        |
-| A  |                |                     |                     |
-| L  | New / Open     |     Zoom, Pan       |                     |
-|    | (no project)   |     Export          |                     |
-| M  |                |                     |                     |
-| E  | Spec / UC / ER |                     |                     |
+| T  |  - Basic Info  |     BPMN canvas     |  [+ER][-ER][>ER]    |
+| I  |  - Use Case    |     with toolbar    |  [Expand][Collapse] |
+| C  |  - ER List     |     in footer       |  [Toggle BPMN]      |
+| A  |                |                     |  ─────────────────  |
+| L  | New / Open     |     Zoom, Pan       |  Tree Table View    |
+|    | (no project)   |     Export          |  ─────────────────  |
+| M  |                |                     |  Detail Panel       |
+| E  | Spec / UC / ER |                     |  (edit selected)    |
 | N  | Validate       |                     |                     |
 | U  | Save & Export  |                     |                     |
 |    | Close Project  |                     |                     |
 +----+-------------------------------------------------------------+
 | Status: [File Path] [Dirty*] | ERs: N | Library: N | [Valid]    |
 +------------------------------------------------------------------+
+```
+
+**BPMN Hidden Mode (ER Expanded)**:
+```
++------------------------------------------------------------------+
+|  [Spec Name]                                    [Theme Toggle]   |
++----+-------------------------------------------------------------+
+|    |                                                             |
+| V  |  ContentPane   |           ERPanel (expanded)               |
+| E  |  (toggled)     |  [+ER][-ER][>ER] [Expand][Collapse] [BPMN] |
+| R  |                |  ───────────────────────────────────────── |
+| T  |  - Basic Info  |  Name         |Type  |Def    |Req|Ex |Ext |
+| I  |  - Use Case    |  ▶ er_Name    |      |       |   |   |    |
+| C  |  - ER List     |    ▶ subER    |      |       |   |   |    |
+| A  |                |      ◦ IU_1   |String|Desc...|☑  |Yes| 2  |
+| L  | New / Open     |      ◦ IU_2   |Bool  |...    |☐  |-  | -  |
+|    | (no project)   |  ───────────────────────────────────────── |
+| M  |                |  Detail Panel: [Edit Information Unit]     |
+| E  | Spec / UC / ER |  Name: [____] DataType: [▼] Definition:    |
+| N  | Validate       |  [________________] Mandatory: [☑]         |
+| U  | Save & Export  |  Examples: [____] External Mappings: [+]   |
+|    | Close Project  |                                             |
++----+-------------------------------------------------------------+
 ```
 
 ### UI/Branding
@@ -397,3 +460,131 @@ src/
 5. **MVD linking** not implemented
 6. **Multi-language support** for UI (currently English only)
 7. **Actor sync with BPMN swimlanes** - bidirectional sync needs implementation (actors can be manually added/managed but not auto-synced with BPMN lanes)
+
+---
+
+## ER-First Architecture: UI Design & Development Checklist
+
+### Core Concept
+The ER-first architecture uses `erHierarchy` as the single source of truth for all Exchange Requirements, replacing the old `dataObjectErMap` approach. BPMN Data Objects can optionally be associated with ERs via `dataObjectErMap`.
+
+### Three-Pane Design
+
+| Pane | Location | Purpose |
+|------|----------|---------|
+| **ER Hierarchy** | ContentPane (left sidebar) | Navigation - shows full ER tree structure |
+| **Individual ER** | ERPanel (center/right) | Shows selected ER's content (IUs, Sub-ERs) |
+| **Detail Panel** | Bottom of ERPanel | Edit details of clicked item (ER, Sub-ER, or IU) |
+
+### Design Rules
+
+#### Rule 1: ER Hierarchy as Navigation
+- The ER Hierarchy in ContentPane shows the complete tree of all ERs
+- Clicking an ER in the hierarchy **changes** which ER is displayed in the Individual ER pane
+- This is the **only** way to change which ER is being viewed/edited
+
+#### Rule 2: Single Top-Level ER (Root ER)
+- Only **ONE** top-level ER is allowed in `erHierarchy`
+- All other ERs must be nested as Sub-ERs
+- **On import**: If multiple top-level ERs exist, prompt users to:
+  - Select one as the root ER (others consolidated under it), OR
+  - Create a new top-level ER named "er_" + ShortTitle (others become sub-ERs)
+  - The hierarchy of the ERs should be preserved
+- **Multiple BPMN Data Objects**: Same prompt behavior as import
+- **Root Switch via Outdent**: When outdenting a second-level ER, prompt:
+  > "Do you want to make '[ER Name]' the new Root ER?"
+  - **Option A: New Root (Dissolve Old)**: Old root is deleted. Its children (excluding new root) are promoted/merged as children of the new root.
+  - **Option B: New Root (Keep Old)**: Old root becomes a sub-ER of the new root.
+  - **Cancel**: The outdent action is cancelled.
+
+#### Rule 3: Individual ER Pane Shows Selected ER's Tree
+- Displays the currently selected ER in the ER Hierarchy pane and its contents:
+  - Information Units (IUs)
+  - Sub-ERs (and their IUs/Sub-ERs recursively)
+- Title shows "Individual ER" with the selected ER's name
+
+#### Rule 4: Clicking in Individual ER Pane Does NOT Change Displayed ER
+- Clicking an item (ER, Sub-ER, or IU) in the Individual ER pane:
+  - ✅ Shows that item's details in the bottom Detail Panel
+  - ❌ Does NOT navigate to a different ER (no drill-down)
+- Users can only change the displayed ER via the ER Hierarchy
+
+#### Rule 5: Detail Panel Shows Clicked Item
+- When any row is clicked in Individual ER pane, its details appear in the bottom panel
+- Works for: Root ER, Sub-ERs, Information Units
+- Enables editing of the selected item's properties
+
+#### Rule 6: Top-Level ER Editable
+- The top-level (root) ER can be clicked in ER Hierarchy
+- Its details appear in the Detail Panel for editing
+- Users can specify name, description, etc.
+
+#### Rule 7: Sub-ER Adding
+- When "+ER" is clicked in the Individual ER pane, Sub-ERs can be added from:
+  1. **Current IDM** - Select from existing ERs (**Move operation**: moves ER from current location to here)
+  2. **Import erXML** - Import from external erXML file
+- Added Sub-ERs become children of the currently selected ER in the Individual ER pane
+- The details of the added Sub-ERs are displayed in the Detail Panel for editing
+
+### Data Structures
+
+```javascript
+// Source of truth
+erHierarchy = [
+  {
+    id: 'root-er-id',
+    name: 'Root ER',
+    description: '...',
+    informationUnits: [...],
+    subERs: [
+      {
+        id: 'sub-er-1',
+        name: 'Sub-ER 1',
+        informationUnits: [...],
+        subERs: [...]  // Recursive
+      }
+    ]
+  }
+  // Only ONE top-level ER allowed (Rule 2)
+]
+
+// Optional BPMN association
+dataObjectErMap = {
+  'DataObject_xyz': 'er-id-123'  // Maps BPMN element to ER
+}
+```
+
+### Key Callbacks
+
+| Callback | Purpose |
+|----------|---------|
+| `onSelectER(erId)` | Change which ER is displayed (ER Hierarchy only) |
+| `onUpdateER(erId, updatedData)` | Update an ER's data |
+| `onAddER()` | Add new root ER (blocked if one exists) |
+| `onDeleteER(erId)` | Delete an ER |
+| `onIndent(erId)` | Make ER a sub-ER of sibling above |
+| `onOutdent(erId)` | Promote sub-ER (intercepted if targeting level-2 ER to trigger Root Switch) |
+
+### Empty States
+
+| State | Message |
+|-------|---------|
+| No ER selected | "No ER selected" / "Select an ER from the ER Hierarchy" |
+| ER selected but empty | "ER is empty" / "Add Information Units using the toolbar" |
+| No ERs in project | "No ERs in project" |
+
+### Implementation Checklist
+
+- [x] `erHierarchy` as source of truth
+- [x] ER Hierarchy navigation in ContentPane
+- [x] Individual ER pane shows selected ER's tree
+- [x] Click in Individual ER → Detail Panel only (no drill-down)
+- [x] Top-level ER clickable and editable
+- [x] Sub-ER adding via erXML import
+- [x] Updated empty state messages
+- [x] Header title "Individual ER"
+- [x] Single top-level ER enforcement with user prompt (Rule 2)
+- [x] Root Selection Modal for import/multiple data objects
+- [x] Root Switch Modal for outdent-to-root scenarios
+- [x] Sub-ER adding from current IDM as **Move** operation
+- [x] Auto-select added Sub-ER in Detail Panel

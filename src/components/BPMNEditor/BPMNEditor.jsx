@@ -10,8 +10,11 @@ import {
   PanIcon,
   ExportSVGIcon,
   ExportBPMNIcon,
+  ImportBPMNIcon,
   ExportPNGIcon,
-  AutoLayoutIcon
+  AutoLayoutIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon
 } from '../icons';
 import './BPMNEditor.css';
 
@@ -25,17 +28,27 @@ import './BPMNEditor.css';
  * @param {Object} props
  * @param {string} props.xml - Initial BPMN XML to load
  * @param {function} props.onDataObjectSelect - Callback when Data Object is selected (for ER editing)
+ * @param {function} props.onNewDataObject - Callback when a new Data Object is created (for ER-first workflow)
  * @param {function} props.onChange - Callback when diagram changes
  * @param {function} props.onReady - Callback when modeler is ready
+ * @param {function} props.onImportBpmn - Callback when BPMN is imported (receives new XML content)
+ * @param {function} props.onToggleCollapse - Callback to toggle BPMN visibility
+ * @param {boolean} props.canCollapse - Whether the collapse button should be shown
  */
 const BPMNEditor = ({
   xml,
   onDataObjectSelect,
+  onNewDataObject,
   onChange,
-  onReady
+  onReady,
+  onImportBpmn,
+  onToggleCollapse,
+  canCollapse = false
 }) => {
   const containerRef = useRef(null);
+  const paletteContainerRef = useRef(null);
   const modelerRef = useRef(null);
+  const isImportingRef = useRef(false); // Track when importing to prevent modal during import
   const [isReady, setIsReady] = useState(false);
   const [selectedElement, setSelectedElement] = useState(null);
   const [error, setError] = useState(null);
@@ -88,6 +101,9 @@ const BPMNEditor = ({
     // Import diagram
     const loadDiagram = async () => {
       try {
+        // Set flag to prevent onNewDataObject during import
+        isImportingRef.current = true;
+
         // Determine which diagram to load initially
         let diagramXml;
         if (xml === 'EMPTY' || xml === 'BLANK' || xml === null || xml === undefined) {
@@ -101,30 +117,26 @@ const BPMNEditor = ({
         }
         const { warnings } = await modeler.importXML(diagramXml);
 
+        // Reset flag after import completes
+        isImportingRef.current = false;
+
         if (warnings.length) {
           console.warn('BPMN import warnings:', warnings);
         }
 
-        // Fit diagram to viewport, accounting for palette width
+        // Fit diagram to viewport
         const canvas = modeler.get('canvas');
         canvas.zoom('fit-viewport');
 
-        // Shift viewport to account for palette width (48px)
-        // This prevents the diagram from overlapping with the palette
+        // Move palette to separate container for proper layout separation
         setTimeout(() => {
-          try {
-            const viewbox = canvas.viewbox();
-            const paletteOffset = 48 / (viewbox.scale || 1);
-            canvas.viewbox({
-              x: viewbox.x - paletteOffset / 2,
-              y: viewbox.y,
-              width: viewbox.width,
-              height: viewbox.height
-            });
-          } catch (e) {
-            // Ignore errors - viewport adjustment is optional
+          if (paletteContainerRef.current && container) {
+            const palette = container.querySelector('.djs-palette');
+            if (palette && palette.parentNode !== paletteContainerRef.current) {
+              paletteContainerRef.current.appendChild(palette);
+            }
           }
-        }, 100);
+        }, 50);
 
         setIsReady(true);
         setError(null);
@@ -135,6 +147,7 @@ const BPMNEditor = ({
       } catch (err) {
         console.error('Failed to import BPMN diagram:', err);
         setError(err.message);
+        isImportingRef.current = false; // Reset flag on error
       }
     };
 
@@ -221,6 +234,30 @@ const BPMNEditor = ({
       }
     });
 
+    // New Data Object created (for ER-first workflow)
+    eventBus.on('shape.added', (e) => {
+      const element = e.element;
+      // Only trigger for Data Objects created from palette (not during import)
+      if (isImportingRef.current) return; // Skip during import
+
+      if (onNewDataObject && (
+        element.type === 'bpmn:DataObjectReference' ||
+        element.type === 'bpmn:DataObject' ||
+        element.type === 'bpmn:DataStoreReference'
+      )) {
+        // Small delay to ensure the element is fully added
+        setTimeout(() => {
+          const businessObject = element.businessObject;
+          onNewDataObject({
+            id: element.id,
+            type: element.type,
+            name: businessObject?.name || '',
+            element: element
+          });
+        }, 100);
+      }
+    });
+
     // Diagram changed
     eventBus.on('commandStack.changed', async () => {
       if (onChange) {
@@ -245,6 +282,9 @@ const BPMNEditor = ({
 
     const loadNewDiagram = async () => {
       try {
+        // Set flag to prevent onNewDataObject during import
+        isImportingRef.current = true;
+
         // Determine which diagram to load
         let diagramXml;
         if (xml === 'EMPTY' || xml === 'BLANK' || xml === null || xml === undefined) {
@@ -260,6 +300,9 @@ const BPMNEditor = ({
 
         const { warnings } = await modelerRef.current.importXML(diagramXml);
 
+        // Reset flag after import completes
+        isImportingRef.current = false;
+
         if (warnings.length) {
           console.warn('BPMN import warnings:', warnings);
         }
@@ -272,6 +315,7 @@ const BPMNEditor = ({
       } catch (err) {
         console.error('Failed to import BPMN diagram:', err);
         setError(err.message);
+        isImportingRef.current = false; // Reset flag on error
       }
     };
 
@@ -352,6 +396,38 @@ const BPMNEditor = ({
       console.error('Export BPMN failed:', err);
     }
   }, []);
+
+  // Import BPMN XML
+  const importBPMN = useCallback(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.bpmn,.xml';
+
+    input.onchange = async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      try {
+        const content = await file.text();
+
+        // Validate that it's a BPMN file
+        if (!content.includes('bpmn:definitions') && !content.includes('definitions')) {
+          alert('The selected file does not appear to be a valid BPMN file.');
+          return;
+        }
+
+        // Call the parent callback to update the BPMN XML
+        if (onImportBpmn) {
+          onImportBpmn(content);
+        }
+      } catch (err) {
+        console.error('Import BPMN failed:', err);
+        alert('Failed to import BPMN file: ' + err.message);
+      }
+    };
+
+    input.click();
+  }, [onImportBpmn]);
 
   // Export SVG
   const exportSVG = useCallback(async () => {
@@ -669,6 +745,17 @@ const BPMNEditor = ({
 
   return (
     <div className="bpmn-editor">
+      {/* Collapse/Expand Toggle Button */}
+      {canCollapse && onToggleCollapse && (
+        <button
+          className="bpmn-collapse-btn"
+          onClick={onToggleCollapse}
+          title="Hide BPMN Editor"
+        >
+          <ChevronLeftIcon size={16} />
+        </button>
+      )}
+
       {/* Data Object Tooltip */}
       {tooltip.visible && (
         <div
@@ -692,8 +779,14 @@ const BPMNEditor = ({
         </div>
       )}
 
-      {/* Canvas container - bpmn.io watermark must remain visible (license requirement) */}
-      <div className="bpmn-canvas" ref={containerRef} />
+      {/* Workspace container with palette and canvas separated */}
+      <div className="bpmn-workspace">
+        {/* Palette container - bpmn-js palette will be moved here */}
+        <div className="bpmn-palette-container" ref={paletteContainerRef} />
+
+        {/* Canvas container - bpmn.io watermark must remain visible (license requirement) */}
+        <div className="bpmn-canvas" ref={containerRef} />
+      </div>
 
       {/* Footer toolbar with BPMN-specific tools */}
       <div className="bpmn-footer-toolbar">
@@ -761,8 +854,22 @@ const BPMNEditor = ({
 
         <div className="footer-spacer" />
 
+        {/* Import button */}
+        {onImportBpmn && (
+          <>
+            <div className="footer-group">
+              <button className="footer-btn footer-btn-import" onClick={importBPMN} title="Import BPMN Diagram (replace current diagram)">
+                <ImportBPMNIcon size={18} />
+                <span>Import BPMN</span>
+              </button>
+            </div>
+            <div className="footer-divider" />
+          </>
+        )}
+
         {/* Export buttons */}
-        <div className="footer-group">
+        <div className="footer-group footer-group-export">
+          <span className="footer-group-label">Export:</span>
           <button className="footer-btn footer-btn-export" onClick={exportSVG} title="Export SVG">
             <ExportSVGIcon size={18} />
             <span>SVG</span>

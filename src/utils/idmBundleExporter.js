@@ -160,6 +160,7 @@ export const exportIdmBundle = async ({
   headerData,
   bpmnXml,
   erDataMap,
+  erHierarchy,
   dataObjects = [],
   erLibrary = []
 }) => {
@@ -173,6 +174,7 @@ export const exportIdmBundle = async ({
     headerData: headerDataWithPaths,
     bpmnXml: null, // BPMN will be in separate file
     erDataMap: erDataMapWithPaths,
+    erHierarchy,
     dataObjects
   });
 
@@ -201,7 +203,7 @@ export const exportIdmBundle = async ({
 
   // Add manifest file
   const manifest = {
-    version: '1.0.0',
+    version: typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0',
     format: 'idm-bundle',
     schemaVersion: 'idmXML 2.0',
     createdBy: 'IDMxPPM neo-Seoul',
@@ -217,7 +219,7 @@ export const exportIdmBundle = async ({
 
   // Add project data for round-trip support (includes bpmnXml for reliability)
   const projectData = {
-    version: '1.0.0',
+    version: typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0',
     format: 'idm-bundle-project',
     headerData: { ...headerDataWithPaths, ...result.guids },
     erDataMap: erDataMapWithPaths,

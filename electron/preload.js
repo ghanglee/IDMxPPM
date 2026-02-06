@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   exportSVG: (data) => ipcRenderer.invoke('dialog:exportSVG', data),
   exportER: (data) => ipcRenderer.invoke('dialog:exportER', data),
   exportIdmXML: (data) => ipcRenderer.invoke('dialog:exportIdmXML', data),
+  showSaveLocation: (data) => ipcRenderer.invoke('dialog:showSaveLocation', data),
+  saveToPath: (data) => ipcRenderer.invoke('dialog:saveToPath', data),
 
   // 메뉴 이벤트 리스너
   onMenuNew: (callback) => ipcRenderer.on('menu-new', callback),

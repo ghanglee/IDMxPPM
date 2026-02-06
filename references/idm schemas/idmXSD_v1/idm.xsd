@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:idm="https://standards.buildingsmart.org/IDM/idmXML/0.2" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+	<xs:include schemaLocation="specId.xsd"/>
+	<xs:include schemaLocation="authoring.xsd"/>
+	<xs:include schemaLocation="uc.xsd"/>
+	<xs:include schemaLocation="businessContextMap.xsd"/>
+	<xs:include schemaLocation="er.xsd"/>
+	<xs:element name="idm">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element ref="specId" minOccurs="1" maxOccurs="1"/>
+				<xs:element ref="authoring" minOccurs="1" maxOccurs="1"/>
+				<xs:element ref="uc" minOccurs="1" maxOccurs="1"/>
+				<xs:element ref="businessContextMap" minOccurs="0" maxOccurs="unbounded"/>
+				<xs:element ref="er" minOccurs="0" maxOccurs="1"/>
+				<xs:element name="subIdm" minOccurs="0" maxOccurs="unbounded">
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element ref="idm"/>
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+</xs:schema>

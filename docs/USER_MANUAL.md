@@ -1,6 +1,6 @@
 # IDMxPPM neo-Seoul User Manual
 
-**Version 1.0.0**
+**Version 1.1.0**
 
 An Information Delivery Manual (IDM) Authoring Tool compliant with ISO 29481-1 and ISO 29481-3
 
@@ -415,16 +415,17 @@ Map information units to external standards and schemas.
 ### Adding Mappings
 
 1. Click **+ Add Mapping** in an Information Unit
-2. Select a schema from the dropdown
-3. Search or enter the element name
+2. The default schema is **bSDD** (buildingSMART Data Dictionary)
+3. Select a different schema from the dropdown if needed
+4. Search or enter the element name
 
 ### Supported Schemas
 
 | Schema | Search | Description |
 |--------|--------|-------------|
+| **bSDD** | Yes (API) | buildingSMART Data Dictionary — IFC 4.3 (default) |
 | IFC 2x3 | Yes | Industry Foundation Classes 2x3 |
 | IFC 4x3 ADD2 | Yes | IFC 4.3 Addendum 2 (current) |
-| bSDD | Yes (API) | buildingSMART Data Dictionary |
 | CityGML | Yes | City Geography Markup Language |
 | UniFormat | Yes | Classification system |
 | OmniClass | Yes | Classification system |
@@ -435,9 +436,10 @@ Map information units to external standards and schemas.
 
 For searchable schemas:
 1. Click the search button or type in the field
-2. Results appear automatically as you type
+2. Results appear automatically as you type (debounced 300ms)
 3. Select **Exact Match** or **Semantic Match**
 4. Click a result to add the mapping
+5. If an error occurs (e.g., timeout or network issue), an error message is displayed instead of search results
 
 <!-- SCREENSHOT: schema-search.png -->
 <!-- Caption: Searching for IFC elements -->
@@ -663,9 +665,10 @@ When importing a ZIP bundle:
 **Problem**: bSDD API search returns no results or errors.
 
 **Solution**:
-- Check your internet connection
-- bSDD API requires network access
-- Try again after a few moments (rate limiting)
+- Check your internet connection — bSDD API requires network access to `https://api.bsdd.buildingsmart.org`
+- If you see a timeout error, try again after a few moments
+- Ensure search terms are at least 2 characters long
+- The app uses two bSDD endpoints with automatic fallback: if `SearchInDictionary` fails, `Class/Search` is tried automatically
 
 #### Pasted Text Looks Different
 

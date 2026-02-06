@@ -1,0 +1,347 @@
+/* Root ER Selection Modal Styles */
+
+.root-er-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.root-er-modal {
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  width: 560px;
+  max-width: 90vw;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Header */
+.root-er-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.root-er-modal-header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.root-er-close-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.root-er-close-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* Warning */
+.root-er-warning {
+  display: flex;
+  gap: 12px;
+  padding: 12px 20px;
+  background: var(--warning-bg, rgba(255, 193, 7, 0.1));
+  border-bottom: 1px solid var(--border-color);
+}
+
+.root-er-warning-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.root-er-warning-text strong {
+  display: block;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.root-er-warning-text p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+/* Tabs */
+.root-er-tabs {
+  display: flex;
+  padding: 12px 20px 0;
+  gap: 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.root-er-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: -1px;
+  transition: all 0.15s ease;
+}
+
+.root-er-tab:hover {
+  color: var(--text-primary);
+}
+
+.root-er-tab.active {
+  color: var(--accent-color);
+  border-bottom-color: var(--accent-color);
+}
+
+/* Body */
+.root-er-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+}
+
+.root-er-instruction {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* Tree */
+.root-er-tree {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.root-er-tree-row {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  gap: 4px;
+  border-bottom: 1px solid var(--border-color);
+  transition: background 0.1s ease;
+}
+
+.root-er-tree-row:last-child {
+  border-bottom: none;
+}
+
+.root-er-tree-row:hover {
+  background: var(--bg-hover);
+}
+
+.root-er-tree-row.selected {
+  background: var(--accent-color-light, rgba(0, 122, 204, 0.15));
+}
+
+.root-er-tree-row.top-level {
+  font-weight: 500;
+}
+
+.root-er-tree-indent {
+  width: 16px;
+  flex-shrink: 0;
+}
+
+.root-er-tree-chevron {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 3px;
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+.root-er-tree-chevron:hover {
+  background: var(--bg-hover);
+}
+
+.root-er-tree-chevron.expanded {
+  transform: rotate(90deg);
+}
+
+.root-er-tree-icon {
+  color: var(--accent-color);
+  flex-shrink: 0;
+  margin-right: 6px;
+}
+
+.root-er-tree-name {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.root-er-top-level-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  background: var(--accent-color);
+  color: white;
+  border-radius: 4px;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+.root-er-tree-count {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+/* Create Mode */
+.root-er-field {
+  margin-bottom: 16px;
+}
+
+.root-er-field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.root-er-field input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.root-er-field input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px var(--accent-color-light, rgba(0, 122, 204, 0.2));
+}
+
+/* Preview */
+.root-er-preview {
+  margin-top: 16px;
+  padding: 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+.root-er-preview-label {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.root-er-preview-tree {
+  font-size: 13px;
+}
+
+.root-er-preview-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  color: var(--text-primary);
+}
+
+.root-er-preview-new {
+  font-weight: 500;
+}
+
+.root-er-preview-sub {
+  color: var(--text-secondary);
+}
+
+.root-er-preview-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  background: var(--success-color, #28a745);
+  color: white;
+  border-radius: 4px;
+  margin-left: auto;
+}
+
+.root-er-preview-badge-sub {
+  font-size: 10px;
+  padding: 2px 6px;
+  background: var(--text-tertiary);
+  color: white;
+  border-radius: 4px;
+  margin-left: auto;
+}
+
+/* Footer */
+.root-er-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border-color);
+}
+
+.root-er-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.root-er-btn-secondary {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.root-er-btn-secondary:hover {
+  background: var(--bg-hover);
+}
+
+.root-er-btn-primary {
+  background: var(--accent-color);
+  border: 1px solid var(--accent-color);
+  color: white;
+}
+
+.root-er-btn-primary:hover {
+  background: var(--accent-color-hover, #0066b3);
+}
+
+.root-er-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

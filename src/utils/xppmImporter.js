@@ -14,20 +14,48 @@
  */
 
 /**
+ * Remove BOM and clean XML content
+ */
+const cleanXmlContent = (content) => {
+  // Remove BOM (Byte Order Mark) if present
+  let cleaned = content.replace(/^\uFEFF/, '');
+  // Remove any other problematic characters at the start
+  cleaned = cleaned.replace(/^[^\x00-\x7F]+/, '');
+  // Ensure it starts with <?xml or <
+  const xmlStart = cleaned.indexOf('<?xml');
+  if (xmlStart > 0) {
+    cleaned = cleaned.substring(xmlStart);
+  } else {
+    const tagStart = cleaned.indexOf('<');
+    if (tagStart > 0) {
+      cleaned = cleaned.substring(tagStart);
+    }
+  }
+  return cleaned;
+};
+
+/**
  * Parse xPPM XML string and extract IDM data
  * @param {string} xppmContent - The xPPM XML content
  * @param {string} bpmnContent - Optional BPMN XML content (if loaded separately)
  * @returns {Object} Parsed IDM data in neo-Seoul format
  */
 export const parseXppm = (xppmContent, bpmnContent = null) => {
+  // Clean the content before parsing
+  const cleanedContent = cleanXmlContent(xppmContent);
+
   const parser = new DOMParser();
-  const doc = parser.parseFromString(xppmContent, 'text/xml');
+  const doc = parser.parseFromString(cleanedContent, 'text/xml');
 
   // Check for parse errors
   const parseError = doc.querySelector('parsererror');
   if (parseError) {
+    console.error('xPPM parse error:', parseError.textContent);
     throw new Error('Invalid xPPM XML: ' + parseError.textContent);
   }
+
+  // Debug: Log the root element
+  console.log('xPPM root element:', doc.documentElement?.tagName);
 
   const result = {
     headerData: parseHeaderData(doc),
@@ -35,24 +63,29 @@ export const parseXppm = (xppmContent, bpmnContent = null) => {
     erLibrary: [],
     bpmnXml: bpmnContent,
     dataObjectErMap: {}, // Map of data object IDs to ER GUIDs
-    images: [] // Image references
+    bpmnFilePath: null
   };
 
-  // Parse Use Case
+  // Parse Use Case and merge into headerData
+  const ucData = parseUseCase(doc);
+  console.log('Parsed Use Case data:', ucData);
   result.headerData = {
     ...result.headerData,
-    ...parseUseCase(doc)
+    ...ucData
   };
 
   // Parse Business Context Map and get data object mappings
   const bcmData = parseBusinessContextMap(doc);
   result.dataObjectErMap = bcmData.dataObjectErMap;
   result.bpmnFilePath = bcmData.bpmnFilePath;
+  console.log('BPMN file path:', result.bpmnFilePath);
+  console.log('Data object mappings:', result.dataObjectErMap);
 
   // Parse Exchange Requirements
   const { erDataMap, erLibrary } = parseExchangeRequirements(doc);
   result.erDataMap = erDataMap;
   result.erLibrary = erLibrary;
+  console.log('Parsed ERs:', Object.keys(erDataMap).length);
 
   return result;
 };
@@ -63,6 +96,9 @@ export const parseXppm = (xppmContent, bpmnContent = null) => {
 const parseHeaderData = (doc) => {
   const specId = doc.querySelector('idm > specId');
   const authoring = doc.querySelector('idm > authoring');
+
+  console.log('specId element found:', !!specId);
+  console.log('authoring element found:', !!authoring);
 
   const headerData = {
     fullTitle: specId?.getAttribute('fullTitle') || '',
@@ -82,6 +118,8 @@ const parseHeaderData = (doc) => {
     creationDate: parseCreationDate(authoring),
     modificationHistory: parseModificationHistory(authoring)
   };
+
+  console.log('Parsed header:', headerData.fullTitle, headerData.shortTitle);
 
   return headerData;
 };
@@ -112,6 +150,7 @@ const parseAuthors = (authoring) => {
     }
   });
 
+  console.log('Parsed authors:', authors.length);
   return authors;
 };
 
@@ -173,24 +212,91 @@ const parseModificationHistory = (authoring) => {
 };
 
 /**
+ * Parse image elements and return array of image references
+ */
+const parseImageElements = (parentElement, sectionName = '') => {
+  if (!parentElement) return [];
+
+  const images = [];
+  const imageElements = parentElement.querySelectorAll(':scope > image, :scope > description > image');
+
+  imageElements.forEach((img, index) => {
+    const filePath = img.getAttribute('filePath') || '';
+    const caption = img.getAttribute('caption') || '';
+    const fileName = filePath.split(/[/\\]/).pop() || `image_${index + 1}`;
+
+    images.push({
+      id: `fig-${sectionName}-${Date.now()}-${index}`,
+      name: fileName,
+      caption: caption,
+      filePath: filePath, // Original file path for later loading
+      data: null, // Will be populated when images are loaded
+      type: getImageMimeType(fileName),
+      needsLoading: true // Flag to indicate image needs to be loaded
+    });
+  });
+
+  return images;
+};
+
+/**
+ * Get MIME type from filename
+ */
+const getImageMimeType = (fileName) => {
+  const ext = fileName.toLowerCase().split('.').pop();
+  const mimeTypes = {
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'png': 'image/png',
+    'gif': 'image/gif',
+    'bmp': 'image/bmp',
+    'svg': 'image/svg+xml',
+    'webp': 'image/webp'
+  };
+  return mimeTypes[ext] || 'image/png';
+};
+
+/**
  * Parse Use Case section
  */
 const parseUseCase = (doc) => {
   const uc = doc.querySelector('uc');
-  if (!uc) return {};
-
-  const ucData = {};
-
-  // Summary
-  const summaryContent = uc.querySelector('summary > description > content');
-  if (summaryContent) {
-    ucData.summary = summaryContent.textContent || '';
+  if (!uc) {
+    console.log('No UC element found');
+    return {};
   }
 
-  // Aim and Scope
-  const aimContent = uc.querySelector('aimAndScope > description > content');
+  console.log('UC element found');
+  const ucData = {};
+
+  // Summary - try multiple paths
+  let summaryContent = uc.querySelector('summary > description > content');
+  if (!summaryContent) {
+    summaryContent = uc.querySelector('summary description content');
+  }
+  if (!summaryContent) {
+    summaryContent = uc.querySelector('summary content');
+  }
+  if (summaryContent) {
+    ucData.summary = summaryContent.textContent || '';
+    console.log('Summary found:', ucData.summary.substring(0, 50) + '...');
+  } else {
+    console.log('No summary content found');
+  }
+
+  // Aim and Scope - try multiple paths
+  let aimContent = uc.querySelector('aimAndScope > description > content');
+  if (!aimContent) {
+    aimContent = uc.querySelector('aimAndScope description content');
+  }
+  if (!aimContent) {
+    aimContent = uc.querySelector('aimAndScope content');
+  }
   if (aimContent) {
     ucData.aimAndScope = aimContent.textContent || '';
+    console.log('Aim and Scope found:', ucData.aimAndScope.substring(0, 50) + '...');
+  } else {
+    console.log('No aimAndScope content found');
   }
 
   // Language
@@ -203,6 +309,7 @@ const parseUseCase = (doc) => {
   const use = uc.querySelector('use');
   if (use) {
     ucData.use = use.getAttribute('name') || '';
+    console.log('Use found:', ucData.use);
   }
 
   // Actors
@@ -213,6 +320,7 @@ const parseUseCase = (doc) => {
     role: '',
     bpmnId: null
   }));
+  console.log('Actors found:', ucData.actorsList.length);
 
   // Project Phases
   const standardPhase = uc.querySelector('standardProjectPhase > name');
@@ -233,6 +341,24 @@ const parseUseCase = (doc) => {
     };
   }
 
+  // Parse images from various sections
+  const summarySection = uc.querySelector('summary');
+  const aimSection = uc.querySelector('aimAndScope');
+  const benefitsSection = uc.querySelector('benefits');
+  const limitationsSection = uc.querySelector('limitations');
+
+  ucData.summaryFigures = parseImageElements(summarySection, 'summary');
+  ucData.aimAndScopeFigures = parseImageElements(aimSection, 'aim');
+  ucData.benefitsFigures = parseImageElements(benefitsSection, 'benefits');
+  ucData.limitationsFigures = parseImageElements(limitationsSection, 'limitations');
+
+  // Log image counts
+  const totalImages = (ucData.summaryFigures?.length || 0) +
+    (ucData.aimAndScopeFigures?.length || 0) +
+    (ucData.benefitsFigures?.length || 0) +
+    (ucData.limitationsFigures?.length || 0);
+  console.log('Total Use Case images found:', totalImages);
+
   return ucData;
 };
 
@@ -246,24 +372,47 @@ const parseBusinessContextMap = (doc) => {
     dataObjectErMap: {}
   };
 
-  if (!bcm) return result;
+  if (!bcm) {
+    console.log('No businessContextMap found');
+    return result;
+  }
 
   // Get BPMN diagram path
   const diagram = bcm.querySelector('pm > diagram');
-  if (diagram) {
+  if (!diagram) {
+    // Try alternate path
+    const altDiagram = bcm.querySelector('diagram');
+    if (altDiagram) {
+      result.bpmnFilePath = altDiagram.getAttribute('filePath');
+    }
+  } else {
     result.bpmnFilePath = diagram.getAttribute('filePath');
   }
+  console.log('Diagram path:', result.bpmnFilePath);
 
   // Get data object to ER mappings
   const mappings = bcm.querySelectorAll('pm > dataObjectAndEr');
-  mappings.forEach(mapping => {
-    const dataObjectId = mapping.querySelector('associatedDataObject')?.textContent;
-    const erGuid = mapping.querySelector('associatedEr')?.textContent;
+  if (mappings.length === 0) {
+    // Try alternate path
+    const altMappings = bcm.querySelectorAll('dataObjectAndEr');
+    altMappings.forEach(mapping => {
+      const dataObjectId = mapping.querySelector('associatedDataObject')?.textContent;
+      const erGuid = mapping.querySelector('associatedEr')?.textContent;
+      if (dataObjectId && erGuid) {
+        result.dataObjectErMap[dataObjectId] = erGuid;
+      }
+    });
+  } else {
+    mappings.forEach(mapping => {
+      const dataObjectId = mapping.querySelector('associatedDataObject')?.textContent;
+      const erGuid = mapping.querySelector('associatedEr')?.textContent;
+      if (dataObjectId && erGuid) {
+        result.dataObjectErMap[dataObjectId] = erGuid;
+      }
+    });
+  }
 
-    if (dataObjectId && erGuid) {
-      result.dataObjectErMap[dataObjectId] = erGuid;
-    }
-  });
+  console.log('Data object mappings:', Object.keys(result.dataObjectErMap).length);
 
   return result;
 };
@@ -276,12 +425,19 @@ const parseExchangeRequirements = (doc) => {
   const erDataMap = {};
   const erLibrary = [];
 
-  if (!erRoot) return { erDataMap, erLibrary };
+  if (!erRoot) {
+    console.log('No ER root found');
+    return { erDataMap, erLibrary };
+  }
 
   // Parse top-level ER and all nested ERs
   const parseErElement = (erElement, parentId = null) => {
+    // Find specId - it might be a direct child
     const specId = erElement.querySelector(':scope > specId');
-    if (!specId) return null;
+    if (!specId) {
+      console.log('No specId in ER element');
+      return null;
+    }
 
     const guid = specId.getAttribute('guid');
     const erData = {
@@ -300,15 +456,26 @@ const parseExchangeRequirements = (doc) => {
       parentId: parentId
     };
 
-    // Parse description
-    const description = erElement.querySelector(':scope > description > content');
-    if (description) {
+    // Parse description - try multiple paths
+    let description = erElement.querySelector(':scope > description > content');
+    if (!description) {
+      description = erElement.querySelector(':scope > description');
+      if (description) {
+        const content = description.querySelector('content');
+        if (content) {
+          erData.definition = content.textContent || '';
+        } else {
+          erData.definition = description.textContent || '';
+        }
+      }
+    } else {
       erData.definition = description.textContent || '';
     }
 
     // Parse information units
     const infoUnits = erElement.querySelectorAll(':scope > informationUnit');
     erData.informationUnits = Array.from(infoUnits).map(iu => parseInformationUnit(iu));
+    console.log(`ER "${erData.name}" has ${erData.informationUnits.length} information units`);
 
     // Parse correspondingMvd
     const mvd = erElement.querySelector(':scope > correspondingMvd');
@@ -331,12 +498,22 @@ const parseExchangeRequirements = (doc) => {
       definition: erData.definition
     });
 
-    // Parse nested ERs (sub-ERs)
+    // Parse nested ERs (sub-ERs) - store full sub-ER data, not just reference
     const nestedErs = erElement.querySelectorAll(':scope > er');
     nestedErs.forEach(nestedEr => {
       const subErData = parseErElement(nestedEr, guid);
       if (subErData) {
-        erData.subErs.push({ id: subErData.id, name: subErData.name });
+        // Store the complete sub-ER data including all information units and nested sub-ERs
+        erData.subErs.push({
+          id: subErData.id,
+          name: subErData.name,
+          shortTitle: subErData.shortTitle,
+          definition: subErData.definition,
+          informationUnits: subErData.informationUnits || [],
+          subErs: subErData.subErs || [],
+          constraints: subErData.constraints || [],
+          correspondingMvd: subErData.correspondingMvd || null
+        });
       }
     });
 
@@ -345,13 +522,8 @@ const parseExchangeRequirements = (doc) => {
   };
 
   // Start parsing from the root ER element
-  parseErElement(erRoot);
-
-  // Also parse any sibling ER elements at the same level
-  const siblingErs = doc.querySelectorAll('idm > er > er');
-  siblingErs.forEach(er => {
-    parseErElement(er);
-  });
+  const rootEr = parseErElement(erRoot);
+  console.log('Root ER parsed:', rootEr?.name);
 
   return { erDataMap, erLibrary };
 };
@@ -367,19 +539,52 @@ const parseInformationUnit = (iuElement) => {
     isMandatory: iuElement.getAttribute('isMandatory') === 'true',
     definition: iuElement.getAttribute('definition') || '',
     examples: '',
-    externalMappings: [],
-    subUnits: []
+    exampleImages: [],
+    correspondingExternalElements: [],
+    subInformationUnits: []
   };
 
-  // Parse description/examples
-  const descriptionContent = iuElement.querySelector(':scope > description > content');
+  // Parse description/examples - try multiple paths
+  let descriptionContent = iuElement.querySelector(':scope > description > content');
+  if (!descriptionContent) {
+    descriptionContent = iuElement.querySelector(':scope > description');
+  }
   if (descriptionContent) {
-    iu.examples = descriptionContent.textContent || '';
+    const content = descriptionContent.querySelector('content');
+    if (content) {
+      iu.examples = content.textContent || '';
+    } else {
+      iu.examples = descriptionContent.textContent || '';
+    }
   }
 
-  // Parse nested information units
-  const nestedUnits = iuElement.querySelectorAll(':scope > informationUnit');
-  iu.subUnits = Array.from(nestedUnits).map(nested => parseInformationUnit(nested));
+  // Parse corresponding external elements (IFC, bSDD, etc.) - skip empty mappings
+  const externalElements = iuElement.querySelectorAll(':scope > correspondingExternalElement');
+  externalElements.forEach(elem => {
+    const name = elem.getAttribute('name') || '';
+    // Only add mapping if it has a non-empty name
+    if (name.trim()) {
+      iu.correspondingExternalElements.push({
+        id: generateUUID(),
+        basis: elem.getAttribute('basis') || 'IFC',
+        name: name
+      });
+    }
+  });
+
+  // Parse nested information units (sub information units)
+  const nestedUnits = iuElement.querySelectorAll(':scope > subInformationUnit > informationUnit');
+  if (nestedUnits.length === 0) {
+    // Try direct informationUnit children (some formats)
+    const directNestedUnits = iuElement.querySelectorAll(':scope > informationUnit');
+    directNestedUnits.forEach(nested => {
+      iu.subInformationUnits.push(parseInformationUnit(nested));
+    });
+  } else {
+    nestedUnits.forEach(nested => {
+      iu.subInformationUnits.push(parseInformationUnit(nested));
+    });
+  }
 
   return iu;
 };
@@ -460,32 +665,83 @@ export const convertToNeoSeoul = (parsedData) => {
     }
   });
 
+  console.log('Converted ER data map has', Object.keys(newErDataMap).length, 'entries');
+
+  // Convert 'use' string to 'uses' array with verb/noun format
+  let usesArray = [];
+  if (headerData.use) {
+    // Parse "Verb Noun" format or just use as noun with default verb
+    const useStr = headerData.use;
+    const words = useStr.split(' ');
+    if (words.length >= 2) {
+      usesArray.push({ verb: words[0], noun: words.slice(1).join(' ') });
+    } else {
+      usesArray.push({ verb: 'Perform', noun: useStr });
+    }
+  }
+
+  // Convert 'region' object to 'regions' array
+  let regionsArray = [];
+  if (headerData.region) {
+    if (typeof headerData.region === 'object' && headerData.region.value) {
+      regionsArray.push(headerData.region.value.toLowerCase().replace(/\s+/g, '-'));
+    } else if (typeof headerData.region === 'string') {
+      regionsArray.push(headerData.region);
+    }
+  }
+  if (regionsArray.length === 0) {
+    regionsArray = ['international'];
+  }
+
+  // Extract project stages
+  const projectStagesIso = headerData.targetPhases?.iso22263 || [];
+  const projectStagesAia = headerData.targetPhases?.aiaB101 || [];
+  const projectStagesRiba = headerData.targetPhases?.ribaPow || [];
+
   return {
     headerData: {
       ...headerData,
-      // Ensure all required fields have defaults
+      // Map title field for ContentPane compatibility
+      title: headerData.fullTitle || 'Imported xPPM Project',
       fullTitle: headerData.fullTitle || 'Imported xPPM Project',
       shortTitle: headerData.shortTitle || 'xPPM Import',
       status: headerData.status || 'NP',
       version: headerData.version || '0.1',
-      authorsList: headerData.authorsList || [],
+      // Use 'authors' for ContentPane AuthorsList component
+      authors: headerData.authorsList || [],
+      // Keep actorsList for actor roles section
       actorsList: headerData.actorsList || [],
       summary: headerData.summary || '',
       aimAndScope: headerData.aimAndScope || '',
-      use: headerData.use || '',
+      // Convert use string to uses array
+      uses: usesArray,
       language: headerData.language || 'EN',
-      targetPhases: headerData.targetPhases || { iso22263: [], aiaB101: [], ribaPow: [] },
-      benefits: '',
-      limitations: '',
+      // Flatten project stages for ContentPane
+      projectStagesIso: projectStagesIso,
+      projectStagesAia: projectStagesAia,
+      projectStagesRiba: projectStagesRiba,
+      // Convert region to regions array
+      regions: regionsArray,
+      // Preserve parsed figure arrays (images from xPPM)
+      summaryFigures: headerData.summaryFigures || [],
+      aimAndScopeFigures: headerData.aimAndScopeFigures || [],
+      benefitsFigures: headerData.benefitsFigures || [],
+      limitationsFigures: headerData.limitationsFigures || [],
+      // Other optional fields
+      benefits: headerData.benefits || '',
+      limitations: headerData.limitations || '',
       keywords: [],
-      references: [],
-      additionalDescription: ''
+      references: '',
+      additionalDescription: '',
+      creationDate: headerData.creationDate || new Date().toISOString().split('T')[0],
+      revisionHistory: headerData.modificationHistory || []
     },
     erDataMap: newErDataMap,
     erLibrary: erLibrary,
     bpmnXml: bpmnXml,
     originalErDataMap: erDataMap, // Keep original for reference
-    dataObjectErMap: dataObjectErMap
+    dataObjectErMap: dataObjectErMap,
+    bpmnFilePath: parsedData.bpmnFilePath
   };
 };
 
@@ -497,8 +753,11 @@ export const convertToNeoSeoul = (parsedData) => {
  * @returns {Object} Project data ready for neo-Seoul
  */
 export const importXppm = (xppmContent, bpmnContent = null, images = {}) => {
+  console.log('Starting xPPM import...');
   const parsed = parseXppm(xppmContent, bpmnContent);
+  console.log('xPPM parsed, converting to neo-Seoul format...');
   const converted = convertToNeoSeoul(parsed);
+  console.log('Conversion complete');
 
   return {
     ...converted,
@@ -515,65 +774,10 @@ export const isXppmFile = (filename) => {
 };
 
 /**
- * Load xPPM bundle from folder structure
- * This is used when loading from a folder with .xppm, Diagram/, and Image/ subfolders
+ * Get the BPMN file path from xPPM data
  */
-export const loadXppmBundle = async (files) => {
-  let xppmContent = null;
-  let bpmnContent = null;
-  const images = {};
-
-  for (const file of files) {
-    const path = file.webkitRelativePath || file.name;
-
-    if (path.endsWith('.xppm')) {
-      xppmContent = await readFileAsText(file);
-    } else if (path.includes('Diagram/') && path.endsWith('.bpmn')) {
-      bpmnContent = await readFileAsText(file);
-    } else if (path.includes('Image/') && isImageFile(path)) {
-      const imageData = await readFileAsBase64(file);
-      const filename = path.split('/').pop();
-      images[filename] = imageData;
-    }
-  }
-
-  if (!xppmContent) {
-    throw new Error('No .xppm file found in the selected folder');
-  }
-
-  return importXppm(xppmContent, bpmnContent, images);
-};
-
-/**
- * Read file as text
- */
-const readFileAsText = (file) => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => resolve(e.target.result);
-    reader.onerror = (e) => reject(e);
-    reader.readAsText(file);
-  });
-};
-
-/**
- * Read file as base64
- */
-const readFileAsBase64 = (file) => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => resolve(e.target.result);
-    reader.onerror = (e) => reject(e);
-    reader.readAsDataURL(file);
-  });
-};
-
-/**
- * Check if file is an image
- */
-const isImageFile = (filename) => {
-  const ext = filename.toLowerCase().split('.').pop();
-  return ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'].includes(ext);
+export const getBpmnFilePath = (xppmData) => {
+  return xppmData.bpmnFilePath;
 };
 
 export default {
@@ -581,5 +785,5 @@ export default {
   convertToNeoSeoul,
   importXppm,
   isXppmFile,
-  loadXppmBundle
+  getBpmnFilePath
 };

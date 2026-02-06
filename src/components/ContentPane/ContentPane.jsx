@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect, memo } from 'react';
 import {
   CloseIcon,
   SpecificationIcon,
@@ -9,9 +9,104 @@ import {
   AddIcon,
   DeleteIcon,
   EditIcon,
-  SettingsIcon
+  SettingsIcon,
+  ExpandAllIcon,
+  CollapseAllIcon
 } from '../icons';
 import './ContentPane.css';
+
+// ============================================================================
+// MEMOIZED ER HIERARCHY ITEM COMPONENT
+// Extracted to prevent recreation on every render (fixes hover flash issue)
+// ============================================================================
+const ERHierarchyItem = memo(({
+  er,
+  level = 0,
+  parentId = 'root',
+  isRoot = false,
+  expandedNodes,
+  onToggleNode,
+  onSelectER,
+  itemRefs,  // Ref object to store item refs for scrolling
+  selectedErId = null  // Currently selected ER for highlighting
+}) => {
+  const hasName = er.name && er.name.trim();
+  const hasUnits = er.informationUnits && er.informationUnits.length > 0;
+  const hasSubERs = er.subERs && er.subERs.length > 0;
+  const isComplete = hasName && (hasUnits || hasSubERs);
+  const nodeId = isRoot ? 'root' : `${parentId}-${er.id}`;
+  const isExpanded = expandedNodes.has(nodeId);
+  const isSelected = selectedErId === er.id;
+
+  return (
+    <div
+      className="er-tree-item-wrapper"
+      ref={el => { if (el && itemRefs) itemRefs.current[er.id] = el; }}
+    >
+      <div
+        className={`er-tree-item ${isRoot ? 'root-er' : ''} ${!isComplete ? 'incomplete' : ''} ${isSelected ? 'selected' : ''}`}
+        style={{ paddingLeft: `${level * 16 + 8}px` }}
+        onClick={() => {
+          if (onSelectER) {
+            onSelectER(er.id);
+          }
+        }}
+      >
+        {hasSubERs ? (
+          <button
+            className="er-tree-toggle"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleNode(nodeId);
+            }}
+          >
+            {isExpanded ? <ChevronDownIcon size={12} /> : <ChevronRightIcon size={12} />}
+          </button>
+        ) : (
+          <span className="er-tree-spacer" />
+        )}
+        <div className={`er-tree-item-icon ${isRoot ? 'root' : ''}`}>
+          <ExchangeReqIcon size={isRoot ? 16 : 14} />
+        </div>
+        <div className="er-tree-item-content">
+          <div className={`er-tree-item-name ${isRoot ? 'root-name' : ''}`}>
+            {hasName ? er.name : `(Unnamed ER)`}
+          </div>
+          <div className="er-tree-item-meta">
+            <span className="er-unit-count">
+              {(er.informationUnits || []).length} information units
+            </span>
+            {hasSubERs && (
+              <span className="er-sub-count">{er.subERs.length} sub-ERs</span>
+            )}
+            {!isComplete && !isRoot && (
+              <span className="er-incomplete-badge">Incomplete</span>
+            )}
+          </div>
+        </div>
+      </div>
+      {hasSubERs && isExpanded && (
+        <div className="er-tree-children">
+          {er.subERs.map(subEr => (
+            <ERHierarchyItem
+              key={subEr.id}
+              er={subEr}
+              level={level + 1}
+              parentId={nodeId}
+              expandedNodes={expandedNodes}
+              onToggleNode={onToggleNode}
+              onSelectER={onSelectER}
+              itemRefs={itemRefs}
+              selectedErId={selectedErId}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+});
+
+ERHierarchyItem.displayName = 'ERHierarchyItem';
 
 // ============================================================================
 // ISO 29481-3 COMPLIANT IDM CODE GENERATION (Clause 11)
@@ -362,6 +457,30 @@ const RevisionHistory = ({ creationDate, revisionHistory = [], onCreationDateCha
   const [editingIndex, setEditingIndex] = useState(null);
   const [editDescription, setEditDescription] = useState('');
 
+  // Ref to track previous length for detecting new additions
+  const prevLengthRef = useRef(revisionHistory.length);
+  // Ref for revision entry elements
+  const entryRefs = useRef({});
+
+  // Auto-scroll and start editing when a new entry is added
+  useEffect(() => {
+    const currentLength = revisionHistory.length;
+    if (currentLength > prevLengthRef.current) {
+      // A new entry was added - scroll to it and start editing
+      const newIndex = currentLength - 1;
+      setTimeout(() => {
+        const entryEl = entryRefs.current[newIndex];
+        if (entryEl) {
+          entryEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        // Start editing the new entry's description
+        setEditingIndex(newIndex);
+        setEditDescription(revisionHistory[newIndex]?.description || '');
+      }, 100);
+    }
+    prevLengthRef.current = currentLength;
+  }, [revisionHistory]);
+
   const handleAddRevision = () => {
     const newEntry = {
       date: new Date().toISOString().split('T')[0],
@@ -422,7 +541,7 @@ const RevisionHistory = ({ creationDate, revisionHistory = [], onCreationDateCha
         {revisionHistory.length > 0 ? (
           <div className="pane-revision-list">
             {revisionHistory.map((entry, index) => (
-              <div key={index} className="pane-revision-entry">
+              <div key={index} ref={(el) => { entryRefs.current[index] = el; }} className="pane-revision-entry">
                 <input
                   type="date"
                   value={entry.date || ''}
@@ -476,58 +595,213 @@ const RevisionHistory = ({ creationDate, revisionHistory = [], onCreationDateCha
 };
 
 /**
- * Use Entry Component (Verb + Noun format per ISO 29481-3)
+ * Use Entry Component
+ * Per ISO 29481-3, with support for NBIMS-US V4, other classifications, or user-defined uses
  */
-const UseEntry = ({ uses = [], onChange }) => {
-  const [newVerb, setNewVerb] = useState('');
-  const [newNoun, setNewNoun] = useState('');
+const UseEntry = ({ uses = [], useClassification = null, onChange, onClassificationChange }) => {
+  const [selectedClassificationUse, setSelectedClassificationUse] = useState('');
+  const [classificationType, setClassificationType] = useState('nbims-us-v4'); // 'nbims-us-v4', 'other', 'user-defined'
+  const [otherClassificationName, setOtherClassificationName] = useState('');
+  const [otherUseName, setOtherUseName] = useState('');
+  const [userDefinedUseName, setUserDefinedUseName] = useState('');
 
-  const handleAdd = () => {
-    if (newVerb.trim() && newNoun.trim()) {
-      onChange([...uses, { verb: newVerb.trim(), noun: newNoun.trim() }]);
-      setNewVerb('');
-      setNewNoun('');
+  // Import use classifications dynamically
+  const [nbimsClassification, setNbimsClassification] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load NBIMS classification on mount
+  useEffect(() => {
+    let isMounted = true;
+
+    import('../../data/useClassifications.js')
+      .then(module => {
+        if (!isMounted) return;
+        setNbimsClassification(module.NBIMS_US_V4_BIM_USE);
+        setIsLoading(false);
+      })
+      .catch(err => {
+        console.error('Failed to load use classifications:', err);
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleAddFromNBIMS = () => {
+    if (!selectedClassificationUse || !nbimsClassification) return;
+    const selectedUse = nbimsClassification.uses.find(u => u.id === selectedClassificationUse);
+    if (selectedUse) {
+      const newUse = {
+        name: selectedUse.name,
+        description: selectedUse.description,
+        classificationId: nbimsClassification.id,
+        classificationName: nbimsClassification.name
+      };
+      onChange([...uses, newUse]);
+      setSelectedClassificationUse('');
     }
+  };
+
+  const handleAddFromOther = () => {
+    if (!otherClassificationName.trim() || !otherUseName.trim()) return;
+    const newUse = {
+      name: otherUseName.trim(),
+      description: '',
+      classificationId: 'other',
+      classificationName: otherClassificationName.trim()
+    };
+    onChange([...uses, newUse]);
+    setOtherClassificationName('');
+    setOtherUseName('');
+  };
+
+  const handleAddUserDefined = () => {
+    if (!userDefinedUseName.trim()) return;
+    const newUse = {
+      name: userDefinedUseName.trim(),
+      description: '',
+      classificationId: 'user-defined',
+      classificationName: 'User-defined'
+    };
+    onChange([...uses, newUse]);
+    setUserDefinedUseName('');
   };
 
   const handleRemove = (index) => {
     onChange(uses.filter((_, i) => i !== index));
   };
 
+  const handleClassificationTypeChange = (type) => {
+    setClassificationType(type);
+    setSelectedClassificationUse('');
+    setOtherClassificationName('');
+    setOtherUseName('');
+    setUserDefinedUseName('');
+    if (onClassificationChange) {
+      onClassificationChange({ type });
+    }
+  };
+
   return (
     <div className="use-entry">
-      <label>Use (Verb + Noun) <span className="required">*</span></label>
-      <div className="use-input-row">
-        <input
-          type="text"
-          value={newVerb}
-          onChange={(e) => setNewVerb(e.target.value)}
-          placeholder="Verb (e.g., Coordinate)"
-          className="pane-input use-verb"
-        />
-        <input
-          type="text"
-          value={newNoun}
-          onChange={(e) => setNewNoun(e.target.value)}
-          placeholder="Noun (e.g., Design Model)"
-          className="pane-input use-noun"
-          onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-        />
-        <button
-          type="button"
-          className="pane-add-btn-small"
-          onClick={handleAdd}
-          disabled={!newVerb.trim() || !newNoun.trim()}
+      <label>(Information) Use <span className="required">*</span></label>
+
+      {/* Classification type selector */}
+      <div className="use-classification-row">
+        <span className="use-classification-label">Use Classification:</span>
+        <select
+          value={classificationType}
+          onChange={(e) => handleClassificationTypeChange(e.target.value)}
+          className="pane-select use-classification-select"
         >
-          <AddIcon size={12} />
-        </button>
+          <option value="nbims-us-v4">NBIMS-US V4 BIM Use</option>
+          <option value="other">Other Use Classification</option>
+          <option value="user-defined">User-defined Use</option>
+        </select>
       </div>
+
+      {/* NBIMS-US V4 BIM Use mode */}
+      {classificationType === 'nbims-us-v4' && nbimsClassification && (
+        <div className="use-input-row">
+          <select
+            value={selectedClassificationUse}
+            onChange={(e) => setSelectedClassificationUse(e.target.value)}
+            className="pane-select use-select"
+          >
+            <option value="">Select a use...</option>
+            {nbimsClassification.uses.map(u => (
+              <option key={u.id} value={u.id}>{u.name}</option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="pane-add-btn-small"
+            onClick={handleAddFromNBIMS}
+            disabled={!selectedClassificationUse}
+            title="Add Use"
+          >
+            <AddIcon size={12} />
+          </button>
+        </div>
+      )}
+
+      {/* Selected use description for NBIMS */}
+      {classificationType === 'nbims-us-v4' && selectedClassificationUse && nbimsClassification && (
+        <div className="use-description-preview">
+          {nbimsClassification.uses.find(u => u.id === selectedClassificationUse)?.description || ''}
+        </div>
+      )}
+
+      {/* Other Use Classification mode */}
+      {classificationType === 'other' && (
+        <div className="use-other-fields">
+          <div className="use-input-row">
+            <input
+              type="text"
+              value={otherClassificationName}
+              onChange={(e) => setOtherClassificationName(e.target.value)}
+              placeholder="Use Classification Name *"
+              className="pane-input use-classification-name-input"
+            />
+          </div>
+          <div className="use-input-row">
+            <input
+              type="text"
+              value={otherUseName}
+              onChange={(e) => setOtherUseName(e.target.value)}
+              placeholder="Use Name *"
+              className="pane-input use-custom-input"
+              onKeyDown={(e) => e.key === 'Enter' && handleAddFromOther()}
+            />
+            <button
+              type="button"
+              className="pane-add-btn-small"
+              onClick={handleAddFromOther}
+              disabled={!otherClassificationName.trim() || !otherUseName.trim()}
+              title="Add Use"
+            >
+              <AddIcon size={12} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* User-defined Use mode */}
+      {classificationType === 'user-defined' && (
+        <div className="use-input-row">
+          <input
+            type="text"
+            value={userDefinedUseName}
+            onChange={(e) => setUserDefinedUseName(e.target.value)}
+            placeholder="Use Name *"
+            className="pane-input use-custom-input"
+            onKeyDown={(e) => e.key === 'Enter' && handleAddUserDefined()}
+          />
+          <button
+            type="button"
+            className="pane-add-btn-small"
+            onClick={handleAddUserDefined}
+            disabled={!userDefinedUseName.trim()}
+            title="Add Use"
+          >
+            <AddIcon size={12} />
+          </button>
+        </div>
+      )}
+
+      {/* List of added uses */}
       {uses.length > 0 && (
         <div className="use-list">
           {uses.map((use, index) => (
-            <div key={index} className="use-tag">
-              <span className="use-verb-text">{use.verb}</span>
-              <span className="use-noun-text">{use.noun}</span>
+            <div key={index} className={`use-tag ${use.classificationId === 'user-defined' ? 'custom' : 'from-classification'}`}>
+              <span className="use-name-text">{use.name || `${use.verb} ${use.noun}`}</span>
+              {use.classificationName && use.classificationName !== 'User-defined' && (
+                <span className="use-classification-badge">{use.classificationName}</span>
+              )}
               <button
                 type="button"
                 className="use-remove"
@@ -630,6 +904,81 @@ const MultiSelectCheckbox = ({ options, selected = [], onChange, label, allowCus
 };
 
 /**
+ * Region Selector Component
+ * Dropdown with + button to add multiple regions (ISO 3166-1)
+ */
+const RegionSelector = ({ regions = [], options = [], onChange, label }) => {
+  const [selectedRegion, setSelectedRegion] = useState('');
+
+  const handleAddRegion = () => {
+    if (selectedRegion && !regions.includes(selectedRegion)) {
+      onChange([...regions, selectedRegion]);
+      setSelectedRegion('');
+    }
+  };
+
+  const handleRemoveRegion = (regionToRemove) => {
+    onChange(regions.filter(r => r !== regionToRemove));
+  };
+
+  // Get label for a region value
+  const getRegionLabel = (value) => {
+    const option = options.find(o => o.value === value);
+    return option ? option.label : value;
+  };
+
+  // Filter out already selected regions from dropdown
+  const availableOptions = options.filter(o => !regions.includes(o.value));
+
+  return (
+    <div className="region-selector">
+      <label>{label}</label>
+      <div className="region-selector-input">
+        <select
+          value={selectedRegion}
+          onChange={(e) => setSelectedRegion(e.target.value)}
+          className="pane-select region-dropdown"
+        >
+          <option value="">Select a region...</option>
+          {availableOptions.map(opt => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+        <button
+          type="button"
+          className="pane-add-btn-small"
+          onClick={handleAddRegion}
+          disabled={!selectedRegion}
+          title="Add region"
+        >
+          <AddIcon size={12} />
+        </button>
+      </div>
+      {regions.length > 0 && (
+        <div className="region-tags">
+          {regions.map(region => (
+            <div key={region} className="region-tag">
+              <span>{getRegionLabel(region)}</span>
+              <button
+                type="button"
+                className="region-tag-remove"
+                onClick={() => handleRemoveRegion(region)}
+                title="Remove"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {regions.length === 0 && (
+        <div className="pane-hint" style={{ marginTop: '4px' }}>No regions selected. Add at least one target region.</div>
+      )}
+    </div>
+  );
+};
+
+/**
  * Description with Figures Component
  * Combines a textarea with optional figure upload for any description field
  */
@@ -714,7 +1063,19 @@ const DescriptionWithFigures = ({
         <div className="description-figures">
           {figures.map((figure, index) => (
             <div key={figure.id} className="description-figure-item">
-              <img src={figure.data} alt={figure.caption || figure.name} />
+              {figure.data ? (
+                <img src={figure.data} alt={figure.caption || figure.name} />
+              ) : (
+                <div className="figure-placeholder" title={`Image file: ${figure.filePath || figure.name}`}>
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <circle cx="8.5" cy="8.5" r="1.5" />
+                    <path d="M21 15l-5-5-8 8" />
+                  </svg>
+                  <span className="figure-placeholder-text">{figure.name || 'Image'}</span>
+                  <span className="figure-placeholder-path">{figure.filePath || 'Click to load'}</span>
+                </div>
+              )}
               <div className="description-figure-controls">
                 <input
                   type="text"
@@ -811,7 +1172,18 @@ const FiguresList = ({ figures = [], onChange }) => {
           {figures.map((figure, index) => (
             <div key={figure.id} className="figure-item">
               <div className="figure-preview">
-                <img src={figure.data} alt={figure.caption || figure.name} />
+                {figure.data ? (
+                  <img src={figure.data} alt={figure.caption || figure.name} />
+                ) : (
+                  <div className="figure-placeholder-grid" title={`Image file: ${figure.filePath || figure.name}`}>
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                      <circle cx="8.5" cy="8.5" r="1.5" />
+                      <path d="M21 15l-5-5-8 8" />
+                    </svg>
+                    <span>{figure.name || 'Image'}</span>
+                  </div>
+                )}
                 <button
                   type="button"
                   className="figure-remove"
@@ -1080,15 +1452,81 @@ const STAGE_FRAMEWORKS = [
   { value: 'riba', label: 'RIBA Plan of Work (UK)', stages: PROJECT_STAGES_RIBA }
 ];
 
-// Regional Applicability
+// Regional Applicability - ISO 3166-1 Country Codes
 const REGIONS = [
-  { value: 'international', label: 'International' },
-  { value: 'europe', label: 'Europe' },
-  { value: 'north-america', label: 'North America' },
-  { value: 'asia-pacific', label: 'Asia-Pacific' },
-  { value: 'middle-east', label: 'Middle East' },
-  { value: 'africa', label: 'Africa' },
-  { value: 'south-america', label: 'South America' }
+  { value: 'international', label: 'International (All regions)' },
+  // Major regions
+  { value: 'EU', label: 'European Union' },
+  { value: 'NA', label: 'North America' },
+  { value: 'APAC', label: 'Asia-Pacific' },
+  // ISO 3166-1 alpha-2 country codes (common countries)
+  { value: 'AF', label: 'Afghanistan' },
+  { value: 'AL', label: 'Albania' },
+  { value: 'DZ', label: 'Algeria' },
+  { value: 'AR', label: 'Argentina' },
+  { value: 'AU', label: 'Australia' },
+  { value: 'AT', label: 'Austria' },
+  { value: 'BE', label: 'Belgium' },
+  { value: 'BR', label: 'Brazil' },
+  { value: 'BG', label: 'Bulgaria' },
+  { value: 'CA', label: 'Canada' },
+  { value: 'CL', label: 'Chile' },
+  { value: 'CN', label: 'China' },
+  { value: 'CO', label: 'Colombia' },
+  { value: 'HR', label: 'Croatia' },
+  { value: 'CZ', label: 'Czech Republic' },
+  { value: 'DK', label: 'Denmark' },
+  { value: 'EG', label: 'Egypt' },
+  { value: 'EE', label: 'Estonia' },
+  { value: 'FI', label: 'Finland' },
+  { value: 'FR', label: 'France' },
+  { value: 'DE', label: 'Germany' },
+  { value: 'GR', label: 'Greece' },
+  { value: 'HK', label: 'Hong Kong' },
+  { value: 'HU', label: 'Hungary' },
+  { value: 'IS', label: 'Iceland' },
+  { value: 'IN', label: 'India' },
+  { value: 'ID', label: 'Indonesia' },
+  { value: 'IE', label: 'Ireland' },
+  { value: 'IL', label: 'Israel' },
+  { value: 'IT', label: 'Italy' },
+  { value: 'JP', label: 'Japan' },
+  { value: 'KZ', label: 'Kazakhstan' },
+  { value: 'KR', label: 'Korea, Republic of' },
+  { value: 'KW', label: 'Kuwait' },
+  { value: 'LV', label: 'Latvia' },
+  { value: 'LT', label: 'Lithuania' },
+  { value: 'LU', label: 'Luxembourg' },
+  { value: 'MY', label: 'Malaysia' },
+  { value: 'MX', label: 'Mexico' },
+  { value: 'NL', label: 'Netherlands' },
+  { value: 'NZ', label: 'New Zealand' },
+  { value: 'NO', label: 'Norway' },
+  { value: 'PK', label: 'Pakistan' },
+  { value: 'PE', label: 'Peru' },
+  { value: 'PH', label: 'Philippines' },
+  { value: 'PL', label: 'Poland' },
+  { value: 'PT', label: 'Portugal' },
+  { value: 'QA', label: 'Qatar' },
+  { value: 'RO', label: 'Romania' },
+  { value: 'RU', label: 'Russian Federation' },
+  { value: 'SA', label: 'Saudi Arabia' },
+  { value: 'RS', label: 'Serbia' },
+  { value: 'SG', label: 'Singapore' },
+  { value: 'SK', label: 'Slovakia' },
+  { value: 'SI', label: 'Slovenia' },
+  { value: 'ZA', label: 'South Africa' },
+  { value: 'ES', label: 'Spain' },
+  { value: 'SE', label: 'Sweden' },
+  { value: 'CH', label: 'Switzerland' },
+  { value: 'TW', label: 'Taiwan' },
+  { value: 'TH', label: 'Thailand' },
+  { value: 'TR', label: 'Turkey' },
+  { value: 'UA', label: 'Ukraine' },
+  { value: 'AE', label: 'United Arab Emirates' },
+  { value: 'GB', label: 'United Kingdom' },
+  { value: 'US', label: 'United States' },
+  { value: 'VN', label: 'Vietnam' }
 ];
 
 // Optional fields for IDM Header - Identifiers section (per ISO 29481-3)
@@ -1126,11 +1564,29 @@ const ContentPane = ({
   type,
   headerData = {},
   erDataMap = {},
+  erHierarchy = [],  // ER-first mode: hierarchical array of ERs
   dataObjects = [],
   onHeaderChange,
   onSelectER,
+  newlyAddedErId = null,         // ID of newly added ER (for scrolling)
+  onClearNewlyAddedErId,         // Callback to clear newly added ER ID after scrolling
+  // ER hierarchy manipulation handlers
+  onAddER,
+  onDeleteER,
+  onMoveUp,
+  onMoveDown,
+  onIndent,
+  onOutdent,
+  selectedErId = null,           // Currently selected ER for operations
   onClose
 }) => {
+  // Determine if using ER-first mode
+  const isErFirstMode = erHierarchy.length > 0;
+  // Ref to prevent double-clicks on Add buttons (React StrictMode can cause double invocations)
+  const lastAddTimeRef = useRef(0);
+  // Refs for scrolling to newly added ER
+  const erItemRefs = useRef({});
+
   // Determine which optional fields have data and should be visible
   const getInitialVisibleFields = useCallback((data) => {
     const identifierKeys = ['subTitle', 'localCode', 'copyright', 'license'];
@@ -1164,6 +1620,50 @@ const ContentPane = ({
       actors: [...new Set([...prev.actors, ...newVisibleFields.actors])]
     }));
   }, [headerData, getInitialVisibleFields]);
+
+  // Auto-expand and scroll to newly added ER in the hierarchy
+  React.useEffect(() => {
+    if (newlyAddedErId && type === 'exchangeReq' && erHierarchy.length > 0) {
+      // Find the path to the newly added ER and expand all nodes along the way
+      // nodeId format matches ERHierarchyItem: isRoot ? 'root' : `${parentId}-${er.id}`
+      const findPathToEr = (hierarchy, targetId, parentNodeId = null, isTopLevel = true) => {
+        for (const er of hierarchy) {
+          // Calculate nodeId the same way ERHierarchyItem does
+          const nodeId = isTopLevel ? 'root' : `${parentNodeId}-${er.id}`;
+          if (er.id === targetId) {
+            return [nodeId];
+          }
+          if (er.subERs && er.subERs.length > 0) {
+            const childPath = findPathToEr(er.subERs, targetId, nodeId, false);
+            if (childPath) {
+              return [nodeId, ...childPath];
+            }
+          }
+        }
+        return null;
+      };
+
+      const pathToNewEr = findPathToEr(erHierarchy, newlyAddedErId);
+      if (pathToNewEr && pathToNewEr.length > 0) {
+        // Expand all ancestors (not the new ER itself, which is the last in the path)
+        setExpandedNodes(prev => {
+          const next = new Set(prev);
+          pathToNewEr.slice(0, -1).forEach(nodeId => next.add(nodeId));
+          return next;
+        });
+      }
+
+      // Wait for DOM update then scroll to the newly added ER
+      setTimeout(() => {
+        const element = erItemRefs.current[newlyAddedErId];
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        // Clear the newly added ER ID after scrolling
+        onClearNewlyAddedErId?.();
+      }, 150);
+    }
+  }, [newlyAddedErId, type, erHierarchy, onClearNewlyAddedErId]);
 
   if (!type) return null;
 
@@ -1374,9 +1874,11 @@ const ContentPane = ({
 
         <UseEntry
           uses={Array.isArray(headerData.uses) ? headerData.uses : []}
+          useClassification={headerData.useClassification}
           onChange={(uses) => handleHeaderFieldChange('uses', uses)}
+          onClassificationChange={(classification) => handleHeaderFieldChange('useClassification', classification)}
         />
-        <span className="pane-hint pane-hint-examples">Examples include Author Design, Review Design, Analyze Structural Performance, etc. See <a href="https://bim.psu.edu/uses/" target="_blank" rel="noopener noreferrer">https://bim.psu.edu/uses/</a> for more examples.</span>
+        <span className="pane-hint">Use defines the purpose of information exchange in a project. Combining uses with specific execution methods and outcome definitions, it forms a use case of an IDM specification.</span>
 
         <DescriptionWithFigures
           label="Summary"
@@ -1390,10 +1892,10 @@ const ContentPane = ({
         />
         <span className="pane-hint">A description of the aim and scope, benefits, and other aspects of the IDM specification. You can add figures by pressing "+" button.</span>
 
-        <MultiSelectCheckbox
+        <RegionSelector
           label={<>Target Regions <span className="required">*</span></>}
           options={REGIONS}
-          selected={Array.isArray(headerData.regions) ? headerData.regions : (headerData.region ? [headerData.region] : ['international'])}
+          regions={Array.isArray(headerData.regions) ? headerData.regions : (headerData.region ? [headerData.region] : [])}
           onChange={(items) => handleHeaderFieldChange('regions', items)}
         />
 
@@ -1521,7 +2023,7 @@ const ContentPane = ({
         />
       </Section>
 
-      {/* ACTOR ROLES Section */}
+      {/* ACTOR ROLES Section - IDM 2.0 Schema Compliant */}
       <Section title="Actor Roles" defaultExpanded={true}>
         <div className="pane-field">
           <div className="pane-field-header">
@@ -1529,65 +2031,177 @@ const ContentPane = ({
             <button
               type="button"
               className="pane-add-btn"
-              onClick={() => {
-                const newActors = [...(Array.isArray(headerData.actorsList) ? headerData.actorsList : []), { id: `actor-${Date.now()}`, name: '', role: '' }];
-                handleHeaderFieldChange('actorsList', newActors);
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                // Debounce to prevent multiple rapid clicks (React StrictMode issue)
+                const now = Date.now();
+                if (now - lastAddTimeRef.current < 300) return;
+                lastAddTimeRef.current = now;
+
+                const currentActors = Array.isArray(headerData.actorsList) ? headerData.actorsList : [];
+                const newActor = {
+                  id: `actor-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                  name: '',
+                  role: '', // Role field (user-editable)
+                  actorType: 'group', // Default to group (Pool) per IDM 2.0
+                  bpmnShapeName: '',
+                  subActors: [] // For BPMN lanes within a pool
+                };
+                handleHeaderFieldChange('actorsList', [...currentActors, newActor]);
               }}
-              title="Add a new actor"
+              title="Add a new actor (Pool)"
             >
               <AddIcon size={12} /> Add Actor
             </button>
           </div>
-          <span className="pane-hint">Named swimlanes (Pools/Lanes) from the BPMN diagram are automatically added here as actors. You can also manually add actors.</span>
+          <span className="pane-hint">Actors can be groups or individuals. Information exchange between groups is external, while exchange between individuals is internal. In BPMN, Pools represent groups and external exchanges, and Swimlanes represent individuals and internal exchanges.</span>
         </div>
         {(Array.isArray(headerData.actorsList) ? headerData.actorsList : []).length === 0 ? (
-          <div className="pane-empty-small">No actors defined. Actors will be auto-populated from BPMN swimlanes.</div>
+          <div className="pane-empty-small">No actors defined. Add actors manually or they will be auto-populated from BPMN Pools and Swimlanes.</div>
         ) : (
           <div className="actors-list-items">
             {(Array.isArray(headerData.actorsList) ? headerData.actorsList : []).map((actor, index) => (
-              <div key={actor.id || index} className="actor-list-item">
-                <input
-                  type="text"
-                  value={actor.name || ''}
-                  onChange={(e) => {
-                    const newActors = [...headerData.actorsList];
-                    newActors[index] = { ...actor, name: e.target.value };
-                    handleHeaderFieldChange('actorsList', newActors);
-                  }}
-                  placeholder="Actor name (e.g., Architect, Contractor)"
-                  className="pane-input actor-name-input"
-                />
-                <input
-                  type="text"
-                  value={actor.role || ''}
-                  onChange={(e) => {
-                    const newActors = [...headerData.actorsList];
-                    newActors[index] = { ...actor, role: e.target.value };
-                    handleHeaderFieldChange('actorsList', newActors);
-                  }}
-                  placeholder="Role description"
-                  className="pane-input actor-role-input"
-                />
-                <button
-                  type="button"
-                  className="actor-remove-btn"
-                  onClick={() => {
-                    // Warn user if the actor is linked to a BPMN swimlane
-                    if (actor.bpmnId) {
-                      const confirmed = window.confirm(
-                        `This actor "${actor.name || 'Unnamed'}" is linked to a swimlane in the BPMN diagram.\n\n` +
-                        `Removing this actor will also delete the corresponding swimlane in the process map.\n\n` +
-                        `Do you want to continue?`
-                      );
-                      if (!confirmed) return;
-                    }
-                    const newActors = headerData.actorsList.filter((_, i) => i !== index);
-                    handleHeaderFieldChange('actorsList', newActors);
-                  }}
-                  title={actor.bpmnId ? "Remove actor (will also remove linked swimlane)" : "Remove actor"}
-                >
-                  ×
-                </button>
+              <div key={actor.id || index} className="actor-card">
+                {/* Actor Header Row */}
+                <div className="actor-header-row">
+                  <input
+                    type="text"
+                    value={actor.name || ''}
+                    onChange={(e) => {
+                      const newActors = [...headerData.actorsList];
+                      newActors[index] = { ...actor, name: e.target.value };
+                      handleHeaderFieldChange('actorsList', newActors);
+                    }}
+                    placeholder="Actor name (e.g., Design Team, Client)"
+                    className="pane-input actor-name-input"
+                  />
+                  <input
+                    type="text"
+                    value={actor.role || ''}
+                    onChange={(e) => {
+                      const newActors = [...headerData.actorsList];
+                      newActors[index] = { ...actor, role: e.target.value };
+                      handleHeaderFieldChange('actorsList', newActors);
+                    }}
+                    placeholder="Role"
+                    className="pane-input actor-role-input"
+                    title="Role of this actor in the process"
+                  />
+                  {/* Swimlane Association Badge */}
+                  {actor.bpmnShapeName || actor.bpmnId ? (
+                    <span className="actor-swimlane-badge" title={`Linked to BPMN: ${actor.bpmnShapeName || actor.bpmnId}`}>
+                      Pool
+                    </span>
+                  ) : (
+                    <span className="actor-manual-badge" title="Manually added actor">
+                      Manual
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    className="actor-remove-btn"
+                    onClick={() => {
+                      if (actor.bpmnShapeName || actor.bpmnId) {
+                        const confirmed = window.confirm(
+                          `This actor "${actor.name || 'Unnamed'}" is linked to a BPMN Pool.\n\n` +
+                          `Removing this actor will also delete the corresponding Pool in the process map.\n\n` +
+                          `Do you want to continue?`
+                        );
+                        if (!confirmed) return;
+                      }
+                      const newActors = headerData.actorsList.filter((_, i) => i !== index);
+                      handleHeaderFieldChange('actorsList', newActors);
+                    }}
+                    title="Remove actor"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                {/* Sub-Actors (Lanes) Section */}
+                <div className="actor-subactors-section">
+                  <div className="actor-subactors-header">
+                    <span className="actor-subactors-label">Swimlanes (Individuals)</span>
+                    <button
+                      type="button"
+                      className="actor-add-lane-btn"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const newActors = [...headerData.actorsList];
+                        const subActors = actor.subActors || [];
+                        const newSubActor = {
+                          id: `subactor-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                          name: '',
+                          role: '', // Role field for lanes
+                          bpmnShapeName: ''
+                        };
+                        newActors[index] = { ...actor, subActors: [...subActors, newSubActor] };
+                        handleHeaderFieldChange('actorsList', newActors);
+                      }}
+                      title="Add a swimlane (individual) to this pool"
+                    >
+                      + Swimlane
+                    </button>
+                  </div>
+                  {(actor.subActors || []).length === 0 ? (
+                    <div className="actor-no-lanes">No swimlanes defined</div>
+                  ) : (
+                    <div className="actor-lanes-list">
+                      {(actor.subActors || []).map((subActor, subIndex) => (
+                        <div key={subActor.id || subIndex} className="actor-lane-item">
+                          <span className="actor-lane-indent">└</span>
+                          <input
+                            type="text"
+                            value={subActor.name || ''}
+                            onChange={(e) => {
+                              const newActors = [...headerData.actorsList];
+                              const newSubActors = [...(actor.subActors || [])];
+                              newSubActors[subIndex] = { ...subActor, name: e.target.value };
+                              newActors[index] = { ...actor, subActors: newSubActors };
+                              handleHeaderFieldChange('actorsList', newActors);
+                            }}
+                            placeholder="Swimlane name (e.g., Architect, Engineer)"
+                            className="pane-input actor-lane-input"
+                          />
+                          <input
+                            type="text"
+                            value={subActor.role || ''}
+                            onChange={(e) => {
+                              const newActors = [...headerData.actorsList];
+                              const newSubActors = [...(actor.subActors || [])];
+                              newSubActors[subIndex] = { ...subActor, role: e.target.value };
+                              newActors[index] = { ...actor, subActors: newSubActors };
+                              handleHeaderFieldChange('actorsList', newActors);
+                            }}
+                            placeholder="Role"
+                            className="pane-input actor-lane-role-input"
+                            title="Role of this individual"
+                          />
+                          {subActor.bpmnShapeName ? (
+                            <span className="actor-lane-badge" title={`Linked to BPMN Lane: ${subActor.bpmnShapeName}`}>
+                              Lane
+                            </span>
+                          ) : null}
+                          <button
+                            type="button"
+                            className="actor-lane-remove-btn"
+                            onClick={() => {
+                              const newActors = [...headerData.actorsList];
+                              const newSubActors = (actor.subActors || []).filter((_, i) => i !== subIndex);
+                              newActors[index] = { ...actor, subActors: newSubActors };
+                              handleHeaderFieldChange('actorsList', newActors);
+                            }}
+                            title="Remove swimlane"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -1629,95 +2243,513 @@ const ContentPane = ({
           onChange={(items) => handleHeaderFieldChange('projectStagesRiba', items)}
           allowCustom={false}
         />
+
+        {/* Custom Project Phase Classification */}
+        <div className="pane-field" style={{ marginTop: '16px' }}>
+          <div className="pane-field-header">
+            <label>Custom Project Phase Classification</label>
+            <button
+              type="button"
+              className="pane-add-btn"
+              onClick={() => {
+                const customPhases = Array.isArray(headerData.customProjectPhases) ? headerData.customProjectPhases : [];
+                const newPhase = {
+                  id: `custom-phase-${Date.now()}`,
+                  classificationName: '',
+                  phaseName: ''
+                };
+                handleHeaderFieldChange('customProjectPhases', [...customPhases, newPhase]);
+              }}
+              title="Add custom project phase"
+            >
+              <AddIcon size={12} /> Add
+            </button>
+          </div>
+          <span className="pane-hint">Define your own project phase classifications and phases.</span>
+        </div>
+        {(Array.isArray(headerData.customProjectPhases) ? headerData.customProjectPhases : []).length > 0 && (
+          <div className="custom-phases-list">
+            {(headerData.customProjectPhases || []).map((phase, index) => (
+              <div key={phase.id || index} className="custom-phase-item">
+                <input
+                  type="text"
+                  value={phase.classificationName || ''}
+                  onChange={(e) => {
+                    const newPhases = [...headerData.customProjectPhases];
+                    newPhases[index] = { ...phase, classificationName: e.target.value };
+                    handleHeaderFieldChange('customProjectPhases', newPhases);
+                  }}
+                  placeholder="Classification Name *"
+                  className="pane-input custom-phase-classification-input"
+                />
+                <input
+                  type="text"
+                  value={phase.phaseName || ''}
+                  onChange={(e) => {
+                    const newPhases = [...headerData.customProjectPhases];
+                    newPhases[index] = { ...phase, phaseName: e.target.value };
+                    handleHeaderFieldChange('customProjectPhases', newPhases);
+                  }}
+                  placeholder="Phase Name *"
+                  className="pane-input custom-phase-name-input"
+                />
+                <button
+                  type="button"
+                  className="custom-phase-remove-btn"
+                  onClick={() => {
+                    const newPhases = headerData.customProjectPhases.filter((_, i) => i !== index);
+                    handleHeaderFieldChange('customProjectPhases', newPhases);
+                  }}
+                  title="Remove custom phase"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </Section>
     </div>
   );
 
   // =========================================================================
-  // EXCHANGE REQUIREMENTS
+  // EXCHANGE REQUIREMENTS - Hierarchical Tree View
   // =========================================================================
+
+  // State for expanded/collapsed tree nodes
+  const [expandedNodes, setExpandedNodes] = useState(new Set(['root']));
+
+  const toggleNode = useCallback((nodeId) => {
+    setExpandedNodes(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(nodeId)) {
+        newSet.delete(nodeId);
+      } else {
+        newSet.add(nodeId);
+      }
+      return newSet;
+    });
+  }, []);
+
+  // Find selected ER's location in hierarchy for move/indent/outdent operations
+  const selectedErLocation = useMemo(() => {
+    if (!selectedErId || !erHierarchy || erHierarchy.length === 0) return null;
+
+    const findLocation = (hierarchy, targetId, parent = null) => {
+      for (let i = 0; i < hierarchy.length; i++) {
+        if (hierarchy[i].id === targetId || hierarchy[i].guid === targetId) {
+          return { parent, index: i, siblings: hierarchy, er: hierarchy[i] };
+        }
+        if (hierarchy[i].subERs?.length > 0) {
+          const found = findLocation(hierarchy[i].subERs, targetId, hierarchy[i]);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+
+    return findLocation(erHierarchy, selectedErId);
+  }, [selectedErId, erHierarchy]);
+
+  // Determine if selected ER can be moved/indented/outdented
+  const canMoveUp = selectedErLocation && selectedErLocation.index > 0;
+  const canMoveDown = selectedErLocation && selectedErLocation.index < selectedErLocation.siblings.length - 1;
+  const canIndent = selectedErLocation && selectedErLocation.index > 0; // Has sibling above to become parent
+  const canOutdent = selectedErLocation && selectedErLocation.parent !== null; // Has parent to outdent from
+
+  // Expand all nodes
+  const handleExpandAll = useCallback(() => {
+    const collectAllNodeIds = (hierarchy, parentNodeId = null, isTopLevel = true) => {
+      const ids = [];
+      hierarchy.forEach(er => {
+        const nodeId = isTopLevel ? 'root' : `${parentNodeId}-${er.id}`;
+        ids.push(nodeId);
+        if (er.subERs?.length > 0) {
+          ids.push(...collectAllNodeIds(er.subERs, nodeId, false));
+        }
+      });
+      return ids;
+    };
+    const allIds = collectAllNodeIds(erHierarchy);
+    setExpandedNodes(new Set(allIds));
+  }, [erHierarchy]);
+
+  // Collapse all nodes
+  const handleCollapseAll = useCallback(() => {
+    setExpandedNodes(new Set(['root'])); // Keep root expanded
+  }, []);
+
   const renderExchangeReq = () => {
-    // Use dataObjects from BPMN as the single source of truth
-    // Filter to only DataObjectReference types (the visual elements users interact with)
+    // Use given root ER name from import, or generate from shortTitle
+    const rootERName = headerData.rootERName
+      ? headerData.rootERName
+      : (headerData.shortTitle
+          ? `er_${headerData.shortTitle.replace(/\s+/g, '_')}`
+          : 'er_IDM_Specification');
+
+    // =========================================================================
+    // ER-FIRST MODE: Render from erHierarchy directly
+    // =========================================================================
+    if (isErFirstMode) {
+      // Count total ERs recursively
+      const countERs = (ers) => {
+        let count = 0;
+        (ers || []).forEach(er => {
+          count += 1;
+          if (er.subERs && er.subERs.length > 0) {
+            count += countERs(er.subERs);
+          }
+        });
+        return count;
+      };
+      const totalERs = countERs(erHierarchy);
+
+      // Only ONE top-level ER is allowed (enforced by design)
+      const rootER = erHierarchy.length > 0 ? erHierarchy[0] : null;
+
+      return (
+        <div className="content-pane-body">
+          <Section
+            title="Exchange Requirement Hierarchy"
+            defaultExpanded={true}
+          >
+            {/* ER Hierarchy Toolbar */}
+            <div className="er-hierarchy-toolbar">
+              <button
+                className="er-hierarchy-btn"
+                onClick={onAddER}
+                title="Add new ER under selected ER"
+              >
+                <AddIcon size={14} />
+              </button>
+              <button
+                className="er-hierarchy-btn"
+                onClick={() => selectedErId && onDeleteER?.(selectedErId)}
+                disabled={!selectedErId || !selectedErLocation?.parent}
+                title="Delete selected ER"
+              >
+                <DeleteIcon size={14} />
+              </button>
+              <div className="er-hierarchy-divider" />
+              <button
+                className="er-hierarchy-btn"
+                onClick={() => selectedErId && onMoveUp?.(selectedErId)}
+                disabled={!canMoveUp}
+                title="Move ER up"
+              >
+                ↑
+              </button>
+              <button
+                className="er-hierarchy-btn"
+                onClick={() => selectedErId && onMoveDown?.(selectedErId)}
+                disabled={!canMoveDown}
+                title="Move ER down"
+              >
+                ↓
+              </button>
+              <div className="er-hierarchy-divider" />
+              <button
+                className="er-hierarchy-btn"
+                onClick={() => selectedErId && onIndent?.(selectedErId)}
+                disabled={!canIndent}
+                title="Indent ER (make sub-ER of above)"
+              >
+                &gt;
+              </button>
+              <button
+                className="er-hierarchy-btn"
+                onClick={() => selectedErId && onOutdent?.(selectedErId)}
+                disabled={!canOutdent}
+                title="Outdent ER (promote to parent level)"
+              >
+                &lt;
+              </button>
+              <div className="er-hierarchy-divider" />
+              <button
+                className="er-hierarchy-btn"
+                onClick={handleExpandAll}
+                title="Expand all"
+              >
+                <ExpandAllIcon size={14} />
+              </button>
+              <button
+                className="er-hierarchy-btn"
+                onClick={handleCollapseAll}
+                title="Collapse all"
+              >
+                <CollapseAllIcon size={14} />
+              </button>
+            </div>
+
+            <div className="er-tree-root">
+              {/* Single top-level ER (only ONE allowed by design) */}
+              {rootER && (
+                <ERHierarchyItem
+                  er={rootER}
+                  level={0}
+                  isRoot={true}
+                  expandedNodes={expandedNodes}
+                  onToggleNode={toggleNode}
+                  onSelectER={onSelectER}
+                  itemRefs={erItemRefs}
+                  selectedErId={selectedErId}
+                />
+              )}
+
+              {/* No ERs - show empty state */}
+              {!rootER && (
+                <div className="pane-empty">
+                  <p>No Exchange Requirements</p>
+                  <span>Click "+ER" to add an Exchange Requirement, or add Data Objects in the BPMN diagram</span>
+                </div>
+              )}
+            </div>
+          </Section>
+
+          <div className="er-stats">
+            <span>Total ERs: {totalERs}</span>
+          </div>
+        </div>
+      );
+    }
+
+    // =========================================================================
+    // LEGACY MODE: Build tree from erDataMap
+    // =========================================================================
+
+    // Get data objects from BPMN diagram
     const filteredDataObjects = dataObjects.filter(d =>
-      d.type === 'bpmn:DataObjectReference' || d.type === 'bpmn:DataStoreReference'
+      d.type === 'bpmn:DataObjectReference' || d.type === 'bpmn:DataStoreReference' || d.type === 'bpmn:DataObject'
     );
 
-    // Build a list of all items with their ER data (if exists)
-    // Use a Map to dedupe by data object ID
-    const itemsMap = new Map();
-    filteredDataObjects.forEach(dataObject => {
-      if (!itemsMap.has(dataObject.id)) {
-        const er = erDataMap[dataObject.id];
-        itemsMap.set(dataObject.id, {
-          dataObjectId: dataObject.id,
-          dataObjectName: dataObject.name || dataObject.id,
-          er
-        });
+    // Build a set of BPMN data object IDs for quick lookup
+    const bpmnDataObjectIds = new Set(filteredDataObjects.map(d => d.id));
+
+    // Build list of ERs - primary source is erDataMap
+    // IMPORTANT: Deduplicate by ER guid/id to avoid showing same ER multiple times
+    // (Multiple data objects can reference the same ER)
+    const allERs = [];
+    const processedDataObjectIds = new Set();
+    const processedErGuids = new Set(); // Track unique ERs by guid to prevent duplicates
+
+    // First, add all ERs from erDataMap (these are defined ERs)
+    Object.entries(erDataMap).forEach(([key, er]) => {
+      if (!er) return;
+
+      // Get unique identifier for this ER (prefer guid, fallback to id or name)
+      const erUniqueId = er.guid || er.id || er.name;
+
+      // Skip if we've already added this ER (deduplicate by ER identifier)
+      if (erUniqueId && processedErGuids.has(erUniqueId)) {
+        // Still track the data object ID as processed
+        processedDataObjectIds.add(key);
+        return;
+      }
+
+      // Skip internal keys like 'unlinked_' prefix
+      const isUnlinkedKey = key.startsWith('unlinked_');
+      const displayKey = isUnlinkedKey ? key.replace('unlinked_', '') : key;
+
+      // Check if this ER is linked to a BPMN data object
+      const isLinkedToBpmn = bpmnDataObjectIds.has(key);
+
+      // Get the data object name from BPMN if linked
+      const bpmnDataObject = filteredDataObjects.find(d => d.id === key);
+
+      allERs.push({
+        dataObjectId: key,
+        dataObjectName: er.name || bpmnDataObject?.name || displayKey,
+        er,
+        isLinked: isLinkedToBpmn && !isUnlinkedKey
+      });
+
+      processedDataObjectIds.add(key);
+      if (erUniqueId) {
+        processedErGuids.add(erUniqueId);
       }
     });
 
-    const allItems = Array.from(itemsMap.values());
-    const definedCount = allItems.filter(item => item.er).length;
-    const totalCount = allItems.length;
+    // Then, add any BPMN data objects that don't have ERs defined yet
+    filteredDataObjects.forEach(dataObject => {
+      if (!processedDataObjectIds.has(dataObject.id)) {
+        allERs.push({
+          dataObjectId: dataObject.id,
+          dataObjectName: dataObject.name || dataObject.id,
+          er: null,
+          isLinked: true
+        });
+        processedDataObjectIds.add(dataObject.id);
+      }
+    });
 
-    return (
-      <div className="content-pane-body">
-        <Section
-          title="Master Exchange Requirements List"
-          count={totalCount}
-          badge={definedCount < totalCount ? `${definedCount}/${totalCount} defined` : null}
-          defaultExpanded={true}
-        >
-          {totalCount === 0 ? (
-            <div className="pane-empty">
-              <p>No Data Objects</p>
-              <span>Add Data Objects in the BPMN diagram and double-click to define ERs</span>
+    // Separate into linked and unassociated for display
+    const linkedERs = allERs.filter(item => item.isLinked || item.er === null);
+    const unassociatedERs = allERs.filter(item => !item.isLinked && item.er !== null);
+
+    // Count statistics
+    const totalLinked = linkedERs.length;
+    const definedLinked = linkedERs.filter(item => item.er).length;
+    const totalUnassociated = unassociatedERs.length;
+
+    // Recursive component to render ER tree item
+    const ERTreeItem = ({ item, level = 0, parentId = 'root' }) => {
+      const { dataObjectId, dataObjectName, er, isLinked } = item;
+      const hasER = !!er;
+      const hasName = er?.name && er.name.trim();
+      const hasUnits = er?.informationUnits && er.informationUnits.length > 0;
+      const hasSubERs = er?.subErs && er.subErs.length > 0;
+      const isComplete = hasER && hasName && hasUnits;
+      const nodeId = `${parentId}-${dataObjectId}`;
+      const isExpanded = expandedNodes.has(nodeId);
+
+      return (
+        <div className="er-tree-item-wrapper">
+          <div
+            className={`er-tree-item ${!hasER ? 'undefined' : ''} ${hasER && !isComplete ? 'incomplete' : ''} ${!isLinked ? 'unassociated' : ''}`}
+            style={{ paddingLeft: `${level * 16 + 8}px` }}
+            onClick={() => onSelectER?.(dataObjectId)}
+          >
+            {hasSubERs ? (
+              <button
+                className="er-tree-toggle"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleNode(nodeId);
+                }}
+              >
+                {isExpanded ? <ChevronDownIcon size={12} /> : <ChevronRightIcon size={12} />}
+              </button>
+            ) : (
+              <span className="er-tree-spacer" />
+            )}
+            <div className="er-tree-item-icon">
+              <ExchangeReqIcon size={14} />
             </div>
-          ) : (
-            <div className="er-list">
-              {allItems.map(({ dataObjectId, dataObjectName, er }) => {
-                const hasER = !!er;
-                const hasName = er?.name && er.name.trim();
-                const hasUnits = er?.informationUnits && er.informationUnits.length > 0;
-                const isComplete = hasER && hasName && hasUnits;
-                const isDefined = hasER;
-
+            <div className="er-tree-item-content">
+              <div className="er-tree-item-name">
+                {hasName ? er.name : dataObjectName}
+              </div>
+              <div className="er-tree-item-meta">
+                {!isLinked && (
+                  <span className="er-unassociated-badge">Unassociated</span>
+                )}
+                {hasER ? (
+                  <>
+                    <span className="er-unit-count">
+                      {(er.informationUnits || []).length} units
+                    </span>
+                    {hasSubERs && (
+                      <span className="er-sub-count">{er.subErs.length} sub-ERs</span>
+                    )}
+                    {!isComplete && (
+                      <span className="er-incomplete-badge">Incomplete</span>
+                    )}
+                  </>
+                ) : (
+                  <span className="er-undefined-badge">Not defined</span>
+                )}
+              </div>
+            </div>
+          </div>
+          {hasSubERs && isExpanded && (
+            <div className="er-tree-children">
+              {er.subErs.map(subEr => {
+                // Find the full ER data for this sub-ER
+                const subErData = erDataMap[subEr.id] || { name: subEr.name, id: subEr.id };
                 return (
-                  <div
-                    key={dataObjectId}
-                    className={`er-list-item ${!isDefined ? 'undefined' : ''} ${isDefined && !isComplete ? 'incomplete' : ''}`}
-                    onClick={() => onSelectER?.(dataObjectId)}
-                    title={!isDefined ? 'Double-click to define this Exchange Requirement' : undefined}
-                  >
-                    <div className="er-list-item-icon">
-                      <ExchangeReqIcon size={14} />
-                    </div>
-                    <div className="er-list-item-content">
-                      <div className="er-list-item-name">
-                        {hasName ? er.name : dataObjectName}
-                      </div>
-                      <div className="er-list-item-meta">
-                        {isDefined ? (
-                          <>
-                            <span className="er-unit-count">
-                              {(er.informationUnits || []).length} units
-                            </span>
-                            {!isComplete && (
-                              <span className="er-incomplete-badge">Incomplete</span>
-                            )}
-                          </>
-                        ) : (
-                          <span className="er-undefined-badge">Not defined</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                  <ERTreeItem
+                    key={subEr.id}
+                    item={{
+                      dataObjectId: subEr.id,
+                      dataObjectName: subEr.name || subEr.id,
+                      er: subErData,
+                      isLinked: true
+                    }}
+                    level={level + 1}
+                    parentId={nodeId}
+                  />
                 );
               })}
             </div>
           )}
+        </div>
+      );
+    };
+
+    return (
+      <div className="content-pane-body">
+        {/* Root ER Section */}
+        <Section
+          title="Exchange Requirement Hierarchy"
+          defaultExpanded={true}
+        >
+          <div className="er-tree-root">
+            <div
+              className="er-tree-item root-er"
+              onClick={() => toggleNode('root')}
+            >
+              <button className="er-tree-toggle">
+                {expandedNodes.has('root') ? <ChevronDownIcon size={14} /> : <ChevronRightIcon size={14} />}
+              </button>
+              <div className="er-tree-item-icon root">
+                <ExchangeReqIcon size={16} />
+              </div>
+              <div className="er-tree-item-content">
+                <div className="er-tree-item-name root-name">{rootERName}</div>
+                <div className="er-tree-item-meta">
+                  <span className="er-sub-count">{totalLinked + totalUnassociated} ERs total</span>
+                </div>
+              </div>
+            </div>
+
+            {expandedNodes.has('root') && (
+              <div className="er-tree-children">
+                {/* Linked ERs from BPMN */}
+                {linkedERs.map(item => (
+                  <ERTreeItem key={item.dataObjectId} item={item} level={1} />
+                ))}
+
+                {/* Unassociated ERs Section */}
+                {unassociatedERs.length > 0 && (
+                  <div className="er-tree-unassociated-section">
+                    <div
+                      className="er-tree-item section-header"
+                      style={{ paddingLeft: '24px' }}
+                      onClick={() => toggleNode('unassociated')}
+                    >
+                      <button className="er-tree-toggle">
+                        {expandedNodes.has('unassociated') ? <ChevronDownIcon size={12} /> : <ChevronRightIcon size={12} />}
+                      </button>
+                      <span className="section-label">Unassociated ERs ({totalUnassociated})</span>
+                    </div>
+                    {expandedNodes.has('unassociated') && (
+                      <div className="er-tree-children">
+                        {unassociatedERs.map(item => (
+                          <ERTreeItem key={item.dataObjectId} item={item} level={2} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Empty state */}
+                {linkedERs.length === 0 && unassociatedERs.length === 0 && (
+                  <div className="pane-empty" style={{ marginLeft: '24px' }}>
+                    <p>No Exchange Requirements</p>
+                    <span>Add Data Objects in the BPMN diagram and double-click to define ERs</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </Section>
+
+        {/* Statistics */}
+        <div className="er-stats">
+          <span>BPMN Data Objects: {totalLinked}</span>
+          <span>Defined: {definedLinked}/{totalLinked}</span>
+          {totalUnassociated > 0 && <span>Unassociated: {totalUnassociated}</span>}
+        </div>
       </div>
     );
   };

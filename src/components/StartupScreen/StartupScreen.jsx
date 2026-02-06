@@ -1,6 +1,9 @@
 import React from 'react';
 import './StartupScreen.css';
 
+const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0';
+const BUILD_DATE = typeof __BUILD_DATE__ !== 'undefined' ? __BUILD_DATE__ : 'dev';
+
 /**
  * Startup Screen Component
  *
@@ -39,7 +42,7 @@ const StartupScreen = ({ onNewBlank, onNewSample, onOpen }) => {
             </div>
             <div className="startup-option-text">
               <span className="startup-option-title">Blank Project</span>
-              <span className="startup-option-desc">Start with an empty canvas and create your own process map</span>
+              <span className="startup-option-desc">Start with an empty canvas and create your own information delivery manual (IDM) specification</span>
             </div>
           </button>
 
@@ -55,7 +58,7 @@ const StartupScreen = ({ onNewBlank, onNewSample, onOpen }) => {
             </div>
             <div className="startup-option-text">
               <span className="startup-option-title">Sample Project</span>
-              <span className="startup-option-desc">Start with a sample IDM specification for design coordination</span>
+              <span className="startup-option-desc">Start with a sample IDM specification</span>
             </div>
           </button>
 
@@ -69,12 +72,13 @@ const StartupScreen = ({ onNewBlank, onNewSample, onOpen }) => {
             </div>
             <div className="startup-option-text">
               <span className="startup-option-title">Open Project</span>
-              <span className="startup-option-desc">Open an existing IDM project, idmXML, xPPM, or BPMN file</span>
+              <span className="startup-option-desc">Open an existing IDM project, idmXML, or BPMN file</span>
             </div>
           </button>
         </div>
 
         <div className="startup-footer">
+          <p className="startup-version">Version {APP_VERSION} · Build {BUILD_DATE}</p>
           <p>Powered by <a href="http://big.yonsei.ac.kr/" target="_blank" rel="noopener noreferrer">BIG Yonsei</a></p>
         </div>
       </div>

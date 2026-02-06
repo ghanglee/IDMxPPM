@@ -372,6 +372,228 @@
 }
 
 /* ============================================================================
+   ER Tree View (Hierarchical)
+   ============================================================================ */
+
+.er-tree-root {
+  margin-bottom: 8px;
+}
+
+.er-tree-item-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.er-tree-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast);
+}
+
+.er-tree-item:hover {
+  background: var(--bg-hover);
+}
+
+.er-tree-item.selected {
+  background: var(--accent-secondary);
+  border-color: var(--accent-primary);
+}
+
+.er-tree-item.selected:hover {
+  background: var(--accent-secondary);
+}
+
+/* ER Hierarchy Toolbar */
+.er-hierarchy-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+}
+
+.er-hierarchy-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.er-hierarchy-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-hover);
+}
+
+.er-hierarchy-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.er-hierarchy-btn span {
+  font-weight: 500;
+}
+
+.er-hierarchy-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border-primary);
+  margin: 0 4px;
+}
+
+.er-tree-item.root-er {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  margin-bottom: 4px;
+}
+
+.er-tree-item.root-er:hover {
+  background: var(--bg-hover);
+}
+
+.er-tree-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.er-tree-toggle:hover {
+  color: var(--text-primary);
+}
+
+.er-tree-spacer {
+  width: 16px;
+  flex-shrink: 0;
+}
+
+.er-tree-item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: var(--accent-color);
+  flex-shrink: 0;
+}
+
+.er-tree-item-icon.root {
+  color: var(--accent-primary);
+}
+
+.er-tree-item-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.er-tree-item-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.er-tree-item-name.root-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.er-tree-item-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.er-tree-item.undefined .er-tree-item-icon {
+  color: var(--text-muted);
+}
+
+.er-tree-item.undefined .er-tree-item-name {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.er-tree-item.incomplete {
+  border-left: 2px solid var(--warning-color);
+}
+
+.er-tree-item.unassociated {
+  background: rgba(255, 152, 0, 0.05);
+  border-left: 2px solid var(--warning-color);
+}
+
+.er-tree-children {
+  display: flex;
+  flex-direction: column;
+}
+
+.er-tree-unassociated-section {
+  margin-top: 8px;
+  border-top: 1px dashed var(--border-secondary);
+  padding-top: 8px;
+}
+
+.er-tree-item.section-header {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.section-label {
+  color: var(--warning-color);
+}
+
+.er-unassociated-badge {
+  background: var(--warning-color);
+  color: white;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 9px;
+  font-weight: 500;
+}
+
+.er-sub-count {
+  color: var(--accent-color);
+}
+
+.er-stats {
+  display: flex;
+  gap: 16px;
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 8px;
+}
+
+/* ============================================================================
    Authors Section
    ============================================================================ */
 
@@ -752,6 +974,97 @@
   background: rgba(255, 255, 255, 0.4);
 }
 
+/* Use Classification UI */
+.use-classification-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.use-classification-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.use-classification-select {
+  flex: 1;
+  font-size: 12px;
+}
+
+.use-mode-toggle {
+  display: flex;
+  gap: 0;
+  margin-bottom: 8px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.use-mode-btn {
+  flex: 1;
+  padding: 6px 12px;
+  font-size: 11px;
+  background: var(--bg-secondary);
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.use-mode-btn:first-child {
+  border-right: 1px solid var(--border-primary);
+}
+
+.use-mode-btn.active {
+  background: var(--accent-primary);
+  color: white;
+}
+
+.use-mode-btn:not(.active):hover {
+  background: var(--bg-hover);
+}
+
+.use-select {
+  flex: 1;
+}
+
+.use-custom-input {
+  flex: 1;
+}
+
+.use-description-preview {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 6px 8px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  margin-top: 4px;
+  margin-bottom: 8px;
+}
+
+.use-name-text {
+  font-weight: 500;
+}
+
+.use-classification-badge {
+  font-size: 9px;
+  padding: 1px 4px;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  margin-left: 4px;
+}
+
+.use-tag.from-classification {
+  background: var(--accent-primary);
+}
+
+.use-tag.custom {
+  background: var(--text-secondary);
+}
+
 /* ============================================================================
    Multi-Select Checkbox
    ============================================================================ */
@@ -1113,24 +1426,176 @@
 }
 
 /* ============================================================================
-   Actors List
+   Figure Placeholders (for images not yet loaded)
+   ============================================================================ */
+
+.figure-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: var(--bg-tertiary);
+  border: 2px dashed var(--border-secondary);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  min-height: 100px;
+  cursor: pointer;
+}
+
+.figure-placeholder:hover {
+  border-color: var(--accent-color);
+  color: var(--text-secondary);
+}
+
+.figure-placeholder svg {
+  margin-bottom: 8px;
+  opacity: 0.5;
+}
+
+.figure-placeholder-text {
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.figure-placeholder-path {
+  font-size: 10px;
+  color: var(--text-muted);
+  word-break: break-all;
+  text-align: center;
+  max-width: 200px;
+}
+
+.figure-placeholder-grid {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 60px;
+  background: var(--bg-tertiary);
+  border: 2px dashed var(--border-secondary);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.figure-placeholder-grid:hover {
+  border-color: var(--accent-color);
+  color: var(--text-secondary);
+}
+
+.figure-placeholder-grid svg {
+  margin-bottom: 4px;
+  opacity: 0.5;
+}
+
+.figure-placeholder-grid span {
+  font-size: 10px;
+  text-align: center;
+  word-break: break-all;
+  max-width: 80px;
+}
+
+/* ============================================================================
+   Region Selector
+   ============================================================================ */
+
+.region-selector {
+  margin-bottom: 12px;
+}
+
+.region-selector > label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.region-selector-input {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.region-selector-input .region-dropdown {
+  flex: 1;
+}
+
+.region-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.region-tag {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: #3b82f6; /* Blue - visible in both dark and light themes */
+  color: white;
+  border-radius: var(--radius-sm, 4px);
+  font-size: 11px;
+}
+
+.region-tag span {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.region-tag-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: 50%;
+  color: white;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 0;
+}
+
+.region-tag-remove:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+/* ============================================================================
+   Actors List - IDM 2.0 Hierarchical Structure (Pools/Lanes)
    ============================================================================ */
 
 .actors-list-items {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
   margin-top: 8px;
 }
 
-.actor-list-item {
+/* Actor Card (Pool) */
+.actor-card {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.actor-header-row {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 8px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-primary);
-  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .actor-name-input {
@@ -1141,10 +1606,17 @@
 }
 
 .actor-role-input {
-  flex: 1.5;
-  min-width: 0;
+  width: 120px;
   padding: 4px 8px;
-  font-size: 12px;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.actor-type-select {
+  width: 90px;
+  padding: 4px 6px;
+  font-size: 11px;
+  flex-shrink: 0;
 }
 
 .actor-remove-btn {
@@ -1164,6 +1636,190 @@
 }
 
 .actor-remove-btn:hover {
+  background: var(--error);
+  color: #fff;
+}
+
+/* Actor swimlane/manual badges */
+.actor-swimlane-badge,
+.actor-manual-badge,
+.actor-lane-badge {
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+.actor-swimlane-badge {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--accent-primary);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.actor-manual-badge {
+  background: rgba(156, 163, 175, 0.15);
+  color: var(--text-muted);
+  border: 1px solid rgba(156, 163, 175, 0.3);
+}
+
+.actor-lane-badge {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--success, #22c55e);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+/* Sub-Actors (Lanes) Section */
+.actor-subactors-section {
+  padding: 8px 10px;
+}
+
+.actor-subactors-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.actor-subactors-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.actor-add-lane-btn {
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--accent-primary);
+  background: transparent;
+  border: 1px solid var(--accent-primary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.actor-add-lane-btn:hover {
+  background: var(--accent-primary);
+  color: #fff;
+}
+
+.actor-no-lanes {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 4px 0;
+}
+
+.actor-lanes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.actor-lane-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-sm);
+}
+
+.actor-lane-indent {
+  color: var(--text-muted);
+  font-size: 12px;
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+
+.actor-lane-input {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  font-size: 11px;
+}
+
+.actor-lane-role-input {
+  width: 80px;
+  padding: 3px 6px;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.actor-lane-remove-btn {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+.actor-lane-remove-btn:hover {
+  background: var(--error);
+  color: #fff;
+}
+
+/* Custom Project Phase Classification */
+.custom-phases-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.custom-phase-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+}
+
+.custom-phase-classification-input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.custom-phase-name-input {
+  flex: 1.5;
+  min-width: 0;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.custom-phase-remove-btn {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+.custom-phase-remove-btn:hover {
   background: var(--error);
   color: #fff;
 }
