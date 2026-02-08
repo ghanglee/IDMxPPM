@@ -76,11 +76,14 @@ IDMxPPM (eXtended Process to Product Modeling) enables BIM professionals, standa
 
 ### Pre-built Releases
 
-Download the latest release for your platform:
-- **macOS (Apple Silicon)**: `IDMxPPM - Neo Seoul-arm64.dmg` (M1/M2/M3/M4 Macs)
-- **macOS (Intel)**: `IDMxPPM - Neo Seoul-x64.dmg`
-- **Windows**: `IDMxPPM - Neo Seoul Setup x.x.x.exe`
-- **Linux**: `IDMxPPM - Neo Seoul-x.x.x.AppImage`
+Download the latest release from the [GitHub Releases page](https://github.com/ghanglee/IDMxPPM/releases):
+
+| Platform | File | Notes |
+|----------|------|-------|
+| macOS (Apple Silicon) | `IDMxPPM - Neo Seoul-arm64.dmg` | M1/M2/M3/M4 Macs |
+| macOS (Intel) | `IDMxPPM - Neo Seoul-x64.dmg` | Intel-based Macs |
+| Windows | `IDMxPPM - Neo Seoul Setup x.x.x.exe` | 64-bit Windows |
+| Linux | `IDMxPPM - Neo Seoul-x.x.x.AppImage` | 64-bit Linux |
 
 ### Build from Source
 
