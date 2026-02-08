@@ -7,6 +7,9 @@ dist-electron/
 release/
 releases/
 
+# Reference documents (ISO standards, not for public distribution)
+references/
+
 # Test scripts
 test-main*.js
 
