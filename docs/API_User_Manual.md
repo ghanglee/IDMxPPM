@@ -58,7 +58,7 @@ The IDMxPPM Central Database API enables organizations to centrally manage all t
 ### Client (Desktop App)
 | Component | Requirement |
 |-----------|-------------|
-| IDMxPPM | Neo Seoul Edition v1.1.0+ |
+| IDMxPPM | Neo Seoul Edition v1.2.0+ |
 | Network | HTTP/HTTPS access to the server |
 
 ---

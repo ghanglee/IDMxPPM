@@ -1,5 +1,122 @@
 # IDMxPPM neo-Seoul — Release Notes
 
+## v1.2.0 (2026-02-09)
+
+### Highlights
+
+- **Server Backend** — Optional self-hosted Express.js + MongoDB server for centralized IDM specification storage
+- **Multi-User Collaboration** — JWT-based authentication with role-based access control (viewer, editor, admin)
+- **Server Browser** — Searchable, sortable, paginated table for browsing and opening specs from the server
+- **Docker Deployment** — One-command deployment with Docker Compose (MongoDB 7 + Node.js 20)
+- **Linux Support** — Added AppImage build target for 64-bit Linux
+
+---
+
+### New Features
+
+#### Server Backend (`server/`)
+- Express.js RESTful API with MongoDB 7 (Mongoose) for persistent spec storage
+- JWT-based authentication with bcrypt password hashing (salt: 12)
+- Role-based access control: viewer, editor, admin (first registered user becomes admin)
+- Full CRUD for IDM specifications with auto-extracted metadata (title, status, version, ER count, language, tags)
+- Full-text search on title/shortTitle, status filtering, pagination, and sorting
+- Security: Helmet.js headers, CORS, rate limiting (200 req/15min general, 20 req/15min auth)
+- 50MB JSON payload limit for base64-encoded images in projectData
+- Docker multi-stage build (Node 20 Alpine) with Docker Compose for MongoDB + API
+- Health check endpoint (`/api/health`) with database status monitoring
+- MongoDB connection retry logic (max 5 retries, 3s delays)
+
+#### Server Connection UI
+- **ServerConnectionModal** — Three-state modal:
+  1. Not connected: configure server URL
+  2. Connected, not authenticated: login or register (tabbed)
+  3. Connected and authenticated: view user info (avatar, name, email, org, role), logout, disconnect
+- **ServerBrowser** — Full-featured spec browser modal:
+  - Full-text search and status filter (NP, WD, CD, DIS, IS)
+  - Sortable columns: Title, Status, Version, ER Count, Author, Modified Date
+  - 15 specs per page with pagination
+  - Open and delete actions per spec
+  - Color-coded status badges
+- **Connection Indicators**:
+  - Green dot in Vertical Menu Bar when connected and authenticated
+  - "Server" badge in status bar; "Server (synced)" when current spec is from server
+  - "Open from Server" button on Startup Screen when connected
+
+#### Client-Side Infrastructure
+- **apiClient.js** — Centralized HTTP client with JWT auth, 30/60s timeouts, `ApiError`/`AuthError` classes, auto-clear token on 401
+- **useServerConnection.js** — React hook managing connection state, auth, periodic health checks (60s), localStorage persistence for session restore
+- **Save to Server** — New export format option; creates or updates spec on server (tracked via `serverSpecId`)
+- **Open from Server** — Browse and load any spec from the server into the local editor
+
+#### Documentation
+- **API User Manual** (`docs/API_User_Manual.md`) — Comprehensive guide covering Docker/manual deployment, environment configuration, desktop app workflow, REST API reference, role permissions, security recommendations, backup/restore, and troubleshooting
+- **Versioned User Manuals** — Moved to `user_manuals/V1.1.0/` with tutorial series
+
+#### Build & Platform
+- **Linux build** — Added `npm run build:linux` for AppImage output
+- **macOS** — Continues to build both x64 (Intel) and arm64 (Apple Silicon) DMG/ZIP installers
+
+---
+
+### Technical Changes
+
+#### Updated File Structure
+```
+src/
+├── components/
+│   ├── ServerBrowser/              (NEW)
+│   └── ServerConnectionModal/      (NEW)
+├── hooks/
+│   └── useServerConnection.js      (NEW)
+├── utils/
+│   └── apiClient.js                (NEW)
+
+server/                             (NEW - entire directory)
+├── src/
+│   ├── config/                     (db.js, env.js)
+│   ├── controllers/                (authController.js, specsController.js)
+│   ├── middleware/                  (auth.js, errorHandler.js)
+│   ├── models/                     (User.js, IdmSpec.js)
+│   ├── routes/                     (auth.js, specs.js, health.js)
+│   └── index.js
+├── Dockerfile
+├── docker-compose.yml
+└── package.json
+
+docs/
+└── API_User_Manual.md              (NEW)
+user_manuals/V1.1.0/                (MOVED from docs/)
+samples/xPPM-neo/                   (MOVED from xPPM/)
+```
+
+#### Configuration Changes
+- `vite.config.js` — Added API proxy configuration for development
+- `index.html` / `src/index.html` — Updated CSP `connect-src` for server API connectivity
+- `electron/main.js` — Added IPC support for server-related operations
+- `electron/preload.js` — Exposed additional APIs for server connectivity
+- `package.json` — Updated dependencies
+
+---
+
+### Compatibility
+
+- **Server** — Node.js 20+, MongoDB 7 (Docker recommended)
+- **Desktop** — macOS (x64, arm64), Windows (x64), Linux (AppImage)
+- **Server is fully optional** — The app works 100% offline with local file save/load; server adds collaborative features
+
+---
+
+### Known Issues
+
+- Server real-time collaboration not yet implemented (single-user save/load only)
+- Server spec versioning / diff tracking not yet available
+- ER Library persistence across sessions not yet implemented
+- Interaction Map (IM) and Transaction Map (TM) not implemented (ISO 29481-2)
+- MVD linking not implemented
+- Bidirectional actor sync with BPMN swimlanes not yet implemented
+
+---
+
 ## v1.1.0 (2026-02-06)
 
 ### Highlights

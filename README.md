@@ -131,7 +131,7 @@ See [API User Manual](docs/API_User_Manual.md) for detailed server deployment an
 
 ## Documentation
 
-- [User Manual (v1.1.0)](user_manuals/V1.1.0/USER_MANUAL.md) - Comprehensive guide to using IDMxPPM
+- [User Manual (v1.1.0)](user_manuals/V1.1.0/USER_MANUAL.md) - Comprehensive guide to using IDMxPPM (v1.2.0 manual in progress)
 - [API User Manual](docs/API_User_Manual.md) - Server deployment, REST API reference, and configuration
 
 ## Technology Stack
