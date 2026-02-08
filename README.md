@@ -14,52 +14,73 @@ IDMxPPM (eXtended Process to Product Modeling) enables BIM professionals, standa
 - **Specify detailed information requirements** for each data exchange
 - **Map requirements to external standards** (IFC, bSDD, CityGML, etc.)
 - **Export specifications** in ISO 29481-3 compliant idmXML format
+- **Collaborate via server** with optional centralized spec storage and multi-user access
 
 ## Features
 
 ### BPMN Process Editor
 - Full BPMN 2.0 compliant diagram editor powered by [bpmn.io](https://bpmn.io)
-- Drag-and-drop element palette
-- Pools, Lanes, Tasks, Gateways, Data Objects, Message Flows
+- Drag-and-drop element palette with Pools, Lanes, Tasks, Gateways, Data Objects, Message Flows
 - Auto-layout for automatic element arrangement
+- Zoom controls, pan mode, undo/redo
 - Export to SVG, PNG, and BPMN XML
 
-### Exchange Requirement Editor
-- Define Exchange Requirements (ERs) by double-clicking Data Objects
-- Hierarchical Information Units with sub-units
-- Data type specification (String, Numeric, Boolean, Date, 3D Model, Document, etc.)
-- Mandatory/Optional field indicators
+### Exchange Requirement (ER) Editor
+- **ER-first architecture** with hierarchical tree table view
+- Define ERs with Information Units (IUs) and nested Sub-ERs
+- Data type specification (String, Numeric, Boolean, Date, Image, 3D Model, Document, Structured, etc.)
+- Mandatory/Optional field indicators per ISO 29481
+- Import/Export individual ERs as `.erxml` files
+- Auto-save with visual status indicator
 
 ### External Element Mapping
-- Search and map to IFC 2x3, IFC 4x3, IFC 5
+- Search and map to IFC 2x3 and IFC 4x3 ADD2
 - Integration with buildingSMART Data Dictionary (bSDD) API
 - Support for CityGML, UniFormat, OmniClass, MasterFormat
+- Exact and semantic matching modes with debounced auto-search
 - Custom schema mapping for other standards
+
+### Server Integration (Optional)
+- **Self-hosted server** with Express.js + MongoDB backend
+- **User authentication** with JWT-based login/registration
+- **Role-based access control** (viewer, editor, admin)
+- **Server Browser** for searching, filtering, and opening specs from the server
+- **Save to Server** for centralized spec storage
+- **Docker deployment** with Docker Compose (MongoDB 7 + Node.js 20)
 
 ### Standards Compliance
 
 | Standard | Description |
 |----------|-------------|
 | ISO 29481-1 | IDM Methodology and format |
-| ISO 29481-2 | Interaction framework (BPMN representation) |
-| ISO 29481-3 | Data schema (idmXML) |
+| ISO 29481-3 | Data schema (idmXML / idmXSD 2.0) |
+| ISO/IEC 19510 | Business Process Model and Notation (BPMN) |
 
 ### File Formats
 
 | Format | Extension | Description |
 |--------|-----------|-------------|
-| IDMxPPM Project | `.idm` / `.json` | Full project with BPMN diagram and all ER data |
-| idmXML | `.xml` | ISO 29481-3 compliant export (includes embedded BPMN) |
+| IDM Project | `.idm` | Full project with BPMN diagram, ER hierarchy, and library |
+| idmXML | `.xml` | ISO 29481-3 compliant export with embedded BPMN and images (base64) |
+| HTML Document | `.html` | Self-contained printable document with BPMN (SVG) and images |
+| ZIP Bundle | `.zip` | idmXML + BPMN + images + project data in one archive |
 | BPMN Diagram | `.bpmn` | BPMN 2.0 XML format (diagram only) |
 | Exchange Requirement | `.erxml` | Individual ER for import/export |
+| Server | (cloud) | Save/load specs to/from connected MongoDB server |
+
+### Import Support
+- IDM Project (`.idm`), idmXML (`.xml`), ZIP Bundle (`.zip`), BPMN (`.bpmn`)
+- **Legacy xPPM** (`.xppm`) format with full data conversion
 
 ## Installation
 
 ### Pre-built Releases
 
 Download the latest release for your platform:
-- **macOS**: `IDMxPPM-x.x.x.dmg`
-- **Windows**: `IDMxPPM-x.x.x-setup.exe`
+- **macOS (Apple Silicon)**: `IDMxPPM - Neo Seoul-arm64.dmg` (M1/M2/M3/M4 Macs)
+- **macOS (Intel)**: `IDMxPPM - Neo Seoul-x64.dmg`
+- **Windows**: `IDMxPPM - Neo Seoul Setup x.x.x.exe`
+- **Linux**: `IDMxPPM - Neo Seoul-x.x.x.AppImage`
 
 ### Build from Source
 
@@ -75,10 +96,21 @@ npm install
 npm run electron:dev
 
 # Build for production
-npm run build:mac    # macOS
-npm run build:win    # Windows
-npm run build:all    # Both platforms
+npm run build:mac    # macOS (x64 + arm64)
+npm run build:win    # Windows (x64)
+npm run build:linux  # Linux (AppImage)
+npm run build:all    # All platforms
 ```
+
+### Server Setup (Optional)
+
+```bash
+cd server
+cp .env.example .env    # Edit with your settings
+docker-compose up -d    # Starts MongoDB + API server
+```
+
+See [API User Manual](docs/API_User_Manual.md) for detailed server deployment and configuration.
 
 ## Quick Start
 
@@ -87,17 +119,21 @@ npm run build:all    # Both platforms
    - **Blank Project**: Start with an empty BPMN canvas
    - **Sample Project**: Start with a pre-configured GDE-IDM sample
    - **Open Project**: Load an existing project file
+   - **Open from Server**: Browse specs on a connected server
 3. **Create your process map** using the BPMN editor
-4. **Define Exchange Requirements** by double-clicking Data Objects
+4. **Define Exchange Requirements** by double-clicking Data Objects or using the ER panel
 5. **Add Information Units** to specify required data items
 6. **Map to external schemas** (IFC, bSDD, etc.)
-7. **Export** as idmXML for ISO 29481-3 compliance
+7. **Export** as idmXML, HTML, ZIP bundle, or save to server
 
 ## Documentation
 
-- [User Manual](docs/USER_MANUAL.md) - Comprehensive guide to using IDMxPPM
+- [User Manual (v1.1.0)](user_manuals/V1.1.0/USER_MANUAL.md) - Comprehensive guide to using IDMxPPM
+- [API User Manual](docs/API_User_Manual.md) - Server deployment, REST API reference, and configuration
 
 ## Technology Stack
+
+### Desktop Client
 
 | Component | Technology |
 |-----------|------------|
@@ -106,6 +142,15 @@ npm run build:all    # Both platforms
 | Build Tool | Vite |
 | BPMN Editor | bpmn-js (bpmn.io) |
 | Styling | CSS Variables (Dark/Light themes) |
+
+### Server Backend (Optional)
+
+| Component | Technology |
+|-----------|------------|
+| Web Framework | Express.js |
+| Database | MongoDB 7 (Mongoose) |
+| Authentication | JWT (jsonwebtoken) |
+| Containerization | Docker + Docker Compose |
 
 ## License
 

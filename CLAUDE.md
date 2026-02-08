@@ -17,6 +17,8 @@ The IDM authoring process begins with **process modeling** (use case specificati
 
 ## Technical Architecture
 
+### Desktop Client
+
 | Component | Technology | Purpose |
 |-----------|------------|---------|
 | **Framework** | Electron | Cross-platform desktop app |
@@ -24,6 +26,17 @@ The IDM authoring process begins with **process modeling** (use case specificati
 | **Build Tool** | Vite | Fast development & bundling |
 | **BPMN Editor** | bpmn-js (bpmn.io) | BPMN 2.0 compliant diagrams |
 | **Styling** | CSS Variables | Dark/Light theme support |
+
+### Server Backend (Optional)
+
+| Component | Technology | Purpose |
+|-----------|------------|---------|
+| **Web Framework** | Express.js | RESTful API server |
+| **Database** | MongoDB 7 (Mongoose) | Document-based spec storage |
+| **Authentication** | JWT (jsonwebtoken) | Stateless token-based auth |
+| **Password Security** | bcryptjs | Password hashing (bcrypt, salt 12) |
+| **Security** | Helmet, CORS, express-rate-limit | HTTP headers, CORS, rate limiting |
+| **Containerization** | Docker + Docker Compose | Deployment (Node 20 Alpine + MongoDB 7) |
 
 ## Reference Standards
 
@@ -34,7 +47,7 @@ Before development, study these specifications:
 | **ISO 29481-1** | IDM Methodology and format | Use case structure, exchange requirements, information units |
 | **ISO 29481-3** | IDM Data schema (idmXML) | XML schema definition (idmXSD), element structures |
 | **idmXSD 2.0** | XML Schema Definition | Detailed element/attribute specifications |
-| **ISO 29481-2 / ISO 19510** | BPMN representation | Process map notation standards |
+| **ISO/IEC 19510** | BPMN representation | Process map notation standards |
 
 ## Core Concept: BPMN-First Workflow
 
@@ -152,6 +165,18 @@ Other schemas: Manual entry
 
 **Note:** IFC 5 has been removed as IFC 4.3 ADD2 is the latest official release.
 
+### Server Connection & Collaboration
+- **Server Connection Modal** - Three-state modal: configure URL, login/register, view connection status
+- **Server Browser** - Searchable, paginated table of server-stored specs with sort, filter by status, and delete
+- **Save to Server** - Save/update specs directly to the connected server
+- **Open from Server** - Load any spec from the server into the local editor
+- **Connection Indicators**:
+  - Vertical Menu Bar: Green dot when connected and authenticated
+  - Status Bar: "Server" badge when connected; "Server (synced)" when current spec is from server
+  - Startup Screen: "Open from Server" button visible when connected
+- **Auto-reconnect** - Periodic health check every 60 seconds; restores saved session on app restart
+- **User Authentication** - JWT-based login/register; first user becomes admin, subsequent users are editors
+
 ### File Formats (Export Order)
 | Format | Extension | Purpose |
 |--------|-----------|---------|
@@ -161,6 +186,7 @@ Other schemas: Manual entry
 | ZIP Bundle | `.zip` | idmXML + BPMN + images + project data in one archive |
 | BPMN Only | `.bpmn` | BPMN 2.0 XML format (process map only) |
 | Exchange Requirement | `.erxml` | Individual ER export/import |
+| Server | (cloud) | Save/load specs to/from connected MongoDB server |
 
 ### Export Features
 - **Customizable Filename**: Default from Short Title, user can modify before export
@@ -171,6 +197,84 @@ Other schemas: Manual entry
 - **Section Figures**: Support for images attached to Summary, Aim & Scope, Benefits, Limitations
 - **Print to PDF**: Users can print the HTML export to PDF via browser print dialog (Ctrl/Cmd+P)
 
+## Server Backend (Optional Cloud Storage)
+
+The app optionally connects to a self-hosted Express/MongoDB server for centralized IDM specification storage and multi-user collaboration.
+
+### Server API Endpoints
+
+#### Authentication (`/api/auth`)
+| Method | Endpoint | Auth | Purpose |
+|--------|----------|------|---------|
+| POST | `/register` | No | User registration (first user becomes admin) |
+| POST | `/login` | No | Login, returns JWT token |
+| GET | `/me` | Yes | Get current user profile |
+| PUT | `/me` | Yes | Update user profile |
+| PUT | `/password` | Yes | Change password |
+
+#### Specifications (`/api/specs`)
+| Method | Endpoint | Auth | Purpose |
+|--------|----------|------|---------|
+| GET | `/` | Yes | List specs (paginated, filterable, sortable) |
+| GET | `/:id` | Yes | Get single spec with full `projectData` |
+| POST | `/` | Yes | Create new spec (auto-extracts metadata) |
+| PUT | `/:id` | Yes | Update spec (owner/admin only) |
+| DELETE | `/:id` | Yes | Delete spec (owner/admin only) |
+
+#### Health (`/api/health`)
+| Method | Endpoint | Auth | Purpose |
+|--------|----------|------|---------|
+| GET | `/` | No | Server and database status check |
+
+### Data Models
+
+**User**: email, passwordHash, name (given/family), organization, role (viewer/editor/admin), isActive, lastLogin
+
+**IdmSpec**: owner, lastEditedBy, title, shortTitle, status, version, idmGuid, ucGuid, bcmGuid, projectData (full .idm format), erCount, language, tags, thumbnail
+
+### Role Permissions
+
+| Role | Browse | Open | Create | Update Own | Update Others | Delete Own | Delete Others |
+|------|:------:|:----:|:------:|:----------:|:-------------:|:----------:|:-------------:|
+| viewer | Yes | Yes | Yes | Yes | No | Yes | No |
+| editor | Yes | Yes | Yes | Yes | No | Yes | No |
+| admin | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+
+### Security Features
+- JWT stateless auth with configurable expiration (default: 7 days)
+- bcrypt password hashing (salt: 12)
+- Helmet.js HTTP security headers
+- Rate limiting: 200 req/15min general, 20 req/15min auth endpoints
+- 50MB JSON payload limit (for base64-encoded images in projectData)
+- Owner-based and role-based access control
+
+### Server Deployment
+
+**Docker (recommended):**
+```bash
+cd server
+cp .env.example .env    # Edit with your settings
+docker-compose up -d    # Starts MongoDB + API server
+```
+
+**Manual:**
+```bash
+cd server
+npm install
+node src/index.js       # Requires Node.js 20+, MongoDB 7
+```
+
+### Server Environment Variables
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `MONGODB_URI` | `mongodb://localhost:27017/idmxppm` | Database connection |
+| `JWT_SECRET` | `dev-secret-change-in-production` | Token signing (MUST change in production) |
+| `JWT_EXPIRES_IN` | `7d` | Token expiration |
+| `PORT` | `3001` | API server port |
+| `CORS_ORIGINS` | `*` | Comma-separated allowed origins |
+| `ALLOW_OPEN_REGISTRATION` | `true` | Enable open user registration |
+
 ## Repository Structure
 
 ```
@@ -178,14 +282,36 @@ idmxppm-neo-seoul/
 ├── electron/              # Electron main process
 │   ├── main.js
 │   └── preload.js
+├── server/                # Express/MongoDB backend (optional)
+│   ├── src/
+│   │   ├── config/        # Database and environment config
+│   │   ├── controllers/   # Auth and specs controllers
+│   │   ├── middleware/     # Auth and error handling middleware
+│   │   ├── models/        # Mongoose schemas (User, IdmSpec)
+│   │   ├── routes/        # API route definitions
+│   │   └── index.js       # Server entry point
+│   ├── Dockerfile
+│   ├── docker-compose.yml
+│   └── package.json
 ├── src/
 │   ├── components/
 │   │   ├── BPMNEditor/    # bpmn-js integration
 │   │   ├── ERPanel/       # ER list and detail editor
-│   │   └── HeaderPanel/   # IDM metadata editor
+│   │   ├── HeaderPanel/   # IDM metadata editor
+│   │   ├── ServerBrowser/ # Server spec browser modal
+│   │   └── ServerConnectionModal/ # Server connect/login modal
+│   ├── hooks/
+│   │   └── useServerConnection.js # Server state management hook
+│   ├── utils/
+│   │   └── apiClient.js   # HTTP client for server API
 │   ├── styles/
 │   ├── App.jsx
 │   └── main.jsx
+├── docs/                  # Documentation
+│   └── API_User_Manual.md # Server API & deployment guide
+├── user_manuals/          # Versioned user manuals
+│   └── V1.1.0/
+├── xPPM/                  # Legacy xPPM sample data
 ├── package.json
 ├── vite.config.js
 └── index.html
@@ -193,14 +319,26 @@ idmxppm-neo-seoul/
 
 ## Development Commands
 
+### Desktop Client
 ```bash
 npm install          # Install dependencies
 npm run dev          # Start Vite dev server
 npm run electron:dev # Start Electron app (development)
 npm run build        # Build for production
-npm run build:mac    # Build macOS .dmg
-npm run build:win    # Build Windows .exe
-npm run build:all    # Build both platforms
+npm run build:mac    # Build macOS .dmg (x64 + arm64)
+npm run build:win    # Build Windows .exe (x64)
+npm run build:linux  # Build Linux AppImage
+npm run build:all    # Build all platforms
+```
+
+### Server Backend
+```bash
+cd server
+npm install          # Install server dependencies
+npm run dev          # Start server with nodemon (auto-restart)
+npm start            # Start server (production)
+docker-compose up -d # Start with Docker (MongoDB + API)
+docker-compose down  # Stop Docker containers
 ```
 
 ## License Compliance
@@ -307,6 +445,7 @@ npm run build:all    # Build both platforms
 #### Project Management
 - **New Project** - Creates blank project with default BPMN diagram
 - **Open Project** - Browser file input fallback (Electron IPC support)
+- **Open from Server** - Browse and load specs from connected server
 - **Import Formats** - IDM project (.idm), idmXML (.xml), ZIP bundle (.zip), legacy xPPM (.xppm), BPMN (.bpmn)
 - **xPPM Import** - Import from legacy xPPM format with full data conversion:
   - Header data (title, authors, version, status)
@@ -317,7 +456,24 @@ npm run build:all    # Build both platforms
   - Data object to ER mappings preserved
 - **Close Project** - Proper cleanup with unsaved changes confirmation
 - **Save/Export** - Multiple format export with customizable filename (default from Short Title)
+- **Save to Server** - Save/update specs to connected server (creates or updates based on serverSpecId)
 - **Dirty state tracking** with visual indicator
+
+#### Server Integration
+- **Server Connection Modal** with three states:
+  1. **Not connected**: Enter server URL and connect
+  2. **Connected, not authenticated**: Login or register (tabs)
+  3. **Connected and authenticated**: View user info, logout, disconnect
+- **Server Browser** - Searchable, sortable, paginated spec list from server
+  - Full-text search on title/shortTitle
+  - Status filter dropdown (NP, WD, CD, DIS, IS)
+  - Sortable columns (Title, Status, Version, ERs, Author, Modified)
+  - 15 specs per page with pagination controls
+  - Open and delete actions per spec
+- **API Client** (`apiClient.js`) - Centralized HTTP wrapper with JWT auth, timeouts, error handling
+- **Server Connection Hook** (`useServerConnection.js`) - React hook managing connection state, auth, periodic health checks (60s), localStorage persistence
+- **Connection Indicators** - Green dot in VerticalMenuBar, "Server" badge in status bar
+- **Startup Screen** - "Open from Server" button visible when connected
 
 #### Validation
 - Project validation against ISO 29481 requirements (including idmXSD compliance)
@@ -330,6 +486,7 @@ npm run build:all    # Build both platforms
 - **HTML (.html)** - Self-contained document with embedded images and BPMN (SVG); printable to PDF via browser
 - **ZIP Bundle (.zip)** - Archive with all project files and images
 - **BPMN Only (.bpmn)** - Process map diagram export
+- **Server** - Save to connected MongoDB server (creates or updates)
 - **XSLT Template Download** - Download default stylesheet for customization
 
 #### idmXML Generation (idmXSD v2.0 Compliant)
@@ -356,7 +513,8 @@ npm run build:all    # Build both platforms
 src/
 ├── App.jsx                     # Main app with state management
 ├── hooks/
-│   └── useTheme.js             # Theme context with persistence
+│   ├── useTheme.js             # Theme context with persistence
+│   └── useServerConnection.js  # Server connection state & auth hook
 ├── components/
 │   ├── BPMNEditor/
 │   │   ├── BPMNEditor.jsx      # bpmn-js integration
@@ -371,6 +529,12 @@ src/
 │   ├── HeaderPanel/
 │   │   ├── HeaderPanel.jsx     # IDM metadata (legacy)
 │   │   └── HeaderPanel.css
+│   ├── ServerBrowser/
+│   │   ├── ServerBrowser.jsx   # Server spec browser modal
+│   │   └── ServerBrowser.css
+│   ├── ServerConnectionModal/
+│   │   ├── ServerConnectionModal.jsx  # Server connect/auth modal
+│   │   └── ServerConnectionModal.css
 │   ├── SpecNameBar/
 │   │   ├── SpecNameBar.jsx     # Top bar
 │   │   └── SpecNameBar.css
@@ -383,6 +547,7 @@ src/
 │   └── icons/
 │       └── index.jsx           # SVG icon components
 ├── utils/
+│   ├── apiClient.js            # HTTP client for server API (JWT, timeouts, errors)
 │   ├── idmXmlGenerator.js      # idmXML 2.0 generation with embedded images
 │   ├── idmXmlParser.js         # idmXML import with figure parsing
 │   ├── idmBundleExporter.js    # ZIP bundle export with JSZip
@@ -395,6 +560,29 @@ src/
 │   └── validation.js           # Project validation (including idmXSD compliance)
 └── schemas/
     └── schemaData.js           # Local schema data
+
+server/                         # Express.js backend (optional)
+├── src/
+│   ├── config/
+│   │   ├── db.js               # MongoDB connection with retry logic
+│   │   └── env.js              # Environment variable defaults
+│   ├── controllers/
+│   │   ├── authController.js   # Register, login, profile management
+│   │   └── specsController.js  # CRUD for IDM specifications
+│   ├── middleware/
+│   │   ├── auth.js             # JWT verification middleware
+│   │   └── errorHandler.js     # Centralized error handling
+│   ├── models/
+│   │   ├── User.js             # User schema (email, role, org)
+│   │   └── IdmSpec.js          # IDM spec schema (metadata + projectData)
+│   ├── routes/
+│   │   ├── auth.js             # Auth route definitions
+│   │   ├── specs.js            # Spec route definitions
+│   │   └── health.js           # Health check endpoint
+│   └── index.js                # Server entry point
+├── Dockerfile                  # Multi-stage Node 20 Alpine build
+├── docker-compose.yml          # MongoDB 7 + API service
+└── package.json
 ```
 
 ### Current UI Layout
@@ -456,10 +644,12 @@ src/
 1. **Electron-specific features** not fully tested in browser-only mode
 2. **ER Library** persistence across sessions needs implementation
 3. **Import idmXML** - Implemented with embedded BPMN restoration
-4. **Interaction Map (IM)** and **Transaction Map (TM)** not implemented
+4. **Interaction Map (IM)** and **Transaction Map (TM)** not implemented (ISO 29481-2)
 5. **MVD linking** not implemented
 6. **Multi-language support** for UI (currently English only)
 7. **Actor sync with BPMN swimlanes** - bidirectional sync needs implementation (actors can be manually added/managed but not auto-synced with BPMN lanes)
+8. **Server real-time collaboration** - Currently single-user save/load; no real-time co-editing or conflict resolution
+9. **Server spec versioning** - No version history or diff tracking on server yet
 
 ---
 
