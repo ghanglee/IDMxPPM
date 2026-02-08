@@ -107,13 +107,21 @@ npm run build:all    # All platforms
 
 ### Server Setup (Optional)
 
+The server enables centralized spec storage and multi-user collaboration. It is fully optional — the app works 100% offline without it.
+
+**Prerequisites:**
+- **Docker Desktop** (v4.0+) — download from [docker.com](https://www.docker.com/products/docker-desktop/). Includes Docker Engine and Docker Compose.
+- Alternative (manual deployment): Node.js 20+ and MongoDB 7+
+
+**Quick start with Docker:**
+
 ```bash
 cd server
 cp .env.example .env    # Edit with your settings
 docker-compose up -d    # Starts MongoDB + API server
 ```
 
-See [API User Manual](docs/API_User_Manual.md) for detailed server deployment and configuration.
+See [API User Manual](docs/API_User_Manual.md) for detailed server deployment, configuration, and manual installation instructions.
 
 ## Quick Start
 

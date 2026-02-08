@@ -248,6 +248,18 @@ The app optionally connects to a self-hosted Express/MongoDB server for centrali
 - 50MB JSON payload limit (for base64-encoded images in projectData)
 - Owner-based and role-based access control
 
+### Server Prerequisites
+
+| Prerequisite | Docker Deployment | Manual Deployment |
+|-------------|-------------------|-------------------|
+| **Docker Desktop** | v4.0+ (Engine 20+, Compose v2+) from [docker.com](https://www.docker.com/products/docker-desktop/) | Not required |
+| **Node.js** | Not required (runs inside container) | v20+ |
+| **MongoDB** | Not required (runs inside container) | v7+ |
+| **OS** | Linux, macOS, or Windows | Linux, macOS, or Windows |
+| **RAM** | 1 GB min (2 GB recommended) | 1 GB min (2 GB recommended) |
+| **Disk** | 1 GB min + spec storage | 1 GB min + spec storage |
+| **Network** | HTTP/HTTPS access from clients | HTTP/HTTPS access from clients |
+
 ### Server Deployment
 
 **Docker (recommended):**
@@ -261,7 +273,7 @@ docker-compose up -d    # Starts MongoDB + API server
 ```bash
 cd server
 npm install
-node src/index.js       # Requires Node.js 20+, MongoDB 7
+node src/index.js       # Requires Node.js 20+, MongoDB 7+
 ```
 
 ### Server Environment Variables

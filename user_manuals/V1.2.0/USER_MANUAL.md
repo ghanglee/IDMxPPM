@@ -538,6 +538,20 @@ Use the toolbar buttons at the bottom of the BPMN editor:
 
 IDMxPPM can optionally connect to a self-hosted server for centralized spec storage and multi-user collaboration. The server is **fully optional** — the app works 100% offline with local file save/load.
 
+### Prerequisites
+
+Before connecting to a server, the server must be deployed. This requires:
+
+| Prerequisite | Requirement | Notes |
+|-------------|-------------|-------|
+| **Docker Desktop** | v4.0+ (Engine 20+, Compose v2+) | Download from [docker.com](https://www.docker.com/products/docker-desktop/). Includes Docker Engine and Docker Compose. |
+| **Operating System** | Linux, macOS, or Windows | Any OS that supports Docker |
+| **RAM** | 1 GB minimum (2 GB recommended) | For MongoDB and the API server |
+| **Disk** | 1 GB minimum | Plus storage for specifications |
+| **Network** | HTTP/HTTPS access between client and server | Clients must be able to reach the server (same LAN, VPN, or public URL) |
+
+> **Note:** If you prefer not to use Docker, you can install the server manually. This requires **Node.js 20+** and **MongoDB 7+** installed on the host machine. See the [API User Manual](../../docs/API_User_Manual.md) for manual deployment instructions.
+
 ### Connecting to a Server
 
 1. Click the **Server** icon in the vertical menu bar
@@ -857,12 +871,26 @@ When importing a ZIP bundle:
 
 ## Appendix B: Server Deployment Quick Reference
 
+### Prerequisites
+
+- **Docker Desktop** (v4.0+) — download from [docker.com](https://www.docker.com/products/docker-desktop/)
+  - Includes Docker Engine and Docker Compose
+  - Available for Linux, macOS, and Windows
+- **Alternative (manual):** Node.js 20+ and MongoDB 7+ installed on the host machine
+
 ### Docker Deployment (Recommended)
 
 ```bash
 cd server
 cp .env.example .env    # Edit with your settings
 docker-compose up -d    # Starts MongoDB + API server
+```
+
+To verify the server is running:
+
+```bash
+docker-compose ps                          # Check container status
+curl http://localhost:3001/api/health      # Check health endpoint
 ```
 
 ### Environment Variables

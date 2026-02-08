@@ -870,6 +870,30 @@
       The server is fully optional — the app works 100% offline with local file save/load.
     </p>
     <div class="steps">
+      <h3>Server Prerequisites</h3>
+      <p>Before connecting, a server must be deployed. The following are required on the machine hosting the server:</p>
+      <div class="step">
+        <div class="step-num">&#9670;</div>
+        <div class="step-text"><strong>Docker Desktop</strong> (v4.0+) — download from <a href="https://www.docker.com/products/docker-desktop/" target="_blank">docker.com</a>. Includes Docker Engine and Docker Compose. Available for Linux, macOS, and Windows.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">&#9670;</div>
+        <div class="step-text"><strong>RAM:</strong> 1 GB minimum (2 GB recommended) for MongoDB and the API server.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">&#9670;</div>
+        <div class="step-text"><strong>Disk:</strong> 1 GB minimum, plus storage for specifications.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">&#9670;</div>
+        <div class="step-text"><strong>Network:</strong> Client machines must be able to reach the server via HTTP/HTTPS (same LAN, VPN, or public URL).</div>
+      </div>
+    </div>
+    <div class="note">
+      <span class="icon">&#128221;</span>
+      <span>If you prefer not to use Docker, you can install the server manually with <strong>Node.js 20+</strong> and <strong>MongoDB 7+</strong>. See the <strong>API User Manual</strong> (<code>docs/API_User_Manual.md</code>) for manual deployment instructions.</span>
+    </div>
+    <div class="steps">
       <h3>Connecting to a Server</h3>
       <div class="step">
         <div class="step-num">1</div>
@@ -932,7 +956,7 @@
     </div>
     <div class="tip">
       <span class="icon">&#9889;</span>
-      <span>For server deployment instructions, see the <strong>API User Manual</strong> in the <code>docs/</code> folder. Docker Compose makes setup as simple as running <code>docker-compose up -d</code>.</span>
+      <span>With Docker Desktop installed, server deployment is as simple as: <code>cd server && cp .env.example .env && docker-compose up -d</code>. See the <strong>API User Manual</strong> (<code>docs/API_User_Manual.md</code>) for detailed deployment and configuration.</span>
     </div>
   </section>
 

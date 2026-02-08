@@ -10,6 +10,10 @@ releases/
 # Reference documents (ISO standards, not for public distribution)
 references/
 
+# Proprietary xPPM data (local only)
+xPPM/
+samples/xPPM-neo/
+
 # Test scripts
 test-main*.js
 
