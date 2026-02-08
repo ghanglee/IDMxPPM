@@ -2513,7 +2513,7 @@ const App = () => {
     // Open the user manual in a new browser tab/window
     // In Electron, this will use the shell.openExternal
     // In browser, this will open the markdown file or a hosted version
-    const manualUrl = 'https://htmlpreview.github.io/?https://github.com/ghanglee/IDMxPPM/blob/main/user_manuals/V1.1.0/IDMxPPM-Tutorials.html';
+    const manualUrl = 'https://htmlpreview.github.io/?https://github.com/ghanglee/IDMxPPM/blob/main/user_manuals/V1.2.0/IDMxPPM-Tutorials.html';
 
     if (window.electronAPI && window.electronAPI.openExternal) {
       window.electronAPI.openExternal(manualUrl);

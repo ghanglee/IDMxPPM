@@ -5,6 +5,10 @@ node_modules/
 dist/
 dist-electron/
 release/
+releases/
+
+# Test scripts
+test-main*.js
 
 # IDE
 .idea/
