@@ -24,6 +24,17 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    emptyOutDir: true
+    emptyOutDir: true,
+    target: 'esnext',
+    minify: 'esbuild',
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'bpmn-js': ['bpmn-js'],
+          'vendor': ['react', 'react-dom']
+        }
+      }
+    }
   }
 });

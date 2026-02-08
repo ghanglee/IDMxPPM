@@ -4,6 +4,7 @@
  */
 
 import { defaultIdmXslt } from './defaultIdmXslt';
+import { getRegionName } from './idmXmlParser';
 
 /**
  * Generate self-contained HTML from IDM data
@@ -718,7 +719,7 @@ const generateRegionsSection = (regions) => {
   return `
   <div class="section">
     <h3>Regions</h3>
-    ${regions.map(r => `<span class="tag">${escapeHtml(r)}</span>`).join('')}
+    ${regions.map(r => `<span class="tag">${escapeHtml(getRegionName(r))}</span>`).join('')}
   </div>
   `;
 };
@@ -788,6 +789,7 @@ const generateERsSection = (erDataMap) => {
       <h3 class="er-title">${escapeHtml(er.name || dataObjectId)}</h3>
 
       ${er.description ? `<div class="description">${escapeHtml(er.description)}</div>` : ''}
+      ${generateFiguresHtml(er.descriptionFigures)}
 
       ${er.informationUnits && er.informationUnits.length > 0 ? `
         <h4>Information Units</h4>
@@ -830,7 +832,19 @@ const generateInfoUnitRow = (unit, level = 0) => {
       </td>
       <td>${escapeHtml(unit.dataType || 'String')}</td>
       <td><span class="${unit.isMandatory ? 'mandatory' : 'optional'}">${unit.isMandatory ? 'Yes' : 'No'}</span></td>
-      <td>${escapeHtml(unit.definition || '')}</td>
+      <td>
+        ${escapeHtml(unit.definition || '')}
+        ${unit.definitionFigures && unit.definitionFigures.length > 0 ? `
+          <div class="section-figures" style="margin-top:4px;">
+            ${unit.definitionFigures.filter(f => f.data).map(f => `
+              <div class="section-figure" style="display:inline-block;max-width:120px;margin:2px;">
+                <img src="${f.data}" alt="${escapeHtml(f.caption || f.name || '')}" style="max-width:100%;"/>
+                ${f.caption ? `<div class="figure-caption" style="font-size:0.75em;">${escapeHtml(f.caption)}</div>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+      </td>
     </tr>
   `;
 

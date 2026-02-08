@@ -78,6 +78,11 @@ function createWindow() {
           click: () => handleImportER()
         },
         { type: 'separator' },
+        {
+          label: 'Connect to Server...',
+          click: () => mainWindow.webContents.send('menu-server-connect')
+        },
+        { type: 'separator' },
         { role: 'quit' }
       ]
     },

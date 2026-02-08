@@ -164,14 +164,25 @@ export const searchSchema = (schema, query, matchType = 'exact', limit = 20) => 
 const BSDD_API_BASE = 'https://api.bsdd.buildingsmart.org';
 const BSDD_IFC_DICTIONARY_URI = 'https://identifier.buildingsmart.org/uri/buildingsmart/ifc/4.3';
 const BSDD_USER_AGENT = 'IDMxPPM-NeoSeoul/1.1';
-const BSDD_TIMEOUT = 10000; // 10 seconds
+const BSDD_TIMEOUT = 15000; // 15 seconds (bSDD API can have cold-start latency)
 
 /**
- * Helper: make a bSDD API request with timeout and error handling
+ * Helper: make a bSDD API request with timeout and error handling.
+ * Accepts an external AbortSignal so callers can cancel in-flight requests.
  */
-const bsddFetch = async (url) => {
+const bsddFetch = async (url, externalSignal) => {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), BSDD_TIMEOUT);
+
+  // If the caller's signal is already aborted, abort immediately
+  if (externalSignal?.aborted) {
+    clearTimeout(timeoutId);
+    throw new DOMException('Aborted', 'AbortError');
+  }
+
+  // Link the external signal to our internal controller
+  const onExternalAbort = () => controller.abort();
+  externalSignal?.addEventListener('abort', onExternalAbort);
 
   try {
     const response = await fetch(url, {
@@ -190,6 +201,8 @@ const bsddFetch = async (url) => {
   } catch (error) {
     clearTimeout(timeoutId);
     throw error;
+  } finally {
+    externalSignal?.removeEventListener('abort', onExternalAbort);
   }
 };
 
@@ -225,9 +238,10 @@ const mapBsddResults = (classes, matchType, defaultCategory = 'bSDD (IFC 4.3)') 
  *
  * @param {string} query - Search query (min 2 characters)
  * @param {string} matchType - 'exact' or 'semantic'
+ * @param {AbortSignal} [signal] - Optional AbortSignal to cancel the request
  * @returns {Promise<Array>} Search results
  */
-export const searchBsdd = async (query, matchType = 'exact') => {
+export const searchBsdd = async (query, matchType = 'exact', signal) => {
   if (!query || query.trim().length < 2) {
     return [];
   }
@@ -243,7 +257,7 @@ export const searchBsdd = async (query, matchType = 'exact') => {
       Limit: '25'
     });
 
-    const data = await bsddFetch(`${BSDD_API_BASE}/api/SearchInDictionary/v1?${params}`);
+    const data = await bsddFetch(`${BSDD_API_BASE}/api/SearchInDictionary/v1?${params}`, signal);
     // SearchInDictionary/v1 nests classes under data.dictionary.classes
     const classes = data?.dictionary?.classes || data?.classes || data?.Classes || [];
 
@@ -252,8 +266,7 @@ export const searchBsdd = async (query, matchType = 'exact') => {
     }
   } catch (error) {
     if (error.name === 'AbortError') {
-      console.warn('bSDD SearchInDictionary timed out');
-      return [];
+      throw error; // Re-throw so caller knows it was cancelled
     }
     console.warn('bSDD SearchInDictionary failed, trying Class/Search fallback:', error.message);
   }
@@ -267,15 +280,14 @@ export const searchBsdd = async (query, matchType = 'exact') => {
       Limit: '25'
     });
 
-    const data = await bsddFetch(`${BSDD_API_BASE}/api/Class/Search/v1?${params}`);
+    const data = await bsddFetch(`${BSDD_API_BASE}/api/Class/Search/v1?${params}`, signal);
     const classes = data?.classes || data?.Classes || [];
     return mapBsddResults(classes, matchType);
   } catch (error) {
     if (error.name === 'AbortError') {
-      console.warn('bSDD Class/Search timed out');
-    } else {
-      console.error('bSDD Class/Search also failed:', error.message);
+      throw error; // Re-throw so caller knows it was cancelled
     }
+    console.error('bSDD Class/Search also failed:', error.message);
     return [];
   }
 };

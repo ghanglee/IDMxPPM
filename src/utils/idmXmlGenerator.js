@@ -128,11 +128,12 @@ const formatAuthor = (author) => {
 const generateInformationUnitXml = (unit, indent = '      ') => {
   const lines = [];
 
-  // Check if IU has children (examples, external elements, or sub-units)
+  // Check if IU has children (definition figures, examples, external elements, or sub-units)
+  const hasDefinitionFigures = unit.definitionFigures && unit.definitionFigures.length > 0;
   const hasExamples = unit.examples || (unit.exampleImages && unit.exampleImages.length > 0);
   const hasExternalElements = unit.correspondingExternalElements && unit.correspondingExternalElements.length > 0;
   const hasSubUnits = unit.subInformationUnits && unit.subInformationUnits.length > 0;
-  const hasChildren = hasExamples || hasExternalElements || hasSubUnits;
+  const hasChildren = hasDefinitionFigures || hasExamples || hasExternalElements || hasSubUnits;
 
   if (hasChildren) {
     lines.push(`${indent}<informationUnit`);
@@ -140,7 +141,13 @@ const generateInformationUnitXml = (unit, indent = '      ') => {
     lines.push(`${indent}  name="${escapeXml(unit.name || '')}"`);
     lines.push(`${indent}  dataType="${escapeXml(unit.dataType || 'String')}"`);
     lines.push(`${indent}  isMandatory="${unit.isMandatory ? 'true' : 'false'}"`);
-    lines.push(`${indent}  definition="${escapeXml(unit.definition || '')}">`);
+    // When definition has figures, use child element instead of attribute
+    if (hasDefinitionFigures) {
+      lines.push(`${indent}  definition="">`);
+      lines.push(...generateDescriptionXml(unit.definition || '', unit.definitionFigures, indent + '  '));
+    } else {
+      lines.push(`${indent}  definition="${escapeXml(unit.definition || '')}">`);
+    }
 
     // Examples - per idmXSD V2: examples contains description elements (with title attribute)
     if (hasExamples) {
@@ -251,9 +258,9 @@ const generateErXml = (er, authorName, indent = '  ', isRoot = true) => {
     });
   }
 
-  // description (optional, per idmXSD V2 uses title attribute)
-  if (er.description) {
-    lines.push(`${indent}  <description title="${escapeXml(er.description)}"/>`);
+  // description (optional, per idmXSD V2 uses title attribute, with optional image children)
+  if (er.description || (er.descriptionFigures && er.descriptionFigures.length > 0)) {
+    lines.push(...generateDescriptionXml(er.description || '', er.descriptionFigures || [], indent + '  '));
   }
 
   // Per ISO 29481-3 Clause 10: ER must have at least one informationUnit OR subEr

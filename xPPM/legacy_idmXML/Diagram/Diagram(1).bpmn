@@ -1,0 +1,253 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:color="http://www.omg.org/spec/BPMN/non-normative/color/1.0" xmlns:xppm="http://xppm.org/schema/1.0/bpmn" xmlns:kdim="http://www.buildingsmart.or.kr/kidm" exporter="KBim BPMN" exporterVersion="1.0" id="ibo-bae872f5-6a69-4aeb-a4c0-f687a1f4821b" targetNamespace="http://www.omg.org/spec/BPMN/20100524/MODEL">
+  <bpmn:globalTask id="ibo-75be3593-0d36-4e1f-8e93-027d680cb662" name="319_010 Vorprojekt erarbeiten" />
+  <bpmn:globalTask id="ibo-6a819dfa-209b-4df5-bc82-7f0fb84413d9" name="319_100 Vorprojekt prüfen" />
+  <bpmn:globalTask id="ibo-397520ec-fd67-4266-8b65-302e48251cbf" name="319_200 Vorprojekt freigeben" />
+  <bpmn:process id="ibo-6da7ad88-bfe9-4a77-af75-09d81d11062b" processType="None" isExecutable="false" isClosed="false">
+    <bpmn:laneSet id="ibo-b8799dcb-b88d-437f-95fe-c6d3fc3ad3a9">
+      <bpmn:lane id="ibo-4279695d-895f-4bf0-a95d-d33c19c1bc9e" name="GPL S&amp;A">
+        <flowNodeRef>ibo-89a40658-effd-4721-9027-2e50f5bb68ce</flowNodeRef>
+        <flowNodeRef>ibo-5bf73395-0614-40ba-a52c-9ef98a0a4dd5</flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="ibo-b1138a06-c37c-43d6-a61d-6f6fc6ea6699" name="GPL TBA">
+        <flowNodeRef>ibo-7f619c0a-a629-4051-91e4-6ffe7c9b5a47</flowNodeRef>
+        <flowNodeRef>ibo-d162ac96-5aa7-4114-a318-03284917e12c</flowNodeRef>
+        <flowNodeRef>ibo-3548ad42-667c-4a5f-a859-e5f0b2abfe17</flowNodeRef>
+        <flowNodeRef>ibo-3548ad42-667c-4a5f-a859-e5f0b2abfe17</flowNodeRef>
+        <flowNodeRef>ibo-54ce0c85-526d-49b6-911d-4ff6f8158bdc</flowNodeRef>
+        <flowNodeRef>ibo-54ce0c85-526d-49b6-911d-4ff6f8158bdc</flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:dataObject id="dataobject_5qElPbuZ" isCollection="false" />
+    <bpmn:dataObjectReference id="dataobjectreference_5qElPruM" name="DO319_101 Übergabeprotokoll" dataObjectRef="dataobject_5qElPbuZ">
+      <bpmn:documentation id="documentation_5qElP8uo">Informationen zur Übergabe für die Prüfenden</bpmn:documentation>
+      <bpmn:extensionElements>
+        <xppm:Property name="link"></xppm:Property>
+      </bpmn:extensionElements>
+    </bpmn:dataObjectReference>
+    <bpmn:sequenceFlow id="ibo-5f19b20e-272d-4c25-901a-d2b226718088" sourceRef="ibo-3548ad42-667c-4a5f-a859-e5f0b2abfe17" targetRef="ibo-54ce0c85-526d-49b6-911d-4ff6f8158bdc" />
+    <bpmn:sequenceFlow id="ibo-03fcfbf3-7ad7-4db0-888a-bce65cd19ab3" name="Ja" sourceRef="ibo-d162ac96-5aa7-4114-a318-03284917e12c" targetRef="ibo-3548ad42-667c-4a5f-a859-e5f0b2abfe17">
+      <bpmn:extensionElements>
+        <xppm:Property name="link"></xppm:Property>
+      </bpmn:extensionElements>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="ibo-c41f1b7c-be47-4678-bb7b-635d194eb08c" name="Nein" sourceRef="ibo-d162ac96-5aa7-4114-a318-03284917e12c" targetRef="ibo-5bf73395-0614-40ba-a52c-9ef98a0a4dd5">
+      <bpmn:extensionElements>
+        <xppm:Property name="link"></xppm:Property>
+      </bpmn:extensionElements>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="ibo-54678257-44eb-4bd0-bde8-64c1e4aa5d2a" sourceRef="ibo-7f619c0a-a629-4051-91e4-6ffe7c9b5a47" targetRef="ibo-d162ac96-5aa7-4114-a318-03284917e12c" />
+    <bpmn:sequenceFlow id="ibo-e87409ca-be30-4735-840e-54f8715df987" sourceRef="ibo-5bf73395-0614-40ba-a52c-9ef98a0a4dd5" targetRef="ibo-7f619c0a-a629-4051-91e4-6ffe7c9b5a47" />
+    <bpmn:sequenceFlow id="ibo-8e4205d9-de60-4082-8170-d5bbb4899514" sourceRef="ibo-89a40658-effd-4721-9027-2e50f5bb68ce" targetRef="ibo-5bf73395-0614-40ba-a52c-9ef98a0a4dd5" />
+    <bpmn:dataObjectReference id="ibo-4ee75b00-4fca-4c5d-9d2c-5db2198fcda0" name="DO319_200 VP inkl. Freigabe">
+      <bpmn:documentation id="Bpmn_Documentation_Bem_40453add-cd9e-4e5a-8b5e-e33923ccdef6">Endprodukt der Arbeitsergebnisse des Vorprojektes inkl. der Anmerkungen aus der Prüfung.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <xppm:Property name="link"></xppm:Property>
+      </bpmn:extensionElements>
+    </bpmn:dataObjectReference>
+    <bpmn:dataObjectReference id="ibo-469d30fd-0033-4c18-b2ee-a830fa1c9c44" name="DO319_102 Rückmeldung Prüfung">
+      <bpmn:documentation id="Bpmn_Documentation_Bem_5ac329a5-7be0-48de-9a10-0470dbb40024">Ergänzungen/Hinweise für die weitere Projektierung; Bei Ablehnung: Begründung einer Ablehnung oder Korrekturwünsche.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <xppm:Property name="link"></xppm:Property>
+      </bpmn:extensionElements>
+    </bpmn:dataObjectReference>
+    <bpmn:dataObjectReference id="ibo-345cfe2b-3db8-482f-82ad-7906cf42658e" name="DO319_010 VP">
+      <bpmn:documentation id="Bpmn_Documentation_Bem_99be0db1-5e92-4b4a-9ff0-3a3804a1ac87">Die endgültige Dokumentation der Planung des Vorprojektes.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <xppm:Property name="link"></xppm:Property>
+      </bpmn:extensionElements>
+    </bpmn:dataObjectReference>
+    <bpmn:endEvent id="ibo-54ce0c85-526d-49b6-911d-4ff6f8158bdc" name="Ende ">
+      <incoming>ibo-54ce0c85-526d-49b6-911d-4ff6f8158bdc</incoming>
+      <bpmn:extensionElements>
+        <xppm:Property name="link"></xppm:Property>
+      </bpmn:extensionElements>
+    </bpmn:endEvent>
+    <bpmn:task id="ibo-3548ad42-667c-4a5f-a859-e5f0b2abfe17" name="319_200 Vorprojekt freigeben" isForCompensation="false" startQuantity="0" completionQuantity="0">
+      <incoming>ibo-3548ad42-667c-4a5f-a859-e5f0b2abfe17</incoming>
+      <outgoing>ibo-3548ad42-667c-4a5f-a859-e5f0b2abfe17</outgoing>
+      <bpmn:documentation id="Bpmn_Documentation_Bem_e7023b79-0385-4998-b807-7b15f650ab2b">Die Planungsergebnisse werden freigegeben. Somit ist die Dokumentation der Planungsergebnisse von S&amp;A ohne Rückfragen oder Informationslücken angenommen und für die nächste Planungsphase zur weiteren Entwicklung (auch mit Dritten) freigegeben.</bpmn:documentation>
+      <bpmn:dataOutputAssociation id="ibo-7b966b34-05df-4406-9a0c-fc18ca3e344c">
+        <targetRef>ibo-4ee75b00-4fca-4c5d-9d2c-5db2198fcda0</targetRef>
+      </bpmn:dataOutputAssociation>
+      <bpmn:extensionElements>
+        <xppm:Property name="link"></xppm:Property>
+      </bpmn:extensionElements>
+      <bpmn:dataOutputAssociation id="dataoutputassociation_5qElPx1x">
+        <targetRef>dataobjectreference_5qElPn1r</targetRef>
+      </bpmn:dataOutputAssociation>
+    </bpmn:task>
+    <bpmn:exclusiveGateway id="ibo-d162ac96-5aa7-4114-a318-03284917e12c" name="Ist das VP eine optimale Grundlage für das BP?" gatewayDirection="Diverging">
+      <incoming>ibo-d162ac96-5aa7-4114-a318-03284917e12c</incoming>
+      <outgoing>ibo-d162ac96-5aa7-4114-a318-03284917e12c</outgoing>
+      <outgoing>ibo-d162ac96-5aa7-4114-a318-03284917e12c</outgoing>
+      <bpmn:extensionElements>
+        <xppm:Property name="link"></xppm:Property>
+      </bpmn:extensionElements>
+    </bpmn:exclusiveGateway>
+    <bpmn:task id="ibo-7f619c0a-a629-4051-91e4-6ffe7c9b5a47" name="319_100 Vorprojekt prüfen" isForCompensation="false" startQuantity="0" completionQuantity="0">
+      <incoming>ibo-7f619c0a-a629-4051-91e4-6ffe7c9b5a47</incoming>
+      <outgoing>ibo-7f619c0a-a629-4051-91e4-6ffe7c9b5a47</outgoing>
+      <bpmn:documentation id="Bpmn_Documentation_Bem_cc7ed538-7b5e-4a54-970e-4648469c3de3">Das Vorprojekt wird abschliessend geprüft. Kann mit dieser Dokumentation im Bauprojekt nahtlos, ohne Rückfragen weiter gearbeitet werden? Dazu soll der Projektleiter in die Lage versetzt werden per Chatfunktion Fragen an das bisherige Projektteam Fragen zu klären oder notwendige Details einzuholen.                                                                                       </bpmn:documentation>
+      <bpmn:dataOutputAssociation id="ibo-a67a319f-2978-4890-9a86-a56dd07e1c68">
+        <targetRef>ibo-469d30fd-0033-4c18-b2ee-a830fa1c9c44</targetRef>
+      </bpmn:dataOutputAssociation>
+      <bpmn:extensionElements>
+        <xppm:Property name="link"></xppm:Property>
+      </bpmn:extensionElements>
+    </bpmn:task>
+    <bpmn:task id="ibo-5bf73395-0614-40ba-a52c-9ef98a0a4dd5" name="319_010 Vorprojekt erarbeiten" isForCompensation="false" startQuantity="0" completionQuantity="0">
+      <incoming>ibo-5bf73395-0614-40ba-a52c-9ef98a0a4dd5</incoming>
+      <incoming>ibo-5bf73395-0614-40ba-a52c-9ef98a0a4dd5</incoming>
+      <outgoing>ibo-5bf73395-0614-40ba-a52c-9ef98a0a4dd5</outgoing>
+      <bpmn:documentation id="Bpmn_Documentation_Bem_8aee624f-61d9-4cce-bec3-30785fc96cd9">Das Vorprojekt wird zwischen veschiedenen Fachstellen koordiniert und abschliessend fertiggestellt. Die Dokumentation des geplanten Projektes liegt vor. der GPL S&amp;A stellt die Dokumentation bereit. </bpmn:documentation>
+      <bpmn:dataOutputAssociation id="ibo-c8713786-3cb5-4f15-a4db-1de472dbc59f">
+        <targetRef>ibo-345cfe2b-3db8-482f-82ad-7906cf42658e</targetRef>
+      </bpmn:dataOutputAssociation>
+      <bpmn:extensionElements>
+        <xppm:Property name="link"></xppm:Property>
+      </bpmn:extensionElements>
+      <bpmn:dataOutputAssociation id="dataoutputassociation_5qElP61F">
+        <targetRef>dataobjectreference_5qElPruM</targetRef>
+      </bpmn:dataOutputAssociation>
+    </bpmn:task>
+    <bpmn:startEvent id="ibo-89a40658-effd-4721-9027-2e50f5bb68ce" name="Start " parallelMultiple="false" isInterrupting="true">
+      <outgoing>ibo-89a40658-effd-4721-9027-2e50f5bb68ce</outgoing>
+      <bpmn:extensionElements>
+        <xppm:Property name="link"></xppm:Property>
+      </bpmn:extensionElements>
+    </bpmn:startEvent>
+    <bpmn:dataObjectReference id="dataobjectreference_5qElPn1r" name="DO319_100 Prozessdokumentation" dataObjectRef="dataobject_5qElP918">
+      <bpmn:documentation id="documentation_5qElPU14">Dokumentation des Übergabe- und Prüfprozesses</bpmn:documentation>
+      <bpmn:extensionElements>
+        <xppm:Property name="link"></xppm:Property>
+      </bpmn:extensionElements>
+    </bpmn:dataObjectReference>
+    <bpmn:dataObject id="dataobject_5qElP918" isCollection="false" />
+  </bpmn:process>
+  <bpmn:collaboration id="ibo-8a6b56b9-dfb4-4dd6-a208-08a4387bf5d5" isClosed="false">
+    <bpmn:participant id="ibo-d5d46a51-fcdd-4b4c-bc23-51c3a044cf50" name="03_VP_319 Phasenabnahme" />
+    <bpmn:participant id="ibo-64a6fc24-f9f1-426b-a5cb-2e81a239f200" name="Pool Phasenabnahme VP =&gt; BP" processRef="ibo-6da7ad88-bfe9-4a77-af75-09d81d11062b" />
+  </bpmn:collaboration>
+  <bpmndi:BPMNDiagram>
+    <bpmndi:BPMNPlane bpmnElement="ibo-8a6b56b9-dfb4-4dd6-a208-08a4387bf5d5">
+      <bpmndi:BPMNShape isHorizontal="true" bpmnElement="ibo-4279695d-895f-4bf0-a95d-d33c19c1bc9e">
+        <dc:Bounds x="30" y="0" width="604" height="154" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="dataobjectreference_5qElPn1r">
+        <dc:Bounds x="476" y="255" width="36" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="505.953179190751" y="264" width="113" height="32" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="dataobjectreference_5qElPruM">
+        <dc:Bounds x="341" y="16" width="36" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="380.711271676301" y="24" width="102" height="16" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge bpmnElement="ibo-7b966b34-05df-4406-9a0c-fc18ca3e344c">
+        <di:waypoint x="425" y="233" />
+        <di:waypoint x="426" y="273" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="ibo-a67a319f-2978-4890-9a86-a56dd07e1c68">
+        <di:waypoint x="199" y="234" />
+        <di:waypoint x="199" y="273" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="ibo-5f19b20e-272d-4c25-901a-d2b226718088">
+        <di:waypoint x="521" y="201" />
+        <di:waypoint x="554" y="202" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="ibo-03fcfbf3-7ad7-4db0-888a-bce65cd19ab3">
+        <di:waypoint x="355" y="202" />
+        <di:waypoint x="393" y="201" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="353" y="202" width="80" height="12" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="ibo-c41f1b7c-be47-4678-bb7b-635d194eb08c">
+        <di:waypoint x="323" y="170" />
+        <di:waypoint x="323" y="106" />
+        <di:waypoint x="263" y="106" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="300.083019160829" y="158" width="80" height="12" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="ibo-54678257-44eb-4bd0-bde8-64c1e4aa5d2a">
+        <di:waypoint x="263" y="202" />
+        <di:waypoint x="291" y="202" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="ibo-e87409ca-be30-4735-840e-54f8715df987">
+        <di:waypoint x="199" y="138" />
+        <di:waypoint x="199" y="170" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="ibo-c8713786-3cb5-4f15-a4db-1de472dbc59f">
+        <di:waypoint x="199" y="74" />
+        <di:waypoint x="199" y="48" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="dataoutputassociation_5qElPx1x">
+        <di:waypoint x="466" y="233" />
+        <di:waypoint x="487" y="255" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="ibo-8e4205d9-de60-4082-8170-d5bbb4899514">
+        <di:waypoint x="110" y="106" />
+        <di:waypoint x="135" y="106" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape bpmnElement="ibo-469d30fd-0033-4c18-b2ee-a830fa1c9c44">
+        <dc:Bounds x="187" y="273" width="24" height="32" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="131" y="305" width="132" height="15" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="ibo-54ce0c85-526d-49b6-911d-4ff6f8158bdc">
+        <dc:Bounds x="554" y="178" width="48" height="48" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="530" y="226" width="96" height="12" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="ibo-3548ad42-667c-4a5f-a859-e5f0b2abfe17">
+        <dc:Bounds x="393" y="169" width="128" height="64" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="ibo-d162ac96-5aa7-4114-a318-03284917e12c">
+        <dc:Bounds x="291" y="170" width="64" height="64" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="259" y="234" width="128" height="12" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="ibo-7f619c0a-a629-4051-91e4-6ffe7c9b5a47">
+        <dc:Bounds x="135" y="170" width="128" height="64" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="ibo-345cfe2b-3db8-482f-82ad-7906cf42658e">
+        <dc:Bounds x="187" y="16" width="24" height="32" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="114" y="23" width="73" height="18" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="ibo-5bf73395-0614-40ba-a52c-9ef98a0a4dd5">
+        <dc:Bounds x="135" y="74" width="128" height="64" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="ibo-89a40658-effd-4721-9027-2e50f5bb68ce">
+        <dc:Bounds x="62" y="82" width="48" height="48" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="38" y="130" width="96" height="12" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape isHorizontal="true" isExpanded="true" bpmnElement="ibo-64a6fc24-f9f1-426b-a5cb-2e81a239f200">
+        <dc:Bounds x="0" y="0" width="634" height="338" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape isHorizontal="true" bpmnElement="ibo-b1138a06-c37c-43d6-a61d-6f6fc6ea6699">
+        <dc:Bounds x="30" y="154" width="604" height="184" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="ibo-4ee75b00-4fca-4c5d-9d2c-5db2198fcda0">
+        <dc:Bounds x="419.711271676301" y="273" width="24" height="32" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="343.711271676301" y="267" width="76" height="38" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge bpmnElement="dataoutputassociation_5qElP61F">
+        <di:waypoint x="263" y="89" />
+        <di:waypoint x="341" y="46" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

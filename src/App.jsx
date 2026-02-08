@@ -10,7 +10,11 @@ import FilePickerModal from './components/FilePickerModal/FilePickerModal';
 import DataObjectERSelectModal from './components/DataObjectERSelectModal/DataObjectERSelectModal';
 import RootERSelectionModal from './components/RootERSelectionModal/RootERSelectionModal';
 import RootSwitchModal from './components/RootSwitchModal/RootSwitchModal';
+import ServerConnectionModal from './components/ServerConnectionModal/ServerConnectionModal';
+import ServerBrowser from './components/ServerBrowser/ServerBrowser';
 import { ThemeProvider } from './hooks/useTheme';
+import { useServerConnection } from './hooks/useServerConnection';
+import { api } from './utils/apiClient';
 import { generateIdmXml } from './utils/idmXmlGenerator';
 import { downloadIdmBundle } from './utils/idmBundleExporter';
 import { importIdmBundle, isZipBundle } from './utils/idmBundleImporter';
@@ -154,6 +158,12 @@ const App = () => {
 
   // About Dialog State
   const [showAboutDialog, setShowAboutDialog] = useState(false);
+
+  // Server Connection State
+  const serverConnection = useServerConnection();
+  const [showServerModal, setShowServerModal] = useState(false);
+  const [showServerBrowser, setShowServerBrowser] = useState(false);
+  const [serverSpecId, setServerSpecId] = useState(null); // MongoDB _id of currently loaded spec
 
   // File Picker Modal State (for browser mode)
   const [showFilePickerModal, setShowFilePickerModal] = useState(false);
@@ -2503,7 +2513,7 @@ const App = () => {
     // Open the user manual in a new browser tab/window
     // In Electron, this will use the shell.openExternal
     // In browser, this will open the markdown file or a hosted version
-    const manualUrl = 'https://github.com/ghanglee/IDMxPPM/blob/main/docs/USER_MANUAL.md';
+    const manualUrl = 'https://htmlpreview.github.io/?https://github.com/ghanglee/IDMxPPM/blob/main/user_manuals/V1.1.0/IDMxPPM-Tutorials.html';
 
     if (window.electronAPI && window.electronAPI.openExternal) {
       window.electronAPI.openExternal(manualUrl);
@@ -2597,6 +2607,46 @@ const App = () => {
       setExportFilename(nameWithoutExt);
     }
   }, [exportFilename, exportFormat]);
+
+  // Save the current project to the server
+  const handleSaveToServer = useCallback(async () => {
+    let currentBpmnXml = bpmnXml;
+    if (modelerRef.current) {
+      try {
+        const { xml } = await modelerRef.current.saveXML({ format: true });
+        currentBpmnXml = xml;
+      } catch (err) {
+        console.error('Failed to get BPMN XML:', err);
+      }
+    }
+
+    const projectData = {
+      version: '2.0.0',
+      appName: 'IDMxPPM - Neo Seoul',
+      bpmnXml: currentBpmnXml,
+      headerData,
+      erHierarchy,
+      dataObjectErMap,
+      erDataMap,
+      erLibrary,
+      savedAt: new Date().toISOString()
+    };
+
+    try {
+      if (serverSpecId) {
+        await api.updateSpec(serverSpecId, projectData);
+      } else {
+        const result = await api.createSpec(projectData);
+        if (result.spec?._id) {
+          setServerSpecId(result.spec._id);
+        }
+      }
+      setIsDirty(false);
+      alert('Saved to server successfully.');
+    } catch (err) {
+      alert(`Failed to save to server: ${err.message}`);
+    }
+  }, [bpmnXml, headerData, erHierarchy, dataObjectErMap, erDataMap, erLibrary, serverSpecId]);
 
   // Execute export based on selected format
   const executeExport = useCallback(async () => {
@@ -2814,6 +2864,11 @@ const App = () => {
           break;
         }
 
+        case 'server': {
+          await handleSaveToServer();
+          break;
+        }
+
         default:
           console.warn('Unknown export format:', exportFormat);
       }
@@ -2823,7 +2878,7 @@ const App = () => {
       console.error('Export failed:', err);
       alert('Export failed: ' + err.message);
     }
-  }, [bpmnXml, headerData, erDataMap, erLibrary, exportFormat, exportFilename, exportSavePath, exportOptions, customXslt]);
+  }, [bpmnXml, headerData, erDataMap, erLibrary, exportFormat, exportFilename, exportSavePath, exportOptions, customXslt, handleSaveToServer]);
 
   // Save project
   const saveProject = async (saveAs = false) => {
@@ -2874,6 +2929,50 @@ const App = () => {
       }
     }
   };
+
+  // --- Server Integration Handlers ---
+
+  // Open a specification from the server
+  const handleOpenFromServer = useCallback(async (specId, projectData) => {
+    try {
+      isLoadingProjectRef.current = true;
+
+      // Determine ER hierarchy
+      let erHierarchyToImport = [];
+      let dataObjectErMapToImport = {};
+      let erDataMapToImport = null;
+
+      if (projectData.erHierarchy && projectData.erHierarchy.length > 0) {
+        erHierarchyToImport = projectData.erHierarchy;
+        dataObjectErMapToImport = projectData.dataObjectErMap || {};
+        erDataMapToImport = projectData.erDataMap || null;
+      } else if (projectData.erDataMap) {
+        const migrated = migrateErDataMap(projectData.erDataMap);
+        erHierarchyToImport = migrated.erHierarchy;
+        dataObjectErMapToImport = migrated.dataObjectErMap;
+        erDataMapToImport = projectData.erDataMap;
+      }
+
+      if (projectData.bpmnXml) setBpmnXml(projectData.bpmnXml);
+      if (projectData.headerData) setHeaderData(projectData.headerData);
+      setErHierarchy(autoConsolidateErHierarchy(erHierarchyToImport));
+      setDataObjectErMap(dataObjectErMapToImport);
+      if (erDataMapToImport) setErDataMap(erDataMapToImport);
+      if (projectData.erLibrary) setErLibrary(projectData.erLibrary);
+      setCurrentFilePath(null);
+      setServerSpecId(specId);
+      setIsDirty(false);
+      setValidationResults(null);
+      setHasActiveProject(true);
+      setActivePane('specification');
+      extractDataObjectsAfterLoad();
+
+      setTimeout(() => { isLoadingProjectRef.current = false; }, 300);
+    } catch (err) {
+      console.error('Failed to load spec from server:', err);
+      isLoadingProjectRef.current = false;
+    }
+  }, [autoConsolidateErHierarchy, migrateErDataMap, extractDataObjectsAfterLoad]);
 
   // Global Enter key handler for single-line text inputs
   // Pressing Enter in a single-line input blurs it (confirms the value).
@@ -3105,6 +3204,7 @@ const App = () => {
 
     window.electronAPI.onMenuSave(() => saveProject(false));
     window.electronAPI.onMenuSaveAs(() => saveProject(true));
+    window.electronAPI.onMenuServerConnect(() => setShowServerModal(true));
 
     return () => {
       window.electronAPI.removeAllListeners('file-opened');
@@ -3112,6 +3212,7 @@ const App = () => {
       window.electronAPI.removeAllListeners('menu-new');
       window.electronAPI.removeAllListeners('menu-save');
       window.electronAPI.removeAllListeners('menu-save-as');
+      window.electronAPI.removeAllListeners('menu-server-connect');
     };
   }, [isDirty, handleImportER, extractDataObjectsAfterLoad, linkActorsToSwimlanesByName]);
 
@@ -3137,6 +3238,8 @@ const App = () => {
             onCloseProject={handleCloseProject}
             onHelp={handleHelp}
             onAbout={() => setShowAboutDialog(true)}
+            onServerConnect={() => setShowServerModal(true)}
+            isServerConnected={serverConnection.isConnected && serverConnection.isAuthenticated}
           />
 
           {/* Content Area */}
@@ -3147,6 +3250,8 @@ const App = () => {
                 onNewBlank={() => createNewProject('blank')}
                 onNewSample={() => createNewProject('sample')}
                 onOpen={handleOpenProject}
+                onOpenFromServer={() => setShowServerBrowser(true)}
+                isServerConnected={serverConnection.isConnected && serverConnection.isAuthenticated}
               />
             ) : (
               <>
@@ -3502,6 +3607,21 @@ const App = () => {
                       <span className="export-format-desc">Process map diagram only</span>
                     </div>
                   </label>
+                  {serverConnection.isConnected && serverConnection.isAuthenticated && (
+                    <label className={`export-format-option export-format-server ${exportFormat === 'server' ? 'selected' : ''}`}>
+                      <input
+                        type="radio"
+                        name="exportFormat"
+                        value="server"
+                        checked={exportFormat === 'server'}
+                        onChange={(e) => setExportFormat(e.target.value)}
+                      />
+                      <div className="export-format-content">
+                        <span className="export-format-title">Save to Server</span>
+                        <span className="export-format-desc">{serverSpecId ? 'Update existing specification on server' : 'Create new specification on server'}</span>
+                      </div>
+                    </label>
+                  )}
                 </div>
 
                 {exportFormat === 'html' && (
@@ -3602,6 +3722,16 @@ const App = () => {
             )}
           </div>
           <div className="status-right">
+            {serverConnection.isConnected && serverConnection.isAuthenticated && (
+              <span
+                className="server-status-indicator"
+                onClick={() => setShowServerModal(true)}
+                title={`Connected as ${serverConnection.user?.name?.givenName || ''} ${serverConnection.user?.name?.familyName || ''}`}
+                style={{ cursor: 'pointer', color: '#22c55e', fontSize: '12px', marginRight: '8px' }}
+              >
+                {serverSpecId ? 'Server (synced)' : 'Server'}
+              </span>
+            )}
             {isProjectOpen && validationResults && (
               <span className={`validation-status ${validationResults.isValid ? 'valid' : 'invalid'}`}>
                 {validationResults.isValid ? 'Valid' : 'Invalid'}
@@ -3711,6 +3841,20 @@ const App = () => {
           onDissolveOldRoot={handleRootSwitchDissolveOld}
           onKeepOldRootAsSub={handleRootSwitchKeepOldAsSub}
           onCancel={handleRootSwitchCancel}
+        />
+
+        {/* Server Connection Modal */}
+        <ServerConnectionModal
+          isOpen={showServerModal}
+          onClose={() => setShowServerModal(false)}
+          serverConnection={serverConnection}
+        />
+
+        {/* Server Browser Modal */}
+        <ServerBrowser
+          isOpen={showServerBrowser}
+          onClose={() => setShowServerBrowser(false)}
+          onOpenSpec={handleOpenFromServer}
         />
 
         <style>{`

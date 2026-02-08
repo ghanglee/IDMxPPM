@@ -13,6 +13,8 @@
  * - <er> - Exchange Requirements (can be nested)
  */
 
+import { normalizeRegionCode } from './idmXmlParser.js';
+
 /**
  * Remove BOM and clean XML content
  */
@@ -684,9 +686,9 @@ export const convertToNeoSeoul = (parsedData) => {
   let regionsArray = [];
   if (headerData.region) {
     if (typeof headerData.region === 'object' && headerData.region.value) {
-      regionsArray.push(headerData.region.value.toLowerCase().replace(/\s+/g, '-'));
+      regionsArray.push(normalizeRegionCode(headerData.region.value.toLowerCase().replace(/\s+/g, '-')));
     } else if (typeof headerData.region === 'string') {
-      regionsArray.push(headerData.region);
+      regionsArray.push(normalizeRegionCode(headerData.region));
     }
   }
   if (regionsArray.length === 0) {

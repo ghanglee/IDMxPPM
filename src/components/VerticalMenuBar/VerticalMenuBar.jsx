@@ -8,7 +8,8 @@ import {
   ValidateIcon,
   SaveExportIcon,
   CloseIcon,
-  HelpIcon
+  HelpIcon,
+  ServerIcon
 } from '../icons';
 import './VerticalMenuBar.css';
 
@@ -26,7 +27,9 @@ const VerticalMenuBar = ({
   onSaveExport,
   onCloseProject,
   onHelp,
-  onAbout
+  onAbout,
+  onServerConnect,
+  isServerConnected = false
 }) => {
   const menuItems = [
     {
@@ -129,6 +132,18 @@ const VerticalMenuBar = ({
       </div>
 
       <div className="vertical-menu-spacer" />
+
+      {/* Server connection button */}
+      <div className="vertical-menu-server">
+        <button
+          className={`vertical-menu-btn action ${isServerConnected ? 'server-connected' : ''}`}
+          onClick={onServerConnect}
+          title={isServerConnected ? 'Connected to Server' : 'Connect to Server'}
+        >
+          <ServerIcon size={22} />
+          {isServerConnected && <span className="server-dot" />}
+        </button>
+      </div>
 
       {/* Footer - IDMxPPM branding */}
       <div className="vertical-menu-footer">

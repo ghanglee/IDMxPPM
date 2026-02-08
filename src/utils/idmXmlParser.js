@@ -4,6 +4,71 @@
  */
 
 /**
+ * ISO 3166-1 alpha-3 to alpha-2 mapping for region code normalization.
+ * When idmXML files store regions as 3-letter codes (e.g., "CHE"),
+ * this converts them to the 2-letter codes used internally (e.g., "CH").
+ */
+const ALPHA3_TO_ALPHA2 = {
+  AFG: 'AF', ALB: 'AL', DZA: 'DZ', ARG: 'AR', AUS: 'AU', AUT: 'AT',
+  BEL: 'BE', BRA: 'BR', BGR: 'BG', CAN: 'CA', CHL: 'CL', CHN: 'CN',
+  COL: 'CO', HRV: 'HR', CZE: 'CZ', DNK: 'DK', EGY: 'EG', EST: 'EE',
+  FIN: 'FI', FRA: 'FR', DEU: 'DE', GRC: 'GR', HKG: 'HK', HUN: 'HU',
+  ISL: 'IS', IND: 'IN', IDN: 'ID', IRL: 'IE', ISR: 'IL', ITA: 'IT',
+  JPN: 'JP', KAZ: 'KZ', KOR: 'KR', KWT: 'KW', LVA: 'LV', LTU: 'LT',
+  LUX: 'LU', MYS: 'MY', MEX: 'MX', NLD: 'NL', NZL: 'NZ', NOR: 'NO',
+  PAK: 'PK', PER: 'PE', PHL: 'PH', POL: 'PL', PRT: 'PT', QAT: 'QA',
+  ROU: 'RO', RUS: 'RU', SAU: 'SA', SRB: 'RS', SGP: 'SG', SVK: 'SK',
+  SVN: 'SI', ZAF: 'ZA', ESP: 'ES', SWE: 'SE', CHE: 'CH', TWN: 'TW',
+  THA: 'TH', TUR: 'TR', UKR: 'UA', ARE: 'AE', GBR: 'GB', USA: 'US',
+  VNM: 'VN'
+};
+
+/**
+ * Normalize a region code: convert ISO 3166-1 alpha-3 to alpha-2 if applicable.
+ * Returns the code as-is if it's already alpha-2 or not recognized.
+ */
+export const normalizeRegionCode = (code) => {
+  if (!code || typeof code !== 'string') return code;
+  const upper = code.toUpperCase();
+  return ALPHA3_TO_ALPHA2[upper] || code;
+};
+
+/** ISO 3166-1 alpha-2 code to full country name */
+const ALPHA2_TO_NAME = {
+  AF: 'Afghanistan', AL: 'Albania', DZ: 'Algeria', AR: 'Argentina',
+  AU: 'Australia', AT: 'Austria', BE: 'Belgium', BR: 'Brazil',
+  BG: 'Bulgaria', CA: 'Canada', CL: 'Chile', CN: 'China',
+  CO: 'Colombia', HR: 'Croatia', CZ: 'Czech Republic', DK: 'Denmark',
+  EG: 'Egypt', EE: 'Estonia', FI: 'Finland', FR: 'France',
+  DE: 'Germany', GR: 'Greece', HK: 'Hong Kong', HU: 'Hungary',
+  IS: 'Iceland', IN: 'India', ID: 'Indonesia', IE: 'Ireland',
+  IL: 'Israel', IT: 'Italy', JP: 'Japan', KZ: 'Kazakhstan',
+  KR: 'Korea, Republic of', KW: 'Kuwait', LV: 'Latvia', LT: 'Lithuania',
+  LU: 'Luxembourg', MY: 'Malaysia', MX: 'Mexico', NL: 'Netherlands',
+  NZ: 'New Zealand', NO: 'Norway', PK: 'Pakistan', PE: 'Peru',
+  PH: 'Philippines', PL: 'Poland', PT: 'Portugal', QA: 'Qatar',
+  RO: 'Romania', RU: 'Russian Federation', SA: 'Saudi Arabia', RS: 'Serbia',
+  SG: 'Singapore', SK: 'Slovakia', SI: 'Slovenia', ZA: 'South Africa',
+  ES: 'Spain', SE: 'Sweden', CH: 'Switzerland', TW: 'Taiwan',
+  TH: 'Thailand', TR: 'Turkey', UA: 'Ukraine', AE: 'United Arab Emirates',
+  GB: 'United Kingdom', US: 'United States', VN: 'Vietnam'
+};
+
+/**
+ * Get full region name from any region code (alpha-2, alpha-3, or custom).
+ * Returns the full name if found, otherwise the original code.
+ */
+export const getRegionName = (code) => {
+  if (!code || typeof code !== 'string') return code;
+  if (code === 'international') return 'International (All regions)';
+  if (code === 'EU') return 'European Union';
+  if (code === 'NA') return 'North America';
+  if (code === 'APAC') return 'Asia-Pacific';
+  const normalized = normalizeRegionCode(code);
+  return ALPHA2_TO_NAME[normalized.toUpperCase()] || code;
+};
+
+/**
  * Parse figures from a section element
  * @param {Element} sectionElement - The parent section element (e.g., summary, aimAndScope)
  * @returns {Array} Array of figure objects
@@ -490,7 +555,7 @@ export const parseIdmXml = (xmlContent) => {
         regionElements.forEach(region => {
           const value = region.getAttribute('value');
           if (value) {
-            result.headerData.regions.push(value);
+            result.headerData.regions.push(normalizeRegionCode(value));
           }
         });
         result.headerData.region = result.headerData.regions[0] || 'international';
@@ -828,10 +893,36 @@ const parseErElement = (erElement) => {
     er.name = er.shortTitle || specId.getAttribute('fullTitle') || '';
   }
 
-  // Parse description - namespace-safe
+  // Parse description - namespace-safe (with optional image children)
   const description = getFirstChild(erElement, 'description');
   if (description) {
     er.description = description.getAttribute('title') || description.textContent || '';
+    // Parse figures from description's image children
+    const descImages = getDirectChildren(description, 'image');
+    if (descImages.length > 0) {
+      er.descriptionFigures = [];
+      descImages.forEach((img, index) => {
+        const caption = img.getAttribute('caption') || `Figure ${index + 1}`;
+        const mimeType = img.getAttribute('mimeType') || 'image/png';
+        const encoding = img.getAttribute('encoding');
+        const filePath = img.getAttribute('filePath');
+        if (encoding === 'base64') {
+          const base64Data = img.textContent?.trim() || '';
+          if (base64Data) {
+            er.descriptionFigures.push({
+              id: `fig-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              name: caption, caption, type: mimeType,
+              data: `data:${mimeType};base64,${base64Data}`
+            });
+          }
+        } else if (filePath) {
+          er.descriptionFigures.push({
+            id: `fig-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            name: filePath, caption, type: mimeType, filePath
+          });
+        }
+      });
+    }
   }
 
   // Parse information units - namespace-safe
@@ -863,11 +954,44 @@ const parseInformationUnit = (iuElement) => {
     dataType: iuElement.getAttribute('dataType') || 'String',
     isMandatory: iuElement.getAttribute('isMandatory') === 'true',
     definition: iuElement.getAttribute('definition') || '',
+    definitionFigures: [],
     examples: '',
     exampleImages: [],
     correspondingExternalElements: [],
     subInformationUnits: []
   };
+
+  // Check for definition figures in <description> child elements (with image children)
+  const defDesc = getFirstChild(iuElement, 'description');
+  if (defDesc) {
+    // If there's a description child, its title overrides the attribute (or supplements it)
+    const descTitle = defDesc.getAttribute('title') || '';
+    if (descTitle) {
+      unit.definition = descTitle;
+    }
+    const defImages = getDirectChildren(defDesc, 'image');
+    defImages.forEach((img, index) => {
+      const caption = img.getAttribute('caption') || `Figure ${index + 1}`;
+      const mimeType = img.getAttribute('mimeType') || 'image/png';
+      const encoding = img.getAttribute('encoding');
+      const filePath = img.getAttribute('filePath');
+      if (encoding === 'base64') {
+        const base64Data = img.textContent?.trim() || '';
+        if (base64Data) {
+          unit.definitionFigures.push({
+            id: `fig-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            name: caption, caption, type: mimeType,
+            data: `data:${mimeType};base64,${base64Data}`
+          });
+        }
+      } else if (filePath) {
+        unit.definitionFigures.push({
+          id: `fig-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          name: filePath, caption, type: mimeType, filePath
+        });
+      }
+    });
+  }
 
   // Parse examples - namespace-safe
   const examplesEl = getFirstChild(iuElement, 'examples');

@@ -897,4 +897,4 @@ const BPMNEditor = ({
   );
 };
 
-export default BPMNEditor;
+export default React.memo(BPMNEditor);

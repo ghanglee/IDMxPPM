@@ -126,6 +126,11 @@
   line-height: 1.4;
 }
 
+.startup-option-server .startup-option-icon {
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  color: white;
+}
+
 .startup-footer {
   margin-top: 40px;
   text-align: center;

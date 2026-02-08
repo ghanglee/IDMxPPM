@@ -25,6 +25,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onMenuZoomFit: (callback) => ipcRenderer.on('menu-zoom-fit', callback),
   onMenuExportBPMN: (callback) => ipcRenderer.on('menu-export-bpmn', callback),
   onMenuExportIdmXML: (callback) => ipcRenderer.on('menu-export-idmxml', callback),
+  onMenuServerConnect: (callback) => ipcRenderer.on('menu-server-connect', callback),
   onFileOpened: (callback) => ipcRenderer.on('file-opened', (event, data) => callback(data)),
   onERImported: (callback) => ipcRenderer.on('er-imported', (event, data) => callback(data)),
   

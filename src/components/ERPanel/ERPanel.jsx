@@ -54,6 +54,74 @@ const SCHEMA_OPTIONS = [
 const uuid = () => crypto.randomUUID?.() || `IU-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 /**
+ * Compact definition field with figure upload support.
+ * Used for ER descriptions and IU definitions.
+ */
+const DefinitionWithFigures = ({ value, figures = [], onChange, onFiguresChange, placeholder, rows = 2, label = 'Definition', className = 'er-textarea' }) => {
+  const fileRef = React.useRef(null);
+
+  const handleFileChange = (e) => {
+    Array.from(e.target.files || []).forEach(file => {
+      if (!file.type.startsWith('image/')) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        onFiguresChange?.([...figures, {
+          id: `fig-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+          name: file.name,
+          caption: '',
+          data: ev.target.result,
+          type: file.type
+        }]);
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = '';
+  };
+
+  return (
+    <div className="er-def-with-figures">
+      <div className="er-def-header">
+        <label>{label}</label>
+        <button type="button" className="er-fig-add-btn" onClick={() => fileRef.current?.click()} title="Add figure">
+          <AddIcon size={10} /> Fig
+        </button>
+        <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleFileChange} style={{ display: 'none' }} />
+      </div>
+      <textarea
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        rows={rows}
+        className={className}
+      />
+      {figures.length > 0 && (
+        <div className="er-def-figures">
+          {figures.map((fig, i) => (
+            <div key={fig.id} className="er-def-figure-item">
+              {fig.data ? (
+                <img src={fig.data} alt={fig.caption || fig.name} className="er-def-figure-img" />
+              ) : (
+                <div className="er-def-figure-placeholder">{fig.name || 'Image'}</div>
+              )}
+              <div className="er-def-figure-controls">
+                <input
+                  type="text"
+                  value={fig.caption || ''}
+                  onChange={(e) => onFiguresChange?.(figures.map(f => f.id === fig.id ? { ...f, caption: e.target.value } : f))}
+                  placeholder={`Figure ${i + 1} caption...`}
+                  className="er-def-figure-caption"
+                />
+                <button type="button" className="er-def-figure-remove" onClick={() => onFiguresChange?.(figures.filter(f => f.id !== fig.id))} title="Remove">x</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/**
  * ER Panel Component - ER-First Hierarchical Tree View
  * Exchange Requirement editor with hierarchical tree structure
  * ER-first architecture: erHierarchy is the source of truth
@@ -118,6 +186,11 @@ const ERPanel = ({
   const [mappingSearchResults, setMappingSearchResults] = useState([]);
   const [mappingSearchLoading, setMappingSearchLoading] = useState(false);
   const [mappingSearchError, setMappingSearchError] = useState(null);
+
+  // AbortController ref for cancelling in-flight search requests
+  const searchAbortControllerRef = useRef(null);
+  // Request counter to guard against stale responses
+  const searchRequestIdRef = useRef(0);
 
   // Sub-ER selection modal state
   const [showSubERModal, setShowSubERModal] = useState(false);
@@ -224,6 +297,7 @@ const ERPanel = ({
   }, [newlyAddedErId, erHierarchy, onClearNewlyAddedErId]);
 
   // Auto-scroll and focus newly added external mapping
+  const [mappingScrollTrigger, setMappingScrollTrigger] = useState(0);
   useEffect(() => {
     if (newlyAddedMappingRef.current) {
       const { mappingId } = newlyAddedMappingRef.current;
@@ -237,7 +311,7 @@ const ERPanel = ({
         newlyAddedMappingRef.current = null;
       }, 100);
     }
-  });
+  }, [mappingScrollTrigger]);
 
   // Auto-sync ER name to BPMN diagram after changes settle
   useEffect(() => {
@@ -864,7 +938,7 @@ const ERPanel = ({
   }, []);
 
   // Toggle expand/collapse for a node
-  const toggleExpand = (nodeId) => {
+  const toggleExpand = useCallback((nodeId) => {
     setExpandedNodes(prev => {
       const next = new Set(prev);
       if (next.has(nodeId)) {
@@ -874,10 +948,10 @@ const ERPanel = ({
       }
       return next;
     });
-  };
+  }, []);
 
   // Expand all nodes
-  const handleExpandAll = () => {
+  const handleExpandAll = useCallback(() => {
     const allIds = new Set();
 
     if (isErFirstMode) {
@@ -916,17 +990,17 @@ const ERPanel = ({
     }
 
     setExpandedNodes(allIds);
-  };
+  }, [isErFirstMode, erHierarchy, dataObject?.id, erData]);
 
   // Collapse all nodes
-  const handleCollapseAll = () => {
+  const handleCollapseAll = useCallback(() => {
     setExpandedNodes(new Set());
-  };
+  }, []);
 
   // ========== ER-First Mode Handlers ==========
 
   // Toggle mandatory flag in ER-first mode
-  const handleMandatoryToggle = (iuId, value) => {
+  const handleMandatoryToggle = useCallback((iuId, value) => {
     if (!isErFirstMode || !onUpdateER) return;
 
     // Find which ER contains this IU
@@ -949,10 +1023,10 @@ const ERPanel = ({
     };
 
     findAndUpdateIU(erHierarchy);
-  };
+  }, [isErFirstMode, onUpdateER, erHierarchy]);
 
   // Add Information Unit to an ER in ER-first mode
-  const handleAddIUToEr = (erId) => {
+  const handleAddIUToEr = useCallback((erId) => {
     if (!isErFirstMode || !onUpdateER) return;
 
     const newIU = {
@@ -988,10 +1062,10 @@ const ERPanel = ({
     };
 
     findEr(erHierarchy);
-  };
+  }, [isErFirstMode, onUpdateER, erHierarchy]);
 
   // Delete Information Unit in ER-first mode
-  const handleDeleteIU = (iuId, erParentId) => {
+  const handleDeleteIU = useCallback((iuId, erParentId) => {
     if (!isErFirstMode || !onUpdateER) return;
 
     const removeIURecursive = (ius) => {
@@ -1022,10 +1096,10 @@ const ERPanel = ({
     if (selectedItem?.id === iuId) {
       setSelectedItem(null);
     }
-  };
+  }, [isErFirstMode, onUpdateER, erHierarchy, selectedItem?.id]);
 
   // Move IU up in ER-first mode
-  const handleMoveIUUp = (iuId, erParentId) => {
+  const handleMoveIUUp = useCallback((iuId, erParentId) => {
     if (!isErFirstMode || !onUpdateER || !selectedIULocation) return;
     if (selectedIULocation.index <= 0) return;
 
@@ -1058,10 +1132,10 @@ const ERPanel = ({
     };
 
     updateErRecursive(erHierarchy);
-  };
+  }, [isErFirstMode, onUpdateER, selectedIULocation, erHierarchy]);
 
   // Move IU down in ER-first mode
-  const handleMoveIUDown = (iuId, erParentId) => {
+  const handleMoveIUDown = useCallback((iuId, erParentId) => {
     if (!isErFirstMode || !onUpdateER || !selectedIULocation) return;
     if (selectedIULocation.index >= selectedIULocation.siblings.length - 1) return;
 
@@ -1094,10 +1168,10 @@ const ERPanel = ({
     };
 
     updateErRecursive(erHierarchy);
-  };
+  }, [isErFirstMode, onUpdateER, selectedIULocation, erHierarchy]);
 
   // Indent IU (make it a sub-IU of the sibling above)
-  const handleIndentIU = (iuId, erParentId) => {
+  const handleIndentIU = useCallback((iuId, erParentId) => {
     if (!isErFirstMode || !onUpdateER || !selectedIULocation) return;
     if (selectedIULocation.index <= 0) return;
 
@@ -1146,10 +1220,10 @@ const ERPanel = ({
     };
 
     updateErRecursive(erHierarchy);
-  };
+  }, [isErFirstMode, onUpdateER, selectedIULocation, erHierarchy]);
 
   // Outdent IU (promote from parent IU to its parent level)
-  const handleOutdentIU = (iuId, erParentId) => {
+  const handleOutdentIU = useCallback((iuId, erParentId) => {
     if (!isErFirstMode || !onUpdateER || !selectedIULocation) return;
     if (!selectedIULocation.parent) return;
 
@@ -1190,31 +1264,31 @@ const ERPanel = ({
     };
 
     updateErRecursive(erHierarchy);
-  };
+  }, [isErFirstMode, onUpdateER, selectedIULocation, erHierarchy]);
 
   // ========== CRUD Operations ==========
 
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
     if (onSave) {
       onSave(erData);
     }
-  };
+  }, [onSave, erData]);
 
-  const handleSaveAs = () => {
+  const handleSaveAs = useCallback(() => {
     setSaveAsName(erData?.name || '');
     setShowSaveAsDialog(true);
-  };
+  }, [erData]);
 
-  const confirmSaveAs = () => {
+  const confirmSaveAs = useCallback(() => {
     if (onSaveAs && saveAsName.trim()) {
       onSaveAs(erData, saveAsName.trim());
       setShowSaveAsDialog(false);
       setSaveAsName('');
     }
-  };
+  }, [onSaveAs, erData, saveAsName]);
 
   // Add new Information Unit
-  const addInformationUnit = (parentId = null, subERId = null) => {
+  const addInformationUnit = useCallback((parentId = null, subERId = null) => {
     const newUnit = {
       id: uuid(),
       name: '',
@@ -1263,10 +1337,10 @@ const ERPanel = ({
 
     setExpandedNodes(prev => new Set([...prev, newUnit.id]));
     setSelectedItem({ id: newUnit.id, type: 'iu', data: newUnit });
-  };
+  }, [erData, onChange]);
 
   // Update Information Unit
-  const updateUnit = (unitId, updates, subERId = null) => {
+  const updateUnit = useCallback((unitId, updates, subERId = null) => {
     const updateRecursive = (units) => units.map(u =>
       u.id === unitId ? { ...u, ...updates } : { ...u, subInformationUnits: updateRecursive(u.subInformationUnits || []) }
     );
@@ -1286,10 +1360,10 @@ const ERPanel = ({
     if (selectedItem?.id === unitId) {
       setSelectedItem(prev => ({ ...prev, data: { ...prev.data, ...updates } }));
     }
-  };
+  }, [erData, onChange, selectedItem?.id]);
 
   // Remove Information Unit
-  const removeUnit = (unitId, subERId = null) => {
+  const removeUnit = useCallback((unitId, subERId = null) => {
     const removeRecursive = (units) => units
       .filter(u => u.id !== unitId)
       .map(u => ({ ...u, subInformationUnits: removeRecursive(u.subInformationUnits || []) }));
@@ -1308,10 +1382,10 @@ const ERPanel = ({
     if (selectedItem?.id === unitId) {
       setSelectedItem(null);
     }
-  };
+  }, [erData, onChange, selectedItem?.id]);
 
   // Remove item (generic)
-  const handleRemoveItem = () => {
+  const handleRemoveItem = useCallback(() => {
     if (!selectedItem) return;
 
     if (selectedItem.type === 'er') {
@@ -1325,11 +1399,11 @@ const ERPanel = ({
       const row = treeRows.find(r => r.id === selectedItem.id);
       removeUnit(selectedItem.id, row?.subERParent);
     }
-  };
+  }, [selectedItem, erData, onChange, treeRows, removeUnit]);
 
   // ========== External Mappings ==========
 
-  const addMapping = (unitId) => {
+  const addMapping = useCallback((unitId) => {
     const newMapping = { id: uuid(), basis: 'bSDD', name: '' };
     const addRecursive = (units) => units.map(u =>
       u.id === unitId
@@ -1339,9 +1413,10 @@ const ERPanel = ({
     onChange({ ...erData, informationUnits: addRecursive(erData?.informationUnits || []) });
     // Track newly added mapping for auto-scroll and focus
     newlyAddedMappingRef.current = { mappingId: newMapping.id, unitId };
-  };
+    setMappingScrollTrigger(c => c + 1);
+  }, [erData, onChange]);
 
-  const updateMapping = (unitId, mappingId, updates) => {
+  const updateMapping = useCallback((unitId, mappingId, updates) => {
     const updateRecursive = (units) => units.map(u => {
       if (u.id === unitId) {
         return { ...u, correspondingExternalElements: (u.correspondingExternalElements || []).map(m => m.id === mappingId ? { ...m, ...updates } : m) };
@@ -1349,9 +1424,9 @@ const ERPanel = ({
       return { ...u, subInformationUnits: updateRecursive(u.subInformationUnits || []) };
     });
     onChange({ ...erData, informationUnits: updateRecursive(erData?.informationUnits || []) });
-  };
+  }, [erData, onChange]);
 
-  const removeMapping = (unitId, mappingId) => {
+  const removeMapping = useCallback((unitId, mappingId) => {
     const removeRecursive = (units) => units.map(u => {
       if (u.id === unitId) {
         return { ...u, correspondingExternalElements: (u.correspondingExternalElements || []).filter(m => m.id !== mappingId) };
@@ -1359,86 +1434,75 @@ const ERPanel = ({
       return { ...u, subInformationUnits: removeRecursive(u.subInformationUnits || []) };
     });
     onChange({ ...erData, informationUnits: removeRecursive(erData?.informationUnits || []) });
-  };
+  }, [erData, onChange]);
 
-  // Open mapping search modal
-  // If mappingId is provided, we're updating an existing mapping; otherwise adding a new one
-  // If initialQuery is provided, pre-populate the search box with it
-  const openMappingSearch = (unitId, currentSchema, mappingId = null, initialQuery = '') => {
-    setMappingSearchUnitId(unitId);
-    setMappingSearchMappingId(mappingId);
-    setMappingSearchSchema(currentSchema || 'bSDD');
-    setMappingSearchQuery(initialQuery);
-    setMappingSearchResults([]);
-    setMappingSearchError(null);
-    setShowMappingSearch(true);
-  };
-
-  // Debounced auto-search
+  // Debounced auto-search with AbortController for cancellation
   const searchTimeoutRef = useRef(null);
-  // Store latest handleMappingSearch in a ref to avoid stale closures
-  const handleMappingSearchRef = useRef(null);
 
-  useEffect(() => {
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
+  // Cancel any in-flight search request.
+  // Also bumps the request counter so any pending finally{} block from the
+  // aborted executeSearch sees a stale requestId and skips state updates.
+  const cancelSearch = useCallback(() => {
+    searchRequestIdRef.current++;
+    if (searchAbortControllerRef.current) {
+      searchAbortControllerRef.current.abort();
+      searchAbortControllerRef.current = null;
     }
+  }, []);
 
-    if (!showMappingSearch || !mappingSearchQuery.trim()) {
-      return;
-    }
-
-    searchTimeoutRef.current = setTimeout(() => {
-      // Use the ref to call the latest version of handleMappingSearch
-      if (handleMappingSearchRef.current) {
-        handleMappingSearchRef.current();
-      }
-    }, 300);
-
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-  }, [mappingSearchQuery, mappingSearchSchema, mappingSearchType, showMappingSearch]);
-
-  const handleMappingSearch = useCallback(async () => {
-    if (!mappingSearchQuery.trim()) {
+  // Core search execution — captures query/schema/type at call time
+  const executeSearch = useCallback(async (query, schema, matchType) => {
+    if (!query.trim()) {
       setMappingSearchResults([]);
       setMappingSearchError(null);
+      setMappingSearchLoading(false);
       return;
     }
+
+    // Cancel previous in-flight request
+    cancelSearch();
+
+    // Create a new AbortController for this request
+    const abortController = new AbortController();
+    searchAbortControllerRef.current = abortController;
+
+    // Increment request ID to detect stale responses
+    const requestId = ++searchRequestIdRef.current;
 
     setMappingSearchLoading(true);
     setMappingSearchResults([]);
     setMappingSearchError(null);
 
     try {
-      const schemaOption = SCHEMA_OPTIONS.find(s => s.value === mappingSearchSchema);
+      const schemaOption = SCHEMA_OPTIONS.find(s => s.value === schema);
       let results = [];
       let searchError = null;
 
-      if (schemaOption?.apiEnabled && mappingSearchSchema === 'bSDD') {
+      if (schemaOption?.apiEnabled && schema === 'bSDD') {
         try {
-          results = await searchBsdd(mappingSearchQuery, mappingSearchType);
+          results = await searchBsdd(query, matchType, abortController.signal);
         } catch (apiError) {
+          if (apiError.name === 'AbortError') {
+            return; // Silently exit — request was cancelled by a newer search
+          }
           console.error('bSDD API error:', apiError);
-          searchError = apiError.name === 'AbortError'
-            ? 'bSDD API request timed out. Please try again.'
-            : `bSDD API error: ${apiError.message || 'Connection failed'}`;
+          searchError = `bSDD API error: ${apiError.message || 'Connection failed'}`;
           results = [];
         }
       } else if (schemaOption?.searchable) {
         try {
-          results = searchSchema(mappingSearchSchema, mappingSearchQuery, mappingSearchType);
+          results = searchSchema(schema, query, matchType);
         } catch (err) {
           console.error('Local schema search error:', err);
           searchError = `Schema search error: ${err.message || 'Unknown error'}`;
           results = [];
         }
       } else {
-        searchError = `Schema '${mappingSearchSchema}' does not support search.`;
+        searchError = `Schema '${schema}' does not support search.`;
       }
+
+      // Guard against stale responses: only update state if this is still the latest request
+      if (requestId !== searchRequestIdRef.current) return;
 
       const validResults = Array.isArray(results)
         ? results
@@ -1447,7 +1511,7 @@ const ERPanel = ({
               name: r.name || r.code || 'Unknown',
               code: r.code || r.name || '',
               description: r.description || '',
-              category: r.category || mappingSearchSchema,
+              category: r.category || schema,
               uri: r.uri || '',
               score: typeof r.score === 'number' ? r.score : 1,
               matchType: r.matchType || 'exact'
@@ -1460,20 +1524,98 @@ const ERPanel = ({
         setMappingSearchError(searchError);
       }
     } catch (error) {
+      if (error.name === 'AbortError' || requestId !== searchRequestIdRef.current) return;
       console.error('Mapping search error:', error);
       setMappingSearchResults([]);
       setMappingSearchError(`Search failed: ${error.message || 'Unknown error'}`);
     } finally {
-      setMappingSearchLoading(false);
+      // Only clear loading if this is still the latest request
+      if (requestId === searchRequestIdRef.current) {
+        setMappingSearchLoading(false);
+      }
     }
-  }, [mappingSearchQuery, mappingSearchSchema, mappingSearchType]);
+  }, [cancelSearch]);
 
-  // Keep the ref in sync with the latest handleMappingSearch
+  // Open mapping search modal
+  // If mappingId is provided, we're updating an existing mapping; otherwise adding a new one
+  // If initialQuery is provided, pre-populate the search box with it
+  const openMappingSearch = useCallback((unitId, currentSchema, mappingId = null, initialQuery = '') => {
+    cancelSearch(); // Cancel any in-flight request from a previous search
+    setMappingSearchUnitId(unitId);
+    setMappingSearchMappingId(mappingId);
+    setMappingSearchSchema(currentSchema || 'bSDD');
+    setMappingSearchQuery(initialQuery);
+    setMappingSearchResults([]);
+    setMappingSearchError(null);
+    setMappingSearchLoading(false);
+    setShowMappingSearch(true);
+  }, [cancelSearch]);
+
+  // Close mapping search and cancel in-flight requests
+  const closeMappingSearch = useCallback(() => {
+    cancelSearch();
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+      searchTimeoutRef.current = null;
+    }
+    setShowMappingSearch(false);
+    setMappingSearchResults([]);
+    setMappingSearchError(null);
+    setMappingSearchLoading(false);
+  }, [cancelSearch]);
+
+  // Debounced trigger: fires executeSearch 300ms after query/schema/type change
+  // IMPORTANT: Always cancel in-flight requests on every change to prevent stale
+  // responses from arriving mid-debounce and causing rapid state flips.
   useEffect(() => {
-    handleMappingSearchRef.current = handleMappingSearch;
-  }, [handleMappingSearch]);
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
 
-  const handleSelectMappingResult = (result) => {
+    // Cancel any in-flight request immediately on every change
+    cancelSearch();
+
+    if (!showMappingSearch || !mappingSearchQuery.trim()) {
+      setMappingSearchLoading(false);
+      setMappingSearchResults([]);
+      return;
+    }
+
+    // Show loading state immediately while debouncing
+    setMappingSearchLoading(true);
+
+    searchTimeoutRef.current = setTimeout(() => {
+      executeSearch(mappingSearchQuery, mappingSearchSchema, mappingSearchType);
+    }, 300);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [mappingSearchQuery, mappingSearchSchema, mappingSearchType, showMappingSearch, cancelSearch, executeSearch]);
+
+  // Cleanup on unmount: cancel any in-flight requests
+  useEffect(() => {
+    return () => {
+      cancelSearch();
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [cancelSearch]);
+
+  // Manual search trigger (for Search button click and Enter key)
+  const handleMappingSearch = useCallback(() => {
+    // Clear debounce timer to prevent it from cancelling this manual search
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+      searchTimeoutRef.current = null;
+    }
+    executeSearch(mappingSearchQuery, mappingSearchSchema, mappingSearchType);
+  }, [executeSearch, mappingSearchQuery, mappingSearchSchema, mappingSearchType]);
+
+  const handleSelectMappingResult = useCallback((result) => {
     if (!mappingSearchUnitId) return;
 
     const isClassification = ['UniFormat', 'OmniClass', 'MasterFormat'].includes(mappingSearchSchema);
@@ -1543,22 +1685,21 @@ const ERPanel = ({
       onChange({ ...erData, informationUnits: updateRecursive(erData?.informationUnits || []) });
     }
 
-    setShowMappingSearch(false);
+    closeMappingSearch();
     setMappingSearchUnitId(null);
     setMappingSearchMappingId(null);
     setMappingSearchQuery('');
-    setMappingSearchResults([]);
-  };
+  }, [mappingSearchUnitId, mappingSearchSchema, mappingSearchMappingId, isErFirstMode, selectedItem?.id, onChange, erData, closeMappingSearch]);
 
   // ========== Sub-ER Functions ==========
 
-  const openSubERModal = () => {
+  const openSubERModal = useCallback(() => {
     setSubERModalTab('current');
     setShowSubERModal(true);
-  };
+  }, []);
 
   // Convert selected IU to a new Sub-ER (>ER button functionality)
-  const handleConvertIUToSubER = () => {
+  const handleConvertIUToSubER = useCallback(() => {
     if (!selectedItem || selectedItem.type !== 'iu') return;
 
     const iuData = selectedItem.data;
@@ -1606,9 +1747,9 @@ const ERPanel = ({
     onChange(updatedErData);
     setExpandedNodes(prev => new Set([...prev, newSubER.id]));
     setSelectedItem({ id: newSubER.id, type: 'subEr', data: newSubER });
-  };
+  }, [selectedItem, treeRows, erData, onChange]);
 
-  const handleAddSubERFromCurrent = (sourceId, sourceER) => {
+  const handleAddSubERFromCurrent = useCallback((sourceId, sourceER) => {
     // In ER-first mode, use onMoveERAsSubER for a MOVE operation
     // The ER is removed from its original location and added as a sub-ER
     if (isErFirstMode && selectedErId && onMoveERAsSubER) {
@@ -1646,9 +1787,9 @@ const ERPanel = ({
     setShowSubERModal(false);
     setExpandedNodes(prev => new Set([...prev, newSubER.id]));
     setSelectedItem({ id: newSubER.id, type: 'subEr', data: newSubER });
-  };
+  }, [isErFirstMode, selectedErId, onMoveERAsSubER, selectedErData, onUpdateER, onChange, erData]);
 
-  const handleImportSubERFile = (event) => {
+  const handleImportSubERFile = useCallback((event) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -1719,7 +1860,7 @@ const ERPanel = ({
     };
     reader.readAsText(file);
     event.target.value = '';
-  };
+  }, [isErFirstMode, selectedErData, onUpdateER, selectedErId, onChange, erData, dataObject?.id]);
 
   const parseInformationUnitXml = (iuElement) => {
     const unit = {
@@ -1758,7 +1899,7 @@ const ERPanel = ({
 
   // ========== Image Handling ==========
 
-  const handleImageUpload = (unitId, event) => {
+  const handleImageUpload = useCallback((unitId, event) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
@@ -1787,9 +1928,9 @@ const ERPanel = ({
     });
 
     event.target.value = '';
-  };
+  }, [erData, onChange]);
 
-  const removeImage = (unitId, imageId) => {
+  const removeImage = useCallback((unitId, imageId) => {
     const removeImageRecursive = (units) => units.map(u => {
       if (u.id === unitId) {
         return { ...u, exampleImages: (u.exampleImages || []).filter(img => img.id !== imageId) };
@@ -1797,10 +1938,10 @@ const ERPanel = ({
       return { ...u, subInformationUnits: removeImageRecursive(u.subInformationUnits || []) };
     });
     onChange({ ...erData, informationUnits: removeImageRecursive(erData?.informationUnits || []) });
-  };
+  }, [erData, onChange]);
 
   // Load ER from library
-  const handleLoadSubER = (libraryER) => {
+  const handleLoadSubER = useCallback((libraryER) => {
     if (selectedUnitForSubER) {
       if (onAddSubER) {
         onAddSubER(selectedUnitForSubER, libraryER);
@@ -1819,7 +1960,7 @@ const ERPanel = ({
     }
     setShowLibrary(false);
     setSelectedUnitForSubER(null);
-  };
+  }, [selectedUnitForSubER, onAddSubER, onChange, erData, onLoadFromLibrary]);
 
   // ========== Count Functions ==========
 
@@ -1924,13 +2065,12 @@ const ERPanel = ({
 
             {/* Definition */}
             <div className="er-card-field">
-              <label>Definition</label>
-              <textarea
+              <DefinitionWithFigures
                 value={unit.definition || ''}
-                onChange={(e) => updateUnit(unit.id, { definition: e.target.value }, subERId)}
+                figures={unit.definitionFigures || []}
+                onChange={(val) => updateUnit(unit.id, { definition: val }, subERId)}
+                onFiguresChange={(figs) => updateUnit(unit.id, { definitionFigures: figs }, subERId)}
                 placeholder="Describe this information unit..."
-                rows={2}
-                className="er-textarea"
               />
             </div>
 
@@ -2365,13 +2505,14 @@ const ERPanel = ({
                 />
               </div>
               <div className="er-details-field er-details-field-desc">
-                <label>Description</label>
-                <input
-                  type="text"
+                <DefinitionWithFigures
+                  label="Description"
                   value={selectedErData.description || ''}
-                  onChange={(e) => onUpdateER?.(selectedErId, { description: e.target.value })}
+                  figures={selectedErData.descriptionFigures || []}
+                  onChange={(val) => onUpdateER?.(selectedErId, { description: val })}
+                  onFiguresChange={(figs) => onUpdateER?.(selectedErId, { descriptionFigures: figs })}
                   placeholder="Brief description"
-                  className="er-input"
+                  rows={1}
                 />
               </div>
             </div>
@@ -2583,15 +2724,16 @@ const ERPanel = ({
                     </div>
                   </div>
                   <div className="er-detail-field">
-                    <label>Definition</label>
-                    <textarea
+                    <DefinitionWithFigures
                       value={selectedItem.data?.definition || ''}
-                      onChange={(e) => {
-                        setSelectedItem(prev => ({ ...prev, data: { ...prev.data, definition: e.target.value } }));
+                      figures={selectedItem.data?.definitionFigures || []}
+                      onChange={(val) => {
+                        setSelectedItem(prev => ({ ...prev, data: { ...prev.data, definition: val } }));
+                      }}
+                      onFiguresChange={(figs) => {
+                        setSelectedItem(prev => ({ ...prev, data: { ...prev.data, definitionFigures: figs } }));
                       }}
                       placeholder="Describe this information unit..."
-                      rows={2}
-                      className="er-textarea"
                     />
                   </div>
                   <div className="er-detail-field">
@@ -2620,6 +2762,7 @@ const ERPanel = ({
                           }));
                           // Track newly added mapping for auto-scroll and focus
                           newlyAddedMappingRef.current = { mappingId: newMapping.id, unitId: selectedItem.id };
+                          setMappingScrollTrigger(c => c + 1);
                         }}
                       >
                         + Add Mapping
@@ -2809,11 +2952,11 @@ const ERPanel = ({
 
         {/* Mapping Search Modal for ER-first mode */}
         {showMappingSearch && (
-          <div className="er-modal-overlay" onClick={() => setShowMappingSearch(false)}>
+          <div className="er-modal-overlay" onClick={closeMappingSearch}>
             <div className="er-modal er-modal-search" onClick={(e) => e.stopPropagation()}>
               <div className="er-modal-header">
                 <h3>Search Matching External Information Item</h3>
-                <button className="er-close-btn" onClick={() => setShowMappingSearch(false)}><CloseIcon size={16} /></button>
+                <button className="er-close-btn" onClick={closeMappingSearch}><CloseIcon size={16} /></button>
               </div>
               <div className="er-modal-body">
                 <div className="er-search-controls">
@@ -2882,7 +3025,7 @@ const ERPanel = ({
                     <div className="er-search-empty er-search-error">
                       <span>{mappingSearchError}</span>
                     </div>
-                  ) : mappingSearchResults.length === 0 ? (
+                  ) : !Array.isArray(mappingSearchResults) || mappingSearchResults.length === 0 ? (
                     <div className="er-search-empty">
                       {mappingSearchQuery.trim() ? (
                         <span>No results found. Try a different search term.</span>
@@ -3127,11 +3270,11 @@ const ERPanel = ({
 
       {/* Mapping Search Modal */}
       {showMappingSearch && (
-        <div className="er-modal-overlay" onClick={() => setShowMappingSearch(false)}>
+        <div className="er-modal-overlay" onClick={closeMappingSearch}>
           <div className="er-modal er-modal-search" onClick={(e) => e.stopPropagation()}>
             <div className="er-modal-header">
               <h3>Search Matching External Information Item</h3>
-              <button className="er-close-btn" onClick={() => setShowMappingSearch(false)}><CloseIcon size={16} /></button>
+              <button className="er-close-btn" onClick={closeMappingSearch}><CloseIcon size={16} /></button>
             </div>
             <div className="er-modal-body">
               <div className="er-search-controls">
@@ -3390,4 +3533,4 @@ const ERPanel = ({
   );
 };
 
-export default ERPanel;
+export default React.memo(ERPanel);

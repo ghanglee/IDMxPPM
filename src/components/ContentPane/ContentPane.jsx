@@ -13,6 +13,7 @@ import {
   ExpandAllIcon,
   CollapseAllIcon
 } from '../icons';
+import { normalizeRegionCode } from '../../utils/idmXmlParser';
 import './ContentPane.css';
 
 // ============================================================================
@@ -921,10 +922,17 @@ const RegionSelector = ({ regions = [], options = [], onChange, label }) => {
     onChange(regions.filter(r => r !== regionToRemove));
   };
 
-  // Get label for a region value
+  // Get label for a region value (handles alpha-3 codes from imported data)
   const getRegionLabel = (value) => {
     const option = options.find(o => o.value === value);
-    return option ? option.label : value;
+    if (option) return option.label;
+    // Try normalizing alpha-3 to alpha-2
+    const normalized = normalizeRegionCode(value);
+    if (normalized !== value) {
+      const normOption = options.find(o => o.value === normalized);
+      if (normOption) return normOption.label;
+    }
+    return value;
   };
 
   // Filter out already selected regions from dropdown
@@ -1667,19 +1675,19 @@ const ContentPane = ({
 
   if (!type) return null;
 
-  const handleHeaderFieldChange = (field, value) => {
+  const handleHeaderFieldChange = useCallback((field, value) => {
     onHeaderChange?.({
       ...headerData,
       [field]: value
     });
-  };
+  }, [onHeaderChange, headerData]);
 
-  const handleOptionalFieldsChange = (category, fields) => {
+  const handleOptionalFieldsChange = useCallback((category, fields) => {
     setVisibleOptionalFields(prev => ({
       ...prev,
       [category]: fields
     }));
-  };
+  }, []);
 
   // Generate IDM Code
   const idmCode = useMemo(() => {
@@ -2764,4 +2772,4 @@ const ContentPane = ({
   );
 };
 
-export default ContentPane;
+export default React.memo(ContentPane);

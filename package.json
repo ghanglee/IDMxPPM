@@ -18,7 +18,8 @@
     "prebuild:all": "npm run icons",
     "build:win": "vite build && electron-builder --win",
     "build:mac": "vite build && electron-builder --mac",
-    "build:all": "vite build && electron-builder --win --mac"
+    "build:linux": "vite build && electron-builder --linux",
+    "build:all": "vite build && electron-builder --win --mac --linux"
   },
   "dependencies": {
     "bpmn-js": "^18.10.1",
@@ -102,11 +103,11 @@
     },
     "linux": {
       "target": [
-        "AppImage",
-        "deb"
+        "AppImage"
       ],
       "icon": "public/icon.png",
-      "category": "Development"
+      "category": "Development",
+      "maintainer": "Building Informatics Group (BIG), Yonsei University <big@yonsei.ac.kr>"
     },
     "nsis": {
       "oneClick": false,

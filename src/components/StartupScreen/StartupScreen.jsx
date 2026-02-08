@@ -12,7 +12,7 @@ const BUILD_DATE = typeof __BUILD_DATE__ !== 'undefined' ? __BUILD_DATE__ : 'dev
  * 2. Sample Project - Start with a sample IDM specification
  * 3. Open Project - Open an existing project file
  */
-const StartupScreen = ({ onNewBlank, onNewSample, onOpen }) => {
+const StartupScreen = ({ onNewBlank, onNewSample, onOpen, onOpenFromServer, isServerConnected }) => {
   return (
     <div className="startup-screen">
       <div className="startup-content">
@@ -75,6 +75,23 @@ const StartupScreen = ({ onNewBlank, onNewSample, onOpen }) => {
               <span className="startup-option-desc">Open an existing IDM project, idmXML, or BPMN file</span>
             </div>
           </button>
+
+          {isServerConnected && (
+            <button className="startup-option startup-option-server" onClick={onOpenFromServer}>
+              <div className="startup-option-icon">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
+                  <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
+                  <line x1="6" y1="6" x2="6.01" y2="6" />
+                  <line x1="6" y1="18" x2="6.01" y2="18" />
+                </svg>
+              </div>
+              <div className="startup-option-text">
+                <span className="startup-option-title">Open from Server</span>
+                <span className="startup-option-desc">Browse IDM specifications from the central database</span>
+              </div>
+            </button>
+          )}
         </div>
 
         <div className="startup-footer">
