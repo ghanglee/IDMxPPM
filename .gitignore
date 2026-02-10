@@ -17,6 +17,9 @@ samples/xPPM-neo/
 # Test scripts
 test-main*.js
 
+# Claude Code project instructions (local only)
+CLAUDE.md
+
 # IDE
 .idea/
 .vscode/
