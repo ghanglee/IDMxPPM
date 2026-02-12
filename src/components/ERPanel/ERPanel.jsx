@@ -864,10 +864,18 @@ const ERPanel = ({
   const commitCurrentEdit = useCallback(() => {
     if (!selectedItem || !onUpdateER) return;
 
+    // Trim leading/trailing whitespace from text fields
+    const trim = (v) => (typeof v === 'string' ? v.trim() : v);
+
     if (selectedItem.type === 'iu') {
       const parentErId = selectedItem.erParent || selectedIULocation?.parentErId;
       if (parentErId) {
-        const updatedIUData = selectedItem.data;
+        const updatedIUData = {
+          ...selectedItem.data,
+          name: trim(selectedItem.data?.name),
+          definition: trim(selectedItem.data?.definition),
+          examples: trim(selectedItem.data?.examples)
+        };
         const updateIURecursive = (ius) => ius.map(iu =>
           iu.id === selectedItem.id
             ? { ...iu, ...updatedIUData }
@@ -887,8 +895,9 @@ const ERPanel = ({
       }
     } else if (selectedItem.type === 'er' || selectedItem.type === 'subEr') {
       onUpdateER(selectedItem.id, {
-        name: selectedItem.data?.name,
-        description: selectedItem.data?.description
+        name: trim(selectedItem.data?.name),
+        description: trim(selectedItem.data?.description),
+        descriptionFigures: selectedItem.data?.descriptionFigures
       });
     }
   }, [selectedItem, selectedIULocation, erHierarchy, onUpdateER]);
@@ -2390,12 +2399,25 @@ const ERPanel = ({
             <span className="er-title-icon"><FolderIcon size={20} /></span>
             <div>
               <h3>Individual ER</h3>
-              <p className="er-data-object-name">{selectedErData?.name || 'No ER selected'}</p>
+              <p className="er-data-object-name">
+                {selectedErData?.name || 'No ER selected'}
+                {selectedErId && selectedErData && (
+                  <button
+                    className={`er-info-btn ${selectedItem?.id === selectedErId && selectedItem?.type === 'er' ? 'er-info-btn-active' : ''}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      commitCurrentEdit();
+                      setSelectedItem({ id: selectedErId, type: 'er', data: selectedErData });
+                    }}
+                    title="Show ER details"
+                  >
+                    i
+                  </button>
+                )}
+              </p>
             </div>
           </div>
-          <div className="er-header-right">
-            <button className="er-close-btn" onClick={onClose}><CloseIcon size={16} /></button>
-          </div>
+          <button className="er-close-btn" onClick={onClose} title="Close ER panel"><CloseIcon size={16} /></button>
         </div>
 
         {/* Toolbar for Information Units (ER manipulation is in ER Hierarchy Pane) */}
@@ -2489,35 +2511,6 @@ const ERPanel = ({
             <CollapseAllIcon size={14} />
           </button>
         </div>
-
-        {/* ER Details Section - Name and Description */}
-        {selectedErId && selectedErData && (
-          <div className="er-details-section">
-            <div className="er-details-row">
-              <div className="er-details-field er-details-field-name">
-                <label>ER Name</label>
-                <input
-                  type="text"
-                  value={selectedErData.name || ''}
-                  onChange={(e) => onUpdateER?.(selectedErId, { name: e.target.value })}
-                  placeholder="Exchange Requirement name"
-                  className="er-input"
-                />
-              </div>
-              <div className="er-details-field er-details-field-desc">
-                <DefinitionWithFigures
-                  label="Description"
-                  value={selectedErData.description || ''}
-                  figures={selectedErData.descriptionFigures || []}
-                  onChange={(val) => onUpdateER?.(selectedErId, { description: val })}
-                  onFiguresChange={(figs) => onUpdateER?.(selectedErId, { descriptionFigures: figs })}
-                  placeholder="Brief description"
-                  rows={1}
-                />
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Information Units Section Header */}
         {selectedErId && (
@@ -2897,14 +2890,17 @@ const ERPanel = ({
                     />
                   </div>
                   <div className="er-detail-field">
-                    <label>Description</label>
-                    <textarea
+                    <DefinitionWithFigures
+                      label="Description"
                       value={selectedItem.data?.description || ''}
-                      onChange={(e) => {
-                        setSelectedItem(prev => ({ ...prev, data: { ...prev.data, description: e.target.value } }));
+                      figures={selectedItem.data?.descriptionFigures || []}
+                      onChange={(val) => {
+                        setSelectedItem(prev => ({ ...prev, data: { ...prev.data, description: val } }));
+                      }}
+                      onFiguresChange={(figs) => {
+                        setSelectedItem(prev => ({ ...prev, data: { ...prev.data, descriptionFigures: figs } }));
                       }}
                       placeholder="Brief description of this Exchange Requirement..."
-                      className="er-input er-textarea"
                       rows={2}
                     />
                   </div>

@@ -49,7 +49,8 @@ const arrayToString = (value, separator = ', ') => {
 
 /**
  * Generate XML for images per idmXSD V2 specification
- * Per schema, image element has only caption and filePath attributes (no inline base64)
+ * For standalone idmXML export, base64 data is embedded inline.
+ * For ZIP bundle export, only filePath is written (images are in separate files).
  * @param {Array} images - Array of image objects
  * @param {string} indent - Indentation string
  * @returns {string[]} Array of XML lines
@@ -62,10 +63,17 @@ const generateImagesXml = (images, indent = '      ') => {
 
   images.forEach((img, index) => {
     const caption = img.caption || img.name || `Figure ${index + 1}`;
-    // Per idmXSD V2, image requires filePath attribute
-    // Generate synthetic path for base64 images (they should be bundled separately)
-    const filePath = img.filePath || img.name || `images/figure_${index + 1}.png`;
-    lines.push(`${indent}<image caption="${escapeXml(caption)}" filePath="${escapeXml(filePath)}"/>`);
+    const mimeType = img.type || 'image/png';
+
+    // If base64 data is available (standalone export), embed it inline
+    if (img.data && img.data.startsWith('data:')) {
+      const base64Data = img.data.split(',')[1] || '';
+      lines.push(`${indent}<image caption="${escapeXml(caption)}" mimeType="${escapeXml(mimeType)}" encoding="base64">${base64Data}</image>`);
+    } else {
+      // filePath-only (ZIP bundle export where images are separate files)
+      const filePath = img.filePath || img.name || `images/figure_${index + 1}.png`;
+      lines.push(`${indent}<image caption="${escapeXml(caption)}" filePath="${escapeXml(filePath)}"/>`);
+    }
   });
 
   return lines;

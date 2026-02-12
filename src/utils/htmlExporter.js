@@ -198,6 +198,7 @@ const collectImagesFromUnits = (units, images, erName) => {
 export const generateStandaloneHtml = ({
   headerData,
   erDataMap,
+  erHierarchy,
   bpmnSvg,
   customXsltContent
 }) => {
@@ -604,7 +605,7 @@ export const generateStandaloneHtml = ({
   ` : ''}
 
   <!-- Exchange Requirements -->
-  ${generateERsSection(erDataMap)}
+  ${generateERsSection(erDataMap, erHierarchy)}
 
   <div class="footer">
     Generated from IDMxPPM neo-Seoul | ISO 29481-3 (idmXML) Compliant
@@ -776,7 +777,52 @@ const generateActorsSection = (actors) => {
   `;
 };
 
-const generateERsSection = (erDataMap) => {
+/**
+ * Generate HTML for a single ER (recursive for subERs)
+ */
+const generateErHtml = (er, level = 3) => {
+  const headingTag = `h${Math.min(level, 6)}`;
+  let html = `
+  <div class="er-section">
+    <${headingTag} class="er-title">${escapeHtml(er.name || 'Unnamed ER')}</${headingTag}>
+
+    ${er.description ? `<div class="description">${escapeHtml(er.description)}</div>` : ''}
+    ${generateFiguresHtml(er.descriptionFigures)}
+
+    ${er.informationUnits && er.informationUnits.length > 0 ? `
+      <h${Math.min(level + 1, 6)}>Information Units</h${Math.min(level + 1, 6)}>
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Data Type</th>
+            <th>Required</th>
+            <th>Definition</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${er.informationUnits.map(iu => generateInfoUnitRow(iu)).join('')}
+        </tbody>
+      </table>
+      ${generateInfoUnitImages(er.informationUnits)}
+    ` : ''}
+
+    ${er.subERs && er.subERs.length > 0 ? er.subERs.map(subEr => generateErHtml(subEr, level + 1)).join('') : ''}
+  </div>
+  `;
+  return html;
+};
+
+const generateERsSection = (erDataMap, erHierarchy) => {
+  // Prefer erHierarchy (ER-first architecture) over legacy erDataMap
+  if (erHierarchy && erHierarchy.length > 0) {
+    let html = '<h2>Exchange Requirements</h2>';
+    erHierarchy.forEach(er => {
+      html += generateErHtml(er, 3);
+    });
+    return html;
+  }
+
   if (!erDataMap || Object.keys(erDataMap).length === 0) {
     return '<p><em>No Exchange Requirements defined.</em></p>';
   }
@@ -784,32 +830,7 @@ const generateERsSection = (erDataMap) => {
   let html = '<h2>Exchange Requirements</h2>';
 
   Object.entries(erDataMap).forEach(([dataObjectId, er]) => {
-    html += `
-    <div class="er-section">
-      <h3 class="er-title">${escapeHtml(er.name || dataObjectId)}</h3>
-
-      ${er.description ? `<div class="description">${escapeHtml(er.description)}</div>` : ''}
-      ${generateFiguresHtml(er.descriptionFigures)}
-
-      ${er.informationUnits && er.informationUnits.length > 0 ? `
-        <h4>Information Units</h4>
-        <table>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Data Type</th>
-              <th>Required</th>
-              <th>Definition</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${er.informationUnits.map(iu => generateInfoUnitRow(iu)).join('')}
-          </tbody>
-        </table>
-        ${generateInfoUnitImages(er.informationUnits)}
-      ` : ''}
-    </div>
-    `;
+    html += generateErHtml(er, 3);
   });
 
   return html;

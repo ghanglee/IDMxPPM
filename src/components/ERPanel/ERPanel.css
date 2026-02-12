@@ -17,29 +17,47 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--border-primary);
+  gap: 8px;
+  min-height: 0;
 }
 
 .er-panel-title {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
 }
 
-.er-title-icon { font-size: 24px; }
+.er-title-icon { font-size: 24px; flex-shrink: 0; }
 
 .er-panel-title h3 {
   font-size: 16px;
   font-weight: 600;
   color: var(--text-primary);
   margin: 0;
+  white-space: nowrap;
+}
+
+.er-panel-title > div {
+  min-width: 0;
+  overflow: hidden;
 }
 
 .er-data-object-name {
-  font-size: 12px;
-  color: var(--text-muted);
-  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text-primary);
+  font-weight: 500;
+  margin: 2px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .er-data-object-name span {
@@ -47,9 +65,45 @@
   font-weight: 500;
 }
 
+/* Info button (i) - inline next to ER name */
+.er-info-btn {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid var(--text-muted);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  font-style: italic;
+  font-family: Georgia, 'Times New Roman', serif;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  padding: 0;
+  line-height: 1;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.er-info-btn:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  background: var(--bg-tertiary);
+}
+
+.er-info-btn-active {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  background: var(--accent-primary-transparent, rgba(0, 122, 204, 0.15));
+}
+
+/* Close button - always visible, never hidden by narrow window */
 .er-close-btn {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -57,8 +111,9 @@
   border: none;
   border-radius: var(--radius-sm);
   color: var(--text-muted);
-  font-size: 20px;
+  font-size: 18px;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .er-close-btn:hover {
@@ -1902,53 +1957,20 @@
   height: 14px;
 }
 
-/* ER Details Section (Name, Description) */
-.er-details-section {
-  padding: 12px;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-primary);
-}
-
-.er-details-row {
-  display: flex;
-  gap: 12px;
-}
-
-.er-details-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.er-details-field label {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-}
-
-.er-details-field-name {
-  flex: 2;
-}
-
-.er-details-field-desc {
-  flex: 3;
-}
-
 /* IU Section Header */
 .er-iu-section-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
+  padding: 4px 12px;
   background: var(--bg-tertiary);
   border-bottom: 1px solid var(--border-primary);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.3px;
+  flex-shrink: 0;
 }
 
 .er-iu-count {

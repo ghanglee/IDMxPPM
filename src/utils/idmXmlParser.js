@@ -77,8 +77,17 @@ const parseFigures = (sectionElement) => {
   const figures = [];
   if (!sectionElement) return figures;
 
+  // Look for both <figure> elements (legacy) and <image> elements (idmXSD V2 generator output)
   const figureElements = getDirectChildren(sectionElement, 'figure');
-  figureElements.forEach((fig, index) => {
+  const imageElements = getDirectChildren(sectionElement, 'image');
+
+  // Also check inside <description> children for nested <image> elements
+  const descriptionEl = getFirstChild(sectionElement, 'description');
+  const descImageElements = descriptionEl ? getDirectChildren(descriptionEl, 'image') : [];
+
+  const allElements = [...figureElements, ...imageElements, ...descImageElements];
+
+  allElements.forEach((fig, index) => {
     const caption = fig.getAttribute('caption') || `Figure ${index + 1}`;
     const mimeType = fig.getAttribute('mimeType') || 'image/png';
     const encoding = fig.getAttribute('encoding');
@@ -108,6 +117,12 @@ const parseFigures = (sectionElement) => {
 
   return figures;
 };
+
+/**
+ * Trim leading/trailing whitespace from a string value.
+ * Returns empty string for null/undefined.
+ */
+const trimStr = (val) => (val ? val.trim() : '');
 
 /**
  * Helper: get direct child elements by tag name (namespace-safe).
@@ -205,15 +220,15 @@ export const parseIdmXml = (xmlContent) => {
     // Parse specId (IDM metadata) - including GUIDs for persistence
     const specId = getFirstChild(idmRoot, 'specId');
     if (specId) {
-      result.headerData.idmGuid = specId.getAttribute('guid') || '';
-      result.headerData.shortTitle = specId.getAttribute('shortTitle') || '';
-      result.headerData.title = specId.getAttribute('fullTitle') || specId.getAttribute('shortTitle') || '';
-      result.headerData.subTitle = specId.getAttribute('subTitle') || '';
-      result.headerData.idmCode = specId.getAttribute('idmCode') || '';
-      result.headerData.localCode = specId.getAttribute('localCode') || '';
-      result.headerData.version = specId.getAttribute('version') || '1.0';
-      result.headerData.status = specId.getAttribute('documentStatus') || 'WD';
-      result.headerData.localDocumentStatus = specId.getAttribute('localDocumentStatus') || '';
+      result.headerData.idmGuid = trimStr(specId.getAttribute('guid'));
+      result.headerData.shortTitle = trimStr(specId.getAttribute('shortTitle'));
+      result.headerData.title = trimStr(specId.getAttribute('fullTitle') || specId.getAttribute('shortTitle'));
+      result.headerData.subTitle = trimStr(specId.getAttribute('subTitle'));
+      result.headerData.idmCode = trimStr(specId.getAttribute('idmCode'));
+      result.headerData.localCode = trimStr(specId.getAttribute('localCode'));
+      result.headerData.version = trimStr(specId.getAttribute('version')) || '1.0';
+      result.headerData.status = trimStr(specId.getAttribute('documentStatus')) || 'WD';
+      result.headerData.localDocumentStatus = trimStr(specId.getAttribute('localDocumentStatus'));
     }
 
     // Parse authoring section (use getFirstChild for namespace safety)
@@ -409,7 +424,7 @@ export const parseIdmXml = (xmlContent) => {
       const summarySection = getFirstChild(uc, 'summary');
       if (summarySection) {
         const summaryDesc = getFirstChild(summarySection, 'description');
-        result.headerData.summary = summaryDesc?.getAttribute('title') || summaryDesc?.textContent || '';
+        result.headerData.summary = trimStr(summaryDesc?.getAttribute('title') || summaryDesc?.textContent);
         const summaryFigs = parseFigures(summarySection);
         if (summaryFigs.length > 0) {
           result.headerData.summaryFigures = summaryFigs;
@@ -420,7 +435,7 @@ export const parseIdmXml = (xmlContent) => {
       const aimAndScopeSection = getFirstChild(uc, 'aimAndScope');
       if (aimAndScopeSection) {
         const aimAndScopeDesc = getFirstChild(aimAndScopeSection, 'description');
-        const aimAndScopeContent = aimAndScopeDesc?.getAttribute('title') || aimAndScopeDesc?.textContent || '';
+        const aimAndScopeContent = trimStr(aimAndScopeDesc?.getAttribute('title') || aimAndScopeDesc?.textContent);
         result.headerData.aimAndScope = aimAndScopeContent;
         result.headerData.objectives = aimAndScopeContent;
         const aimAndScopeFigs = parseFigures(aimAndScopeSection);
@@ -432,14 +447,14 @@ export const parseIdmXml = (xmlContent) => {
       // Language
       const language = getFirstChild(uc, 'language');
       if (language) {
-        result.headerData.language = language.textContent || 'EN';
+        result.headerData.language = trimStr(language.textContent) || 'EN';
       }
 
       // Benefits - with optional figures
       const benefitsSection = getFirstChild(uc, 'benefits');
       if (benefitsSection) {
         const benefitsDesc = getFirstChild(benefitsSection, 'description');
-        result.headerData.benefits = benefitsDesc?.getAttribute('title') || benefitsDesc?.textContent || '';
+        result.headerData.benefits = trimStr(benefitsDesc?.getAttribute('title') || benefitsDesc?.textContent);
         const benefitsFigs = parseFigures(benefitsSection);
         if (benefitsFigs.length > 0) {
           result.headerData.benefitsFigures = benefitsFigs;
@@ -450,7 +465,7 @@ export const parseIdmXml = (xmlContent) => {
       const limitationsSection = getFirstChild(uc, 'limitations');
       if (limitationsSection) {
         const limitationsDesc = getFirstChild(limitationsSection, 'description');
-        result.headerData.limitations = limitationsDesc?.getAttribute('title') || limitationsDesc?.textContent || '';
+        result.headerData.limitations = trimStr(limitationsDesc?.getAttribute('title') || limitationsDesc?.textContent);
         const limitationsFigs = parseFigures(limitationsSection);
         if (limitationsFigs.length > 0) {
           result.headerData.limitationsFigures = limitationsFigs;
@@ -884,19 +899,19 @@ const parseErElement = (erElement) => {
   // Parse specId - namespace-safe
   const specId = getFirstChild(erElement, 'specId');
   if (specId) {
-    er.guid = specId.getAttribute('guid') || '';
-    er.shortTitle = specId.getAttribute('shortTitle') || '';
+    er.guid = trimStr(specId.getAttribute('guid'));
+    er.shortTitle = trimStr(specId.getAttribute('shortTitle'));
 
-    const idmCode = specId.getAttribute('idmCode') || '';
+    const idmCode = trimStr(specId.getAttribute('idmCode'));
     const idFromCode = idmCode.startsWith('ER-') ? idmCode.substring(3) : idmCode;
     er.id = idFromCode || er.guid || `ER-${Date.now()}`;
-    er.name = er.shortTitle || specId.getAttribute('fullTitle') || '';
+    er.name = er.shortTitle || trimStr(specId.getAttribute('fullTitle'));
   }
 
   // Parse description - namespace-safe (with optional image children)
   const description = getFirstChild(erElement, 'description');
   if (description) {
-    er.description = description.getAttribute('title') || description.textContent || '';
+    er.description = trimStr(description.getAttribute('title') || description.textContent);
     // Parse figures from description's image children
     const descImages = getDirectChildren(description, 'image');
     if (descImages.length > 0) {
@@ -949,11 +964,11 @@ const parseErElement = (erElement) => {
  */
 const parseInformationUnit = (iuElement) => {
   const unit = {
-    id: iuElement.getAttribute('id') || `IU-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    name: iuElement.getAttribute('name') || '',
-    dataType: iuElement.getAttribute('dataType') || 'String',
+    id: trimStr(iuElement.getAttribute('id')) || `IU-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    name: trimStr(iuElement.getAttribute('name')),
+    dataType: trimStr(iuElement.getAttribute('dataType')) || 'String',
     isMandatory: iuElement.getAttribute('isMandatory') === 'true',
-    definition: iuElement.getAttribute('definition') || '',
+    definition: trimStr(iuElement.getAttribute('definition')),
     definitionFigures: [],
     examples: '',
     exampleImages: [],
@@ -965,7 +980,7 @@ const parseInformationUnit = (iuElement) => {
   const defDesc = getFirstChild(iuElement, 'description');
   if (defDesc) {
     // If there's a description child, its title overrides the attribute (or supplements it)
-    const descTitle = defDesc.getAttribute('title') || '';
+    const descTitle = trimStr(defDesc.getAttribute('title'));
     if (descTitle) {
       unit.definition = descTitle;
     }
@@ -997,7 +1012,7 @@ const parseInformationUnit = (iuElement) => {
   const examplesEl = getFirstChild(iuElement, 'examples');
   const examplesDesc = examplesEl ? getFirstChild(examplesEl, 'description') : null;
   if (examplesDesc) {
-    unit.examples = examplesDesc.getAttribute('title') || examplesDesc.textContent || '';
+    unit.examples = trimStr(examplesDesc.getAttribute('title') || examplesDesc.textContent);
   }
 
   // Parse example images (both embedded base64 and file references)

@@ -8,20 +8,96 @@ import JSZip from 'jszip';
 import { generateIdmXml } from './idmXmlGenerator';
 
 /**
+ * Extract images from a single ER (and its subERs recursively)
+ * @param {Object} er - ER data object
+ * @param {Array} images - Mutable array to push extracted images into
+ * @returns {Object} cloned ER with filePaths replacing base64 data
+ */
+const extractImagesFromEr = (er, images) => {
+  if (!er) return er;
+  const cloned = JSON.parse(JSON.stringify(er));
+
+  // Extract ER description figures
+  if (cloned.descriptionFigures && cloned.descriptionFigures.length > 0) {
+    cloned.descriptionFigures = cloned.descriptionFigures.map((img, imgIndex) => {
+      if (img.data && img.data.startsWith('data:')) {
+        const ext = getExtensionFromMimeType(img.type || 'image/png');
+        const fileName = `images/er_${sanitizeFilename(cloned.id || 'unknown')}_desc_img${imgIndex}.${ext}`;
+        images.push({ fileName, data: img.data, type: img.type || 'image/png', caption: img.caption || img.name });
+        return { ...img, filePath: fileName, data: undefined };
+      }
+      return img;
+    });
+  }
+
+  const processUnit = (unit, path) => {
+    // Extract IU definition figures
+    if (unit.definitionFigures && unit.definitionFigures.length > 0) {
+      unit.definitionFigures = unit.definitionFigures.map((img, imgIndex) => {
+        if (img.data && img.data.startsWith('data:')) {
+          const ext = getExtensionFromMimeType(img.type || 'image/png');
+          const fileName = `images/er_${sanitizeFilename(cloned.id || 'unknown')}_iu${path}_def${imgIndex}.${ext}`;
+          images.push({ fileName, data: img.data, type: img.type || 'image/png', caption: img.caption || img.name });
+          return { ...img, filePath: fileName, data: undefined };
+        }
+        return img;
+      });
+    }
+    // Extract IU example images
+    if (unit.exampleImages && unit.exampleImages.length > 0) {
+      unit.exampleImages = unit.exampleImages.map((img, imgIndex) => {
+        if (img.data && img.data.startsWith('data:')) {
+          const ext = getExtensionFromMimeType(img.type || 'image/png');
+          const fileName = `images/er_${sanitizeFilename(cloned.id || 'unknown')}_iu${path}_img${imgIndex}.${ext}`;
+          images.push({ fileName, data: img.data, type: img.type || 'image/png', caption: img.caption || img.name });
+          return { ...img, filePath: fileName, data: undefined };
+        }
+        return img;
+      });
+    }
+    if (unit.subInformationUnits && unit.subInformationUnits.length > 0) {
+      unit.subInformationUnits.forEach((subUnit, subIndex) => {
+        processUnit(subUnit, `${path}_sub${subIndex}`);
+      });
+    }
+  };
+
+  if (cloned.informationUnits) {
+    cloned.informationUnits.forEach((unit, unitIndex) => {
+      processUnit(unit, `${unitIndex}`);
+    });
+  }
+
+  // Recurse into subERs
+  if (cloned.subERs && cloned.subERs.length > 0) {
+    cloned.subERs = cloned.subERs.map(subEr => extractImagesFromEr(subEr, images));
+  }
+
+  return cloned;
+};
+
+/**
  * Extract images from ER data and prepare them for bundle
  * @param {Object} erDataMap - Map of data object IDs to ER data
  * @param {Object} headerData - Header data with figure images
- * @returns {Object} { images: Array, erDataMapWithPaths: Object, headerDataWithPaths: Object }
+ * @param {Array} erHierarchy - ER hierarchy (source of truth)
+ * @returns {Object} { images, erDataMapWithPaths, headerDataWithPaths, erHierarchyWithPaths }
  */
-const extractImages = (erDataMap, headerData) => {
+const extractImages = (erDataMap, headerData, erHierarchy) => {
   const images = [];
-  let imageCounter = 0;
 
   // Deep clone to avoid mutating original data
   const erDataMapWithPaths = JSON.parse(JSON.stringify(erDataMap || {}));
   const headerDataWithPaths = JSON.parse(JSON.stringify(headerData || {}));
 
-  // Extract images from ER information units
+  // Extract images from erHierarchy (source of truth for ER-first architecture)
+  let erHierarchyWithPaths = [];
+  if (erHierarchy && erHierarchy.length > 0) {
+    erHierarchyWithPaths = erHierarchy.map(er => extractImagesFromEr(er, images));
+  }
+
+  // Also extract from erDataMap for legacy/backup (avoid duplicates by checking filePath)
+  const existingFileNames = new Set(images.map(i => i.fileName));
   Object.entries(erDataMapWithPaths).forEach(([dataObjectId, er]) => {
     if (!er.informationUnits) return;
 
@@ -29,29 +105,25 @@ const extractImages = (erDataMap, headerData) => {
       if (unit.exampleImages && unit.exampleImages.length > 0) {
         unit.exampleImages = unit.exampleImages.map((img, imgIndex) => {
           if (img.data && img.data.startsWith('data:')) {
-            imageCounter++;
             const ext = getExtensionFromMimeType(img.type || 'image/png');
             const fileName = `images/er_${sanitizeFilename(er.id || dataObjectId)}_iu${path}_img${imgIndex}.${ext}`;
 
-            images.push({
-              fileName,
-              data: img.data,
-              type: img.type || 'image/png',
-              caption: img.caption || img.name
-            });
+            if (!existingFileNames.has(fileName)) {
+              images.push({
+                fileName,
+                data: img.data,
+                type: img.type || 'image/png',
+                caption: img.caption || img.name
+              });
+              existingFileNames.add(fileName);
+            }
 
-            return {
-              ...img,
-              filePath: fileName,
-              // Remove base64 data from exported structure
-              data: undefined
-            };
+            return { ...img, filePath: fileName, data: undefined };
           }
           return img;
         });
       }
 
-      // Process sub information units recursively
       if (unit.subInformationUnits && unit.subInformationUnits.length > 0) {
         unit.subInformationUnits.forEach((subUnit, subIndex) => {
           processUnit(subUnit, `${path}_sub${subIndex}`);
@@ -77,7 +149,6 @@ const extractImages = (erDataMap, headerData) => {
     if (headerDataWithPaths[section] && headerDataWithPaths[section].length > 0) {
       headerDataWithPaths[section] = headerDataWithPaths[section].map((fig, figIndex) => {
         if (fig.data && fig.data.startsWith('data:')) {
-          imageCounter++;
           const ext = getExtensionFromMimeType(fig.type || 'image/png');
           const fileName = `images/uc_${section}_fig${figIndex}.${ext}`;
 
@@ -102,7 +173,8 @@ const extractImages = (erDataMap, headerData) => {
   return {
     images,
     erDataMapWithPaths,
-    headerDataWithPaths
+    headerDataWithPaths,
+    erHierarchyWithPaths
   };
 };
 
@@ -161,20 +233,21 @@ export const exportIdmBundle = async ({
   bpmnXml,
   erDataMap,
   erHierarchy,
+  dataObjectErMap,
   dataObjects = [],
   erLibrary = []
 }) => {
   const zip = new JSZip();
 
   // Extract images and get modified data with file paths
-  const { images, erDataMapWithPaths, headerDataWithPaths } = extractImages(erDataMap, headerData);
+  const { images, erDataMapWithPaths, headerDataWithPaths, erHierarchyWithPaths } = extractImages(erDataMap, headerData, erHierarchy);
 
   // Generate idmXML with file paths for images
   const result = generateIdmXml({
     headerData: headerDataWithPaths,
     bpmnXml: null, // BPMN will be in separate file
     erDataMap: erDataMapWithPaths,
-    erHierarchy,
+    erHierarchy: erHierarchyWithPaths,
     dataObjects
   });
 
@@ -222,7 +295,9 @@ export const exportIdmBundle = async ({
     version: typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0',
     format: 'idm-bundle-project',
     headerData: { ...headerDataWithPaths, ...result.guids },
-    erDataMap: erDataMapWithPaths,
+    erHierarchy: erHierarchyWithPaths,       // ER-first: hierarchical ER tree (source of truth)
+    dataObjectErMap: dataObjectErMap || {},   // ER-first: BPMN data object to ER ID mapping
+    erDataMap: erDataMapWithPaths,            // Legacy: kept for backward compatibility
     erLibrary,
     bpmnXml: bpmnXml || null // Include BPMN in project.json as backup
   };

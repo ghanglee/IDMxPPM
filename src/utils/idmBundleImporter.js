@@ -19,6 +19,8 @@ export const importIdmBundle = async (zipData) => {
     const result = {
       headerData: {},
       bpmnXml: null,
+      erHierarchy: [],
+      dataObjectErMap: {},
       erDataMap: {},
       erLibrary: [],
       images: {}
@@ -45,6 +47,12 @@ export const importIdmBundle = async (zipData) => {
 
         if (projectData.headerData) {
           result.headerData = projectData.headerData;
+        }
+        if (projectData.erHierarchy) {
+          result.erHierarchy = projectData.erHierarchy;
+        }
+        if (projectData.dataObjectErMap) {
+          result.dataObjectErMap = projectData.dataObjectErMap;
         }
         if (projectData.erDataMap) {
           result.erDataMap = projectData.erDataMap;
@@ -105,6 +113,11 @@ export const importIdmBundle = async (zipData) => {
           if (!result.headerData || Object.keys(result.headerData).length === 0) {
             result.headerData = idmData.headerData;
           }
+          if (!result.erHierarchy || result.erHierarchy.length === 0) {
+            if (idmData.erHierarchy) {
+              result.erHierarchy = idmData.erHierarchy;
+            }
+          }
           if (!result.erDataMap || Object.keys(result.erDataMap).length === 0) {
             result.erDataMap = idmData.erDataMap;
           }
@@ -159,6 +172,7 @@ export const importIdmBundle = async (zipData) => {
 
       // Restore image data in ERs and headerData
       restoreImageData(result.erDataMap, result.images);
+      restoreErHierarchyImageData(result.erHierarchy, result.images);
       restoreHeaderImageData(result.headerData, result.images);
     }
 
@@ -200,16 +214,33 @@ const restoreImageData = (erDataMap, images) => {
   if (!erDataMap || !images) return;
 
   Object.values(erDataMap).forEach(er => {
+    // Restore ER description figures
+    if (er.descriptionFigures && er.descriptionFigures.length > 0) {
+      er.descriptionFigures = er.descriptionFigures.map(img => {
+        if (img.filePath && images[img.filePath]) {
+          return { ...img, data: images[img.filePath] };
+        }
+        return img;
+      });
+    }
+
     if (!er.informationUnits) return;
 
     const processUnit = (unit) => {
+      // Restore IU definition figures
+      if (unit.definitionFigures && unit.definitionFigures.length > 0) {
+        unit.definitionFigures = unit.definitionFigures.map(img => {
+          if (img.filePath && images[img.filePath]) {
+            return { ...img, data: images[img.filePath] };
+          }
+          return img;
+        });
+      }
+      // Restore IU example images
       if (unit.exampleImages && unit.exampleImages.length > 0) {
         unit.exampleImages = unit.exampleImages.map(img => {
           if (img.filePath && images[img.filePath]) {
-            return {
-              ...img,
-              data: images[img.filePath]
-            };
+            return { ...img, data: images[img.filePath] };
           }
           return img;
         });
@@ -222,6 +253,61 @@ const restoreImageData = (erDataMap, images) => {
 
     er.informationUnits.forEach(processUnit);
   });
+};
+
+/**
+ * Restore base64 image data in ER hierarchy (recursive) from extracted images
+ */
+const restoreErHierarchyImageData = (erHierarchy, images) => {
+  if (!erHierarchy || !images) return;
+
+  const restoreErImages = (er) => {
+    if (!er) return;
+
+    // Restore ER description figures
+    if (er.descriptionFigures && er.descriptionFigures.length > 0) {
+      er.descriptionFigures = er.descriptionFigures.map(img => {
+        if (img.filePath && images[img.filePath]) {
+          return { ...img, data: images[img.filePath] };
+        }
+        return img;
+      });
+    }
+
+    if (er.informationUnits) {
+      const processUnit = (unit) => {
+        // Restore IU definition figures
+        if (unit.definitionFigures && unit.definitionFigures.length > 0) {
+          unit.definitionFigures = unit.definitionFigures.map(img => {
+            if (img.filePath && images[img.filePath]) {
+              return { ...img, data: images[img.filePath] };
+            }
+            return img;
+          });
+        }
+        // Restore IU example images
+        if (unit.exampleImages && unit.exampleImages.length > 0) {
+          unit.exampleImages = unit.exampleImages.map(img => {
+            if (img.filePath && images[img.filePath]) {
+              return { ...img, data: images[img.filePath] };
+            }
+            return img;
+          });
+        }
+        if (unit.subInformationUnits && unit.subInformationUnits.length > 0) {
+          unit.subInformationUnits.forEach(processUnit);
+        }
+      };
+      er.informationUnits.forEach(processUnit);
+    }
+
+    // Recurse into subERs
+    if (er.subERs && er.subERs.length > 0) {
+      er.subERs.forEach(restoreErImages);
+    }
+  };
+
+  erHierarchy.forEach(restoreErImages);
 };
 
 /**

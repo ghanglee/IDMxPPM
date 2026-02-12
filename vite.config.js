@@ -10,7 +10,7 @@ export default defineConfig({
   base: './',
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
-    __BUILD_DATE__: JSON.stringify(new Date().toISOString().split('T')[0])
+    __BUILD_DATE__: JSON.stringify(new Date().toISOString().replace('T', ' ').substring(0, 19))
   },
   server: {
     port: 5173,

@@ -558,7 +558,7 @@ const App = () => {
     setHasActiveProject(true);
     setActivePane('specification');
 
-    setTimeout(() => { isLoadingProjectRef.current = false; }, 500);
+    setTimeout(() => { isLoadingProjectRef.current = false; }, 2000);
     extractDataObjectsAfterLoad();
     linkActorsToSwimlanesByName();
 
@@ -1939,6 +1939,23 @@ const App = () => {
 
   // Handle ER selection from list or content pane
   const handleSelectER = useCallback((erId) => {
+    // Validate current ER before switching (warn if missing description or IUs)
+    if (selectedErId && selectedErId !== erId) {
+      const currentEr = findErById(erHierarchy, selectedErId);
+      if (currentEr) {
+        const missingParts = [];
+        if (!currentEr.description || !currentEr.description.trim()) {
+          missingParts.push('a description');
+        }
+        if (!currentEr.informationUnits || currentEr.informationUnits.length === 0) {
+          missingParts.push('at least one Information Unit');
+        }
+        if (missingParts.length > 0) {
+          alert(`The ER "${currentEr.name || 'Unnamed ER'}" is missing ${missingParts.join(' and ')}. Please complete it later.`);
+        }
+      }
+    }
+
     // Set the selected ER ID for ER-first mode
     setSelectedErId(erId);
     // Also set selectedDataObject for legacy mode compatibility
@@ -1946,7 +1963,7 @@ const App = () => {
     setErPanelMode('detail');
     setShowERPanel(true);
     // Keep the ER list open on the left when selecting an individual ER
-  }, []);
+  }, [selectedErId, erHierarchy, findErById]);
 
   // Add new ER to the hierarchy
   // If an ER is selected, add as sub-ER of the selected ER
@@ -2080,21 +2097,59 @@ const App = () => {
           isLoadingProjectRef.current = true;
           const bundleData = await importIdmBundle(file);
 
+          // Determine ER hierarchy (new format or migrated from legacy)
+          let erHierarchyToImport = [];
+          let dataObjectErMapToImport = {};
+          let erDataMapToImport = null;
+
+          if (bundleData.erHierarchy && bundleData.erHierarchy.length > 0) {
+            erHierarchyToImport = bundleData.erHierarchy;
+            dataObjectErMapToImport = bundleData.dataObjectErMap || {};
+            erDataMapToImport = bundleData.erDataMap || null;
+          } else if (bundleData.erDataMap) {
+            const migrated = migrateErDataMap(bundleData.erDataMap);
+            erHierarchyToImport = migrated.erHierarchy;
+            dataObjectErMapToImport = migrated.dataObjectErMap;
+            erDataMapToImport = bundleData.erDataMap;
+          }
+
+          const hasBpmn = !!bundleData.bpmnXml;
+          const bpmnToImport = hasBpmn ? bundleData.bpmnXml : 'DEFAULT';
+          const isDirtyAfterImport = !hasBpmn;
+
+          // Check if we need to show root selection modal
+          if (handleErHierarchyImport(erHierarchyToImport, {
+            bpmnXml: bpmnToImport,
+            headerData: bundleData.headerData,
+            dataObjectErMap: dataObjectErMapToImport,
+            erDataMap: erDataMapToImport,
+            erLibrary: bundleData.erLibrary,
+            filePath: file.name,
+            isDirtyAfterImport,
+            source: 'project'
+          })) {
+            // Modal shown, import will be completed by modal handler
+            if (!hasBpmn) {
+              alert('Bundle imported. Note: No BPMN diagram found. The process map needs to be recreated manually.');
+            }
+            return;
+          }
+
+          // No modal needed - proceed with direct import
           if (bundleData.headerData) {
             setHeaderData(bundleData.headerData);
           }
-          if (bundleData.erDataMap) {
-            setErDataMap(bundleData.erDataMap);
+          setErHierarchy(erHierarchyToImport);
+          setDataObjectErMap(dataObjectErMapToImport);
+          if (erDataMapToImport) {
+            setErDataMap(erDataMapToImport);
           }
           if (bundleData.erLibrary) {
             setErLibrary(bundleData.erLibrary);
           }
-          if (bundleData.bpmnXml) {
-            setBpmnXml(bundleData.bpmnXml);
-            setIsDirty(false);
-          } else {
-            setBpmnXml('DEFAULT');
-            setIsDirty(true);
+          setBpmnXml(bpmnToImport);
+          setIsDirty(isDirtyAfterImport);
+          if (!hasBpmn) {
             alert('Bundle imported successfully. Note: No BPMN diagram found in the bundle. The process map needs to be recreated manually.');
           }
 
@@ -2102,7 +2157,7 @@ const App = () => {
           setValidationResults(null);
           setHasActiveProject(true);
           setActivePane('specification');
-          setTimeout(() => { isLoadingProjectRef.current = false; }, 500);
+          setTimeout(() => { isLoadingProjectRef.current = false; }, 2000);
           extractDataObjectsAfterLoad();
           linkActorsToSwimlanesByName(); // Sync actors with BPMN Pools
         } catch (zipErr) {
@@ -2163,7 +2218,7 @@ const App = () => {
         setValidationResults(null);
         setHasActiveProject(true);
         setActivePane('specification');
-        setTimeout(() => { isLoadingProjectRef.current = false; }, 500);
+        setTimeout(() => { isLoadingProjectRef.current = false; }, 2000);
         extractDataObjectsAfterLoad();
         linkActorsToSwimlanesByName();
       } else if (fileName.endsWith('.xml')) {
@@ -2228,7 +2283,7 @@ const App = () => {
             setValidationResults(null);
             setHasActiveProject(true);
             setActivePane('specification');
-            setTimeout(() => { isLoadingProjectRef.current = false; }, 500);
+            setTimeout(() => { isLoadingProjectRef.current = false; }, 2000);
             extractDataObjectsAfterLoad();
             linkActorsToSwimlanesByName();
           } catch (idmErr) {
@@ -2311,7 +2366,7 @@ const App = () => {
       // Load GDE-IDM sample project from file
       try {
         isLoadingProjectRef.current = true;
-        const response = await fetch('/samples/GDE-IDM.idm');
+        const response = await fetch('./samples/GDE-IDM.idm');
         if (!response.ok) {
           throw new Error(`Failed to fetch sample: ${response.status}`);
         }
@@ -2341,7 +2396,7 @@ const App = () => {
         if (projectData.erLibrary) {
           setErLibrary(projectData.erLibrary);
         }
-        setTimeout(() => { isLoadingProjectRef.current = false; }, 500);
+        setTimeout(() => { isLoadingProjectRef.current = false; }, 2000);
       } catch (err) {
         console.error('Failed to load sample project:', err);
         // Fallback to embedded sample data (v2.0 format)
@@ -2351,7 +2406,7 @@ const App = () => {
         setDataObjectErMap({ ...SAMPLE_DATA_OBJECT_ER_MAP });
         setErLibrary([...SAMPLE_ER_LIBRARY]);
         setBpmnXml(SAMPLE_BPMN_XML);
-        isLoadingProjectRef.current = false;
+        setTimeout(() => { isLoadingProjectRef.current = false; }, 2000);
       }
     } else {
       // Blank project
@@ -2794,6 +2849,7 @@ const App = () => {
             bpmnXml: currentBpmnXml,
             erDataMap: bundleErDataMap,
             erHierarchy,
+            dataObjectErMap,
             dataObjects,
             erLibrary
           }, `${fileName}.zip`);
@@ -2856,6 +2912,7 @@ const App = () => {
           const htmlContent = generateStandaloneHtml({
             headerData,
             erDataMap: htmlErDataMap,
+            erHierarchy,
             bpmnSvg,
             customXsltContent
           });
@@ -2967,7 +3024,7 @@ const App = () => {
       setActivePane('specification');
       extractDataObjectsAfterLoad();
 
-      setTimeout(() => { isLoadingProjectRef.current = false; }, 300);
+      setTimeout(() => { isLoadingProjectRef.current = false; }, 2000);
     } catch (err) {
       console.error('Failed to load spec from server:', err);
       isLoadingProjectRef.current = false;
@@ -3049,10 +3106,10 @@ const App = () => {
           extractDataObjectsAfterLoad();
           linkActorsToSwimlanesByName();
 
-          // Clear loading flag after a delay
+          // Clear loading flag after a delay (2s to let BPMN editor finish processing)
           setTimeout(() => {
             isLoadingProjectRef.current = false;
-          }, 300);
+          }, 2000);
         } catch (err) {
           console.error('Failed to parse project file:', err);
           isLoadingProjectRef.current = false;
@@ -3122,10 +3179,10 @@ const App = () => {
           extractDataObjectsAfterLoad();
           linkActorsToSwimlanesByName();
 
-          // Clear loading flag after a delay
+          // Clear loading flag after a delay (2s to let BPMN editor finish processing)
           setTimeout(() => {
             isLoadingProjectRef.current = false;
-          }, 300);
+          }, 2000);
         } catch (err) {
           console.error('Failed to parse idmXML file:', err);
           alert('Failed to parse idmXML file: ' + err.message);
@@ -3766,6 +3823,7 @@ const App = () => {
                 </div>
                 <div className="about-info">
                   <p className="about-version">Version {typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0'}</p>
+                  <p className="about-build">Build: {typeof __BUILD_DATE__ !== 'undefined' ? __BUILD_DATE__ : 'unknown'}</p>
                   <p className="about-description">
                     Information Delivery Manual (IDM) Authoring Tool<br />
                     Compliant with ISO 29481-1 and ISO 29481-3 (idmXML)
@@ -4620,7 +4678,14 @@ const App = () => {
             font-size: 16px;
             font-weight: 600;
             color: var(--text-primary);
+            margin: 0 0 4px;
+          }
+
+          .about-build {
+            font-size: 11px;
+            color: var(--text-muted);
             margin: 0 0 8px;
+            font-family: monospace;
           }
 
           .about-description {
