@@ -217,6 +217,9 @@ const ERPanel = ({
   const resizeStartHeightRef = useRef(0);
   const panelContainerRef = useRef(null);
 
+  // Snapshot of selectedItem.data when first selected (for dirty detection)
+  const selectedItemSnapshotRef = useRef(null);
+
   // Auto-expand the selected ER and its ancestors when it changes
   // This ensures the user can see the ER's content when first selecting it
   useEffect(() => {
@@ -281,7 +284,7 @@ const ERPanel = ({
 
       // Select the newly added ER in the detail panel so users can edit it
       if (newErData) {
-        setSelectedItem({ id: newlyAddedErId, type: 'er', data: newErData, erParent: null });
+        selectNewItem({ id: newlyAddedErId, type: 'er', data: newErData, erParent: null });
       }
 
       // Wait for DOM update then scroll to the newly added ER
@@ -368,7 +371,7 @@ const ERPanel = ({
       const initialExpanded = new Set();
       initialExpanded.add(dataObject.id);
       setExpandedNodes(initialExpanded);
-      setSelectedItem(null);
+      selectedItemSnapshotRef.current = null; setSelectedItem(null);
     }
   }, [dataObject?.id, erData, isErFirstMode]);
 
@@ -403,7 +406,7 @@ const ERPanel = ({
       // Set selectedItem to show details of the selected ER
       const isTopLevel = erHierarchy.some(e => e.id === selectedErId || e.guid === selectedErId);
       const type = isTopLevel ? 'er' : 'subEr';
-      setSelectedItem({ id: erData.id, type, data: erData });
+      selectNewItem({ id: erData.id, type, data: erData });
       // Also expand the ER node
       setExpandedNodes(prev => {
         const next = new Set(prev);
@@ -905,13 +908,42 @@ const ERPanel = ({
   // Save detail panel edits and close the panel
   const handleDetailSave = useCallback(() => {
     commitCurrentEdit();
-    setSelectedItem(null);
+    selectedItemSnapshotRef.current = null;
+    selectedItemSnapshotRef.current = null; setSelectedItem(null);
   }, [commitCurrentEdit]);
 
   // Close the detail panel without saving
   const handleDetailClose = useCallback(() => {
-    setSelectedItem(null);
+    selectedItemSnapshotRef.current = null;
+    selectedItemSnapshotRef.current = null; setSelectedItem(null);
   }, []);
+
+  // Select a new item in the detail panel, storing a snapshot for dirty detection
+  const selectNewItem = useCallback((item) => {
+    selectedItemSnapshotRef.current = item ? JSON.stringify(item.data) : null;
+    setSelectedItem(item);
+  }, []);
+
+  // Check if the current detail panel has unsaved changes
+  const hasUnsavedDetailChanges = useCallback(() => {
+    if (!selectedItem || !selectedItemSnapshotRef.current) return false;
+    return JSON.stringify(selectedItem.data) !== selectedItemSnapshotRef.current;
+  }, [selectedItem]);
+
+  // Prompt for unsaved changes before switching to a new item.
+  // Returns true if it's safe to proceed (changes applied, discarded, or none).
+  const confirmBeforeSwitch = useCallback((nextItemFn) => {
+    if (hasUnsavedDetailChanges()) {
+      const choice = window.confirm(
+        'You have unsaved changes in the detail panel. Click OK to apply and save them, or Cancel to discard.'
+      );
+      if (choice) {
+        commitCurrentEdit();
+      }
+      // Either way, proceed to the new item
+    }
+    nextItemFn();
+  }, [hasUnsavedDetailChanges, commitCurrentEdit]);
 
   // Detail panel resize handlers
   const handleResizeMouseDown = useCallback((e) => {
@@ -1060,7 +1092,7 @@ const ERPanel = ({
           // Auto-expand to show new IU
           setExpandedNodes(prev => new Set([...prev, erId]));
           // Select the newly created IU with its parent ER
-          setSelectedItem({ id: newIU.id, type: 'iu', data: newIU, erParent: erId });
+          selectNewItem({ id: newIU.id, type: 'iu', data: newIU, erParent: erId });
           return true;
         }
         if (er.subERs?.length > 0 && findEr(er.subERs)) {
@@ -1103,7 +1135,7 @@ const ERPanel = ({
 
     updateErRecursive(erHierarchy);
     if (selectedItem?.id === iuId) {
-      setSelectedItem(null);
+      selectedItemSnapshotRef.current = null; setSelectedItem(null);
     }
   }, [isErFirstMode, onUpdateER, erHierarchy, selectedItem?.id]);
 
@@ -1345,8 +1377,8 @@ const ERPanel = ({
     }
 
     setExpandedNodes(prev => new Set([...prev, newUnit.id]));
-    setSelectedItem({ id: newUnit.id, type: 'iu', data: newUnit });
-  }, [erData, onChange]);
+    selectNewItem({ id: newUnit.id, type: 'iu', data: newUnit });
+  }, [erData, onChange, selectNewItem]);
 
   // Update Information Unit
   const updateUnit = useCallback((unitId, updates, subERId = null) => {
@@ -1389,7 +1421,7 @@ const ERPanel = ({
     }
 
     if (selectedItem?.id === unitId) {
-      setSelectedItem(null);
+      selectedItemSnapshotRef.current = null; setSelectedItem(null);
     }
   }, [erData, onChange, selectedItem?.id]);
 
@@ -1403,7 +1435,7 @@ const ERPanel = ({
     } else if (selectedItem.type === 'subEr') {
       const updatedSubERs = (erData?.subERs || []).filter(sub => sub.id !== selectedItem.id);
       onChange({ ...erData, subERs: updatedSubERs });
-      setSelectedItem(null);
+      selectedItemSnapshotRef.current = null; setSelectedItem(null);
     } else if (selectedItem.type === 'iu') {
       const row = treeRows.find(r => r.id === selectedItem.id);
       removeUnit(selectedItem.id, row?.subERParent);
@@ -1755,8 +1787,8 @@ const ERPanel = ({
 
     onChange(updatedErData);
     setExpandedNodes(prev => new Set([...prev, newSubER.id]));
-    setSelectedItem({ id: newSubER.id, type: 'subEr', data: newSubER });
-  }, [selectedItem, treeRows, erData, onChange]);
+    selectNewItem({ id: newSubER.id, type: 'subEr', data: newSubER });
+  }, [selectedItem, treeRows, erData, onChange, selectNewItem]);
 
   const handleAddSubERFromCurrent = useCallback((sourceId, sourceER) => {
     // In ER-first mode, use onMoveERAsSubER for a MOVE operation
@@ -1767,7 +1799,7 @@ const ERPanel = ({
       setShowSubERModal(false);
       // Expand to show the moved ER and select it in the detail panel
       setExpandedNodes(prev => new Set([...prev, selectedErId, sourceER.id]));
-      setSelectedItem({ id: sourceER.id, type: 'subEr', data: sourceER, erParent: selectedErId });
+      selectNewItem({ id: sourceER.id, type: 'subEr', data: sourceER, erParent: selectedErId });
       return;
     }
 
@@ -1795,8 +1827,8 @@ const ERPanel = ({
     }
     setShowSubERModal(false);
     setExpandedNodes(prev => new Set([...prev, newSubER.id]));
-    setSelectedItem({ id: newSubER.id, type: 'subEr', data: newSubER });
-  }, [isErFirstMode, selectedErId, onMoveERAsSubER, selectedErData, onUpdateER, onChange, erData]);
+    selectNewItem({ id: newSubER.id, type: 'subEr', data: newSubER });
+  }, [isErFirstMode, selectedErId, onMoveERAsSubER, selectedErData, onUpdateER, onChange, erData, selectNewItem]);
 
   const handleImportSubERFile = useCallback((event) => {
     const file = event.target.files?.[0];
@@ -1858,7 +1890,7 @@ const ERPanel = ({
           setShowSubERModal(false);
           // Expand to show the imported sub-ER and select it in the detail panel
           setExpandedNodes(prev => new Set([...prev, selectedErId || dataObject?.id, newSubER.id]));
-          setSelectedItem({ id: newSubER.id, type: 'subEr', data: newSubER, erParent: selectedErId });
+          selectNewItem({ id: newSubER.id, type: 'subEr', data: newSubER, erParent: selectedErId });
         } else {
           alert('Could not parse the erXML file. Please ensure it is a valid ER specification.');
         }
@@ -2406,8 +2438,11 @@ const ERPanel = ({
                     className={`er-info-btn ${selectedItem?.id === selectedErId && selectedItem?.type === 'er' ? 'er-info-btn-active' : ''}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      commitCurrentEdit();
-                      setSelectedItem({ id: selectedErId, type: 'er', data: selectedErData });
+                      if (selectedItem?.id !== selectedErId || selectedItem?.type !== 'er') {
+                        confirmBeforeSwitch(() => {
+                          selectNewItem({ id: selectedErId, type: 'er', data: selectedErData });
+                        });
+                      }
                     }}
                     title="Show ER details"
                   >
@@ -2554,11 +2589,12 @@ const ERPanel = ({
                   ref={el => { if (el) treeRowRefs.current[row.id] = el; }}
                   className={`er-tree-row ${row.type}-type ${selectedErId === row.id ? 'selected' : ''} ${selectedItem?.id === row.id ? 'item-selected' : ''}`}
                   onClick={() => {
-                    // Commit current edits before switching to new item
-                    commitCurrentEdit();
-                    // Set selectedItem to show details in bottom panel
-                    // DO NOT call onSelectER - users can only change displayed ER via ER Hierarchy
-                    setSelectedItem({ id: row.id, type: row.type, data: row.data, erParent: row.erParent || null });
+                    // Check for unsaved changes before switching
+                    if (selectedItem?.id !== row.id) {
+                      confirmBeforeSwitch(() => {
+                        selectNewItem({ id: row.id, type: row.type, data: row.data, erParent: row.erParent || null });
+                      });
+                    }
                   }}
                 >
                   <div className="er-tree-cell er-col-name">
@@ -2574,9 +2610,11 @@ const ERPanel = ({
                           onClick={(e) => {
                             e.stopPropagation();
                             toggleExpand(row.id);
-                            // Commit current edits and show details when clicking chevron
-                            commitCurrentEdit();
-                            setSelectedItem({ id: row.id, type: row.type, data: row.data, erParent: row.erParent || null });
+                            if (selectedItem?.id !== row.id) {
+                              confirmBeforeSwitch(() => {
+                                selectNewItem({ id: row.id, type: row.type, data: row.data, erParent: row.erParent || null });
+                              });
+                            }
                           }}
                         >
                           <ChevronRightIcon size={12} />
@@ -2730,15 +2768,18 @@ const ERPanel = ({
                     />
                   </div>
                   <div className="er-detail-field">
-                    <label>Examples</label>
-                    <input
-                      type="text"
+                    <DefinitionWithFigures
+                      label="Examples"
                       value={selectedItem.data?.examples || ''}
-                      onChange={(e) => {
-                        setSelectedItem(prev => ({ ...prev, data: { ...prev.data, examples: e.target.value } }));
+                      figures={selectedItem.data?.exampleImages || []}
+                      onChange={(val) => {
+                        setSelectedItem(prev => ({ ...prev, data: { ...prev.data, examples: val } }));
+                      }}
+                      onFiguresChange={(figs) => {
+                        setSelectedItem(prev => ({ ...prev, data: { ...prev.data, exampleImages: figs } }));
                       }}
                       placeholder="e.g., Wall-001, Level-1"
-                      className="er-input"
+                      rows={1}
                     />
                   </div>
                   {/* External Mappings */}
@@ -3015,7 +3056,15 @@ const ERPanel = ({
                 <div className="er-search-results">
                   {mappingSearchLoading ? (
                     <div className="er-search-loading">
-                      <span>Searching...</span>
+                      {mappingSearchSchema === 'bSDD' ? (
+                        <>
+                          <span className="er-search-hourglass">&#9203;</span>
+                          <span>Connecting to the bSDD server...</span>
+                          <span className="er-search-loading-hint">This may take a moment on the first search.</span>
+                        </>
+                      ) : (
+                        <span>Searching...</span>
+                      )}
                     </div>
                   ) : mappingSearchError ? (
                     <div className="er-search-empty er-search-error">
@@ -3333,7 +3382,15 @@ const ERPanel = ({
               <div className="er-search-results">
                 {mappingSearchLoading ? (
                   <div className="er-search-loading">
-                    <span>Searching...</span>
+                    {mappingSearchSchema === 'bSDD' ? (
+                      <>
+                        <span className="er-search-hourglass">&#9203;</span>
+                        <span>Connecting to the bSDD server...</span>
+                        <span className="er-search-loading-hint">This may take a moment on the first search.</span>
+                      </>
+                    ) : (
+                      <span>Searching...</span>
+                    )}
                   </div>
                 ) : mappingSearchError ? (
                   <div className="er-search-empty er-search-error">

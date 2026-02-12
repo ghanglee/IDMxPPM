@@ -1165,6 +1165,12 @@ export const detectIdmXmlVersion = (content) => {
   return result;
 };
 
+export {
+  getFirstChild,
+  getDirectChildren,
+  parseErElement
+};
+
 export default {
   parseIdmXml,
   isIdmXml,

@@ -15,11 +15,11 @@ import ServerBrowser from './components/ServerBrowser/ServerBrowser';
 import { ThemeProvider } from './hooks/useTheme';
 import { useServerConnection } from './hooks/useServerConnection';
 import { api } from './utils/apiClient';
-import { generateIdmXml } from './utils/idmXmlGenerator';
+import { generateIdmXml, generateErXmlStandalone } from './utils/idmXmlGenerator';
 import { downloadIdmBundle } from './utils/idmBundleExporter';
 import { importIdmBundle, isZipBundle } from './utils/idmBundleImporter';
 import { validateProject, getValidationStatusLabel } from './utils/validation';
-import { parseIdmXml, isIdmXml, detectIdmXmlVersion } from './utils/idmXmlParser';
+import { parseIdmXml, isIdmXml, detectIdmXmlVersion, getFirstChild, getDirectChildren, parseErElement } from './utils/idmXmlParser';
 import { readFileAsText } from './utils/pdfExporter';
 import { defaultIdmXslt } from './utils/defaultIdmXslt';
 import { generateStandaloneHtml } from './utils/htmlExporter';
@@ -1213,6 +1213,135 @@ const App = () => {
     setShowRootSwitchModal(false);
     setPendingOutdentER(null);
   }, []);
+
+  // Export selected ER to erXML file
+  const handleExportErXml = useCallback((erId) => {
+    const er = erId ? findErById(erHierarchy, erId) : null;
+    if (!er) {
+      alert('No ER selected to export.');
+      return;
+    }
+
+    const authorName = headerData.authors?.[0]?.givenName
+      ? `${headerData.authors[0].givenName} ${headerData.authors[0].familyName || ''}`.trim()
+      : 'IDMxPPM User';
+    const xmlContent = generateErXmlStandalone(er, authorName);
+    const safeName = (er.name || 'ER').replace(/[^a-zA-Z0-9_-]/g, '_');
+
+    if (window.electronAPI?.exportER) {
+      window.electronAPI.exportER({
+        content: xmlContent,
+        defaultName: `${safeName}.erxml`,
+        format: 'xml'
+      });
+    } else {
+      // Browser fallback: download via blob
+      const blob = new Blob([xmlContent], { type: 'application/xml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${safeName}.erxml`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  }, [erHierarchy, headerData, findErById]);
+
+  // Import ER from erXML file — adds as sub-ER of selected ER, or as root if none exists
+  const handleImportErXml = useCallback((file) => {
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target.result;
+        let importedER = null;
+
+        // Try JSON first
+        try {
+          importedER = JSON.parse(content);
+        } catch {
+          // Parse as XML using namespace-safe helpers
+          const parser = new DOMParser();
+          const xmlDoc = parser.parseFromString(content, 'text/xml');
+
+          // Check for parse errors
+          if (xmlDoc.querySelector('parsererror')) {
+            alert('Could not parse the erXML file. The file may be malformed.');
+            return;
+          }
+
+          // Find the root <er> element (namespace-safe)
+          const root = xmlDoc.documentElement;
+          const erElement = root.localName === 'er' ? root : getFirstChild(root, 'er');
+
+          if (erElement) {
+            importedER = parseErElement(erElement);
+          }
+        }
+
+        if (!importedER) {
+          alert('Could not parse the erXML file. Please ensure it is a valid ER specification.');
+          return;
+        }
+
+        // Assign new IDs to avoid conflicts
+        const assignNewIds = (er) => {
+          er.id = `ER-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+          if (er.informationUnits) {
+            er.informationUnits.forEach(iu => {
+              iu.id = `IU-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+              if (iu.subInformationUnits) {
+                iu.subInformationUnits.forEach(sub => {
+                  sub.id = `IU-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+                });
+              }
+            });
+          }
+          if (er.subERs) {
+            er.subERs.forEach(assignNewIds);
+          }
+        };
+        assignNewIds(importedER);
+
+        const newER = {
+          id: importedER.id,
+          name: importedER.name || importedER.shortTitle || file.name.replace(/\.(er)?xml$/i, ''),
+          description: importedER.description || '',
+          descriptionFigures: importedER.descriptionFigures || [],
+          informationUnits: importedER.informationUnits || [],
+          subERs: importedER.subERs || [],
+          sourceFile: file.name
+        };
+
+        if (erHierarchy.length === 0) {
+          // No root ER — imported ER becomes the root
+          setErHierarchy([newER]);
+          setSelectedErId(newER.id);
+        } else if (selectedErId) {
+          // Add as sub-ER of selected ER
+          const selectedEr = findErById(erHierarchy, selectedErId);
+          if (selectedEr) {
+            handleUpdateErInHierarchy(selectedErId, {
+              subERs: [...(selectedEr.subERs || []), newER]
+            });
+          }
+        } else {
+          // No ER selected — add as sub-ER of root
+          const rootER = erHierarchy[0];
+          handleUpdateErInHierarchy(rootER.id, {
+            subERs: [...(rootER.subERs || []), newER]
+          });
+        }
+
+        setNewlyAddedErId(newER.id);
+        setIsDirty(true);
+      } catch (err) {
+        console.error('Failed to import erXML:', err);
+        alert('Failed to import erXML file: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+  }, [erHierarchy, selectedErId, findErById, handleUpdateErInHierarchy]);
 
   // Get ER for a data object (via dataObjectErMap)
   const getErForDataObject = useCallback((dataObjectId) => {
@@ -3332,6 +3461,8 @@ const App = () => {
                     onMoveDown={handleMoveErDown}
                     onIndent={handleIndentEr}
                     onOutdent={handleOutdentEr}
+                    onImportER={handleImportErXml}
+                    onExportER={handleExportErXml}
                     onClose={() => {
                       setActivePane(null);
                       if (activePane === 'exchangeReq') {

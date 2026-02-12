@@ -11,7 +11,9 @@ import {
   EditIcon,
   SettingsIcon,
   ExpandAllIcon,
-  CollapseAllIcon
+  CollapseAllIcon,
+  ImportIcon,
+  SaveExportIcon
 } from '../icons';
 import { normalizeRegionCode } from '../../utils/idmXmlParser';
 import './ContentPane.css';
@@ -1585,6 +1587,8 @@ const ContentPane = ({
   onMoveDown,
   onIndent,
   onOutdent,
+  onImportER,
+  onExportER,
   selectedErId = null,           // Currently selected ER for operations
   onClose
 }) => {
@@ -1594,6 +1598,8 @@ const ContentPane = ({
   const lastAddTimeRef = useRef(0);
   // Refs for scrolling to newly added ER
   const erItemRefs = useRef({});
+  // Ref for hidden file input (ER import)
+  const erImportFileRef = useRef(null);
 
   // Determine which optional fields have data and should be visible
   const getInitialVisibleFields = useCallback((data) => {
@@ -2437,6 +2443,33 @@ const ContentPane = ({
                 title="Delete selected ER"
               >
                 <DeleteIcon size={14} />
+              </button>
+              <div className="er-hierarchy-divider" />
+              <button
+                className="er-hierarchy-btn"
+                onClick={() => erImportFileRef.current?.click()}
+                title="Import ER from erXML file"
+              >
+                <ImportIcon size={14} />
+              </button>
+              <input
+                ref={erImportFileRef}
+                type="file"
+                accept=".xml,.erxml,.json"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file && onImportER) onImportER(file);
+                  e.target.value = '';
+                }}
+              />
+              <button
+                className="er-hierarchy-btn"
+                onClick={() => selectedErId && onExportER?.(selectedErId)}
+                disabled={!selectedErId}
+                title="Export selected ER to erXML file"
+              >
+                <SaveExportIcon size={14} />
               </button>
               <div className="er-hierarchy-divider" />
               <button

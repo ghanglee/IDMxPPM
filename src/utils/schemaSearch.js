@@ -172,7 +172,8 @@ const BSDD_TIMEOUT = 15000; // 15 seconds (bSDD API can have cold-start latency)
  */
 const bsddFetch = async (url, externalSignal) => {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), BSDD_TIMEOUT);
+  let timedOut = false;
+  const timeoutId = setTimeout(() => { timedOut = true; controller.abort(); }, BSDD_TIMEOUT);
 
   // If the caller's signal is already aborted, abort immediately
   if (externalSignal?.aborted) {
@@ -197,9 +198,22 @@ const bsddFetch = async (url, externalSignal) => {
     if (!response.ok) {
       throw new Error(`bSDD API error: ${response.status} ${response.statusText}`);
     }
-    return await response.json();
+    try {
+      return await response.json();
+    } catch (jsonError) {
+      throw new Error('bSDD API returned an invalid response. The server may be experiencing issues.');
+    }
   } catch (error) {
     clearTimeout(timeoutId);
+    // Distinguish external cancellation from internal timeout
+    if (error.name === 'AbortError') {
+      if (externalSignal?.aborted) {
+        throw error; // Re-throw as AbortError for cancellation
+      }
+      if (timedOut) {
+        throw new Error('bSDD server is not responding. Please try again later.');
+      }
+    }
     throw error;
   } finally {
     externalSignal?.removeEventListener('abort', onExternalAbort);
@@ -210,6 +224,7 @@ const bsddFetch = async (url, externalSignal) => {
  * Map bSDD class items to our result format
  */
 const mapBsddResults = (classes, matchType, defaultCategory = 'bSDD (IFC 4.3)') => {
+  if (!Array.isArray(classes)) return [];
   const results = [];
   for (const item of classes) {
     if (!item) continue;
