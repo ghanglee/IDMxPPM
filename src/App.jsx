@@ -151,8 +151,7 @@ const App = () => {
   const [exportSavePath, setExportSavePath] = useState(''); // Full path from browse dialog
   const [exportOptions, setExportOptions] = useState({
     includeBpmn: true,
-    includeImages: true,
-    idmXsdVersion: '2.0' // '1.0' or '2.0'
+    includeImages: true
   });
   const [customXslt, setCustomXslt] = useState(null); // Custom XSLT file for PDF export
 
@@ -2769,7 +2768,6 @@ const App = () => {
     const extensions = {
       'idm': '.idm',
       'idmxml-v2': '.xml',
-      'idmxml-v1': '.xml',
       'html': '.html',
       'zip': '.zip',
       'bpmn': '.bpmn'
@@ -2877,10 +2875,8 @@ const App = () => {
 
     try {
       switch (exportFormat) {
-        case 'idmxml-v2':
-        case 'idmxml-v1': {
-          // ISO 29481-3 compliant idmXML
-          const idmXsdVersion = exportFormat === 'idmxml-v1' ? '1.0' : '2.0';
+        case 'idmxml-v2': {
+          // ISO 29481-3 compliant idmXML (idmXSD 2.0)
 
           // Build erDataMap from ER-first architecture (erHierarchy + dataObjectErMap)
           // This maps data object IDs to their associated ER data
@@ -2915,8 +2911,7 @@ const App = () => {
             bpmnXml: exportOptions.includeBpmn ? currentBpmnXml : null,
             erDataMap: exportErDataMap,
             erHierarchy,
-            dataObjects,
-            idmXsdVersion
+            dataObjects
           });
 
           // Persist GUIDs if this is the first generation
@@ -3688,7 +3683,6 @@ const App = () => {
                       <span className="export-filename-ext">
                         {exportFormat === 'idm' ? '.idm' :
                          exportFormat === 'idmxml-v2' ? '.xml' :
-                         exportFormat === 'idmxml-v1' ? '.xml' :
                          exportFormat === 'html' ? '.html' :
                          exportFormat === 'zip' ? '.zip' :
                          exportFormat === 'bpmn' ? '.bpmn' : ''}
@@ -3739,21 +3733,8 @@ const App = () => {
                       onChange={(e) => setExportFormat(e.target.value)}
                     />
                     <div className="export-format-content">
-                      <span className="export-format-title">idmXML v2.0 (.xml)</span>
-                      <span className="export-format-desc">ISO 29481-3 compliant XML (idmXSD 2.0 - Latest)</span>
-                    </div>
-                  </label>
-                  <label className={`export-format-option ${exportFormat === 'idmxml-v1' ? 'selected' : ''}`}>
-                    <input
-                      type="radio"
-                      name="exportFormat"
-                      value="idmxml-v1"
-                      checked={exportFormat === 'idmxml-v1'}
-                      onChange={(e) => setExportFormat(e.target.value)}
-                    />
-                    <div className="export-format-content">
-                      <span className="export-format-title">idmXML v1.0 (.xml)</span>
-                      <span className="export-format-desc">ISO 29481-3 compliant XML (idmXSD 1.0 - Legacy)</span>
+                      <span className="export-format-title">idmXML (.xml)</span>
+                      <span className="export-format-desc">ISO 29481-3 compliant XML (idmXSD 2.0)</span>
                     </div>
                   </label>
                   <label className={`export-format-option ${exportFormat === 'html' ? 'selected' : ''}`}>

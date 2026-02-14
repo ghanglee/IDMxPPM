@@ -5,7 +5,7 @@
 
 export const defaultIdmXslt = `<?xml version="1.0" encoding="UTF-8"?>
 <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
-  xmlns:idm="https://standards.buildingsmart.org/IDM/idmXML/0.2">
+  xmlns:idm="https://standards.iso.org/iso/29481/-3/ed-2/en">
 
   <xsl:output method="html" encoding="UTF-8" indent="yes"/>
 
@@ -266,10 +266,24 @@ export const defaultIdmXslt = `<?xml version="1.0" encoding="UTF-8"?>
       </dl>
       <dl>
         <dt>Author</dt>
-        <dd><xsl:value-of select="idm:authoring/@author | authoring/@author"/></dd>
+        <dd>
+          <xsl:for-each select="idm:authoring/idm:author | authoring/author">
+            <xsl:if test="idm:person | person">
+              <xsl:value-of select="idm:person/@firstName | person/@firstName"/>
+              <xsl:if test="idm:person/@lastName | person/@lastName">
+                <xsl:text> </xsl:text>
+                <xsl:value-of select="idm:person/@lastName | person/@lastName"/>
+              </xsl:if>
+            </xsl:if>
+            <xsl:if test="idm:organization | organization">
+              <xsl:value-of select="idm:organization/@name | organization/@name"/>
+            </xsl:if>
+            <xsl:if test="position() != last()"><xsl:text>, </xsl:text></xsl:if>
+          </xsl:for-each>
+        </dd>
 
         <dt>Creation Date</dt>
-        <dd><xsl:value-of select="idm:authoring/@creationDate | authoring/@creationDate"/></dd>
+        <dd><xsl:value-of select="substring-before(idm:authoring/idm:changeLog/@changeDateTime | authoring/changeLog/@changeDateTime, 'T')"/></dd>
 
         <dt>GUID</dt>
         <dd style="font-size: 8pt;"><xsl:value-of select="idm:specId/@guid | specId/@guid"/></dd>
@@ -300,7 +314,7 @@ export const defaultIdmXslt = `<?xml version="1.0" encoding="UTF-8"?>
       <div class="section">
         <h3>Summary</h3>
         <div class="description">
-          <xsl:value-of select="idm:summary/idm:description | summary/description"/>
+          <xsl:value-of select="idm:summary/idm:description/@title | summary/description/@title"/>
         </div>
       </div>
     </xsl:if>
@@ -310,7 +324,7 @@ export const defaultIdmXslt = `<?xml version="1.0" encoding="UTF-8"?>
       <div class="section">
         <h3>Aim and Scope</h3>
         <div class="description">
-          <xsl:value-of select="idm:aimAndScope/idm:description | aimAndScope/description"/>
+          <xsl:value-of select="idm:aimAndScope/idm:description/@title | aimAndScope/description/@title"/>
         </div>
       </div>
     </xsl:if>
@@ -368,7 +382,7 @@ export const defaultIdmXslt = `<?xml version="1.0" encoding="UTF-8"?>
       <div class="section">
         <h3>Benefits</h3>
         <div class="description">
-          <xsl:value-of select="idm:benefits/idm:description | benefits/description"/>
+          <xsl:value-of select="idm:benefits/idm:description/@title | benefits/description/@title"/>
         </div>
       </div>
     </xsl:if>
@@ -378,27 +392,7 @@ export const defaultIdmXslt = `<?xml version="1.0" encoding="UTF-8"?>
       <div class="section">
         <h3>Limitations</h3>
         <div class="description">
-          <xsl:value-of select="idm:limitations/idm:description | limitations/description"/>
-        </div>
-      </div>
-    </xsl:if>
-
-    <!-- Preconditions -->
-    <xsl:if test="idm:preconditions | preconditions">
-      <div class="section">
-        <h3>Preconditions</h3>
-        <div class="description">
-          <xsl:value-of select="idm:preconditions/idm:description | preconditions/description"/>
-        </div>
-      </div>
-    </xsl:if>
-
-    <!-- Postconditions -->
-    <xsl:if test="idm:postconditions | postconditions">
-      <div class="section">
-        <h3>Postconditions</h3>
-        <div class="description">
-          <xsl:value-of select="idm:postconditions/idm:description | postconditions/description"/>
+          <xsl:value-of select="idm:limitations/idm:description/@title | limitations/description/@title"/>
         </div>
       </div>
     </xsl:if>
@@ -417,7 +411,7 @@ export const defaultIdmXslt = `<?xml version="1.0" encoding="UTF-8"?>
       <!-- ER Description -->
       <xsl:if test="idm:description | description">
         <div class="description">
-          <xsl:value-of select="idm:description | description"/>
+          <xsl:value-of select="idm:description/@title | description/@title"/>
         </div>
       </xsl:if>
 
@@ -437,6 +431,13 @@ export const defaultIdmXslt = `<?xml version="1.0" encoding="UTF-8"?>
             <xsl:apply-templates select="idm:informationUnit | informationUnit"/>
           </tbody>
         </table>
+      </xsl:if>
+
+      <!-- Sub-ERs (recursive) -->
+      <xsl:if test="idm:subEr | subEr">
+        <xsl:for-each select="idm:subEr/idm:er | subEr/er">
+          <xsl:apply-templates select="."/>
+        </xsl:for-each>
       </xsl:if>
     </div>
   </xsl:template>

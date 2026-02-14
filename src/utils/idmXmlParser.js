@@ -488,21 +488,33 @@ export const parseIdmXml = (xmlContent) => {
           const classification = getFirstChild(actorEl, 'classification');
           const role = classification ? classification.getAttribute('name') : '';
 
-          // Get subActor elements (per IDM 2.0)
+          // Get subActor elements (per IDM 2.0 - direct attributes on subActor)
           const subActorContainers = getDirectChildren(actorEl, 'subActor');
           const subActors = [];
           subActorContainers.forEach(container => {
-            const subActorEl = getFirstChild(container, 'actor');
-            if (subActorEl) {
-              const subActorId = subActorEl.getAttribute('id') || `subactor-${Date.now()}`;
-              const subActorName = subActorEl.getAttribute('name') || '';
-              const subBpmnShapeEl = getFirstChild(subActorEl, 'bpmnShapeName');
-              const subBpmnShapeName = subBpmnShapeEl ? subBpmnShapeEl.textContent.trim() : '';
+            // v2.0 format: <subActor id="..." name="..."/> (direct attributes)
+            const directId = container.getAttribute('id');
+            const directName = container.getAttribute('name');
+            if (directId || directName) {
               subActors.push({
-                id: subActorId,
-                name: subActorName,
-                bpmnShapeName: subBpmnShapeName
+                id: directId || `subactor-${Date.now()}`,
+                name: directName || '',
+                bpmnShapeName: ''
               });
+            } else {
+              // Legacy format: <subActor><actor id="..." name="...">...</actor></subActor>
+              const subActorEl = getFirstChild(container, 'actor');
+              if (subActorEl) {
+                const subActorId = subActorEl.getAttribute('id') || `subactor-${Date.now()}`;
+                const subActorName = subActorEl.getAttribute('name') || '';
+                const subBpmnShapeEl = getFirstChild(subActorEl, 'bpmnShapeName');
+                const subBpmnShapeName = subBpmnShapeEl ? subBpmnShapeEl.textContent.trim() : '';
+                subActors.push({
+                  id: subActorId,
+                  name: subActorName,
+                  bpmnShapeName: subBpmnShapeName
+                });
+              }
             }
           });
 
@@ -730,14 +742,49 @@ export const parseIdmXml = (xmlContent) => {
         }
       }
 
+      // Parse shapeAndActor links (maps BPMN shapes to actors)
+      const shapeActorLinks = getDirectChildren(pm, 'shapeAndActor');
+      if (shapeActorLinks.length > 0) {
+        result.shapeActorMap = {};
+        shapeActorLinks.forEach(link => {
+          const shapeEl = getFirstChild(link, 'associatedShape');
+          const actorEl = getFirstChild(link, 'associatedActor');
+          const shapeRef = shapeEl?.getAttribute('ref') || shapeEl?.textContent;
+          const actorRef = actorEl?.getAttribute('ref') || actorEl?.textContent;
+          if (shapeRef && actorRef) {
+            result.shapeActorMap[actorRef] = shapeRef;
+          }
+        });
+      }
+
       // Parse dataObjectAndEr links
       const doErLinks = getDirectChildren(pm, 'dataObjectAndEr');
       doErLinks.forEach(link => {
-        const doId = getFirstChild(link, 'associatedDataObject')?.textContent;
-        const erId = getFirstChild(link, 'associatedEr')?.textContent;
+        const doEl = getFirstChild(link, 'associatedDataObject');
+        const erEl = getFirstChild(link, 'associatedEr');
+        // v2.0 uses ref attribute; fallback to textContent for backward compatibility
+        const doId = doEl?.getAttribute('ref') || doEl?.textContent;
+        const erId = erEl?.getAttribute('ref') || erEl?.textContent;
         if (doId && erId) {
           result.dataObjectErLinks = result.dataObjectErLinks || {};
           result.dataObjectErLinks[doId] = erId;
+        }
+      });
+    }
+
+    // Apply shapeAndActor mappings to actors (bpmnShapeName from BCM)
+    // Must run after BCM parsing (which sets result.shapeActorMap)
+    if (result.shapeActorMap && result.headerData.actorsList) {
+      result.headerData.actorsList.forEach(actor => {
+        if (result.shapeActorMap[actor.id]) {
+          actor.bpmnShapeName = result.shapeActorMap[actor.id];
+        }
+        if (actor.subActors) {
+          actor.subActors.forEach(sub => {
+            if (result.shapeActorMap[sub.id]) {
+              sub.bpmnShapeName = result.shapeActorMap[sub.id];
+            }
+          });
         }
       });
     }
@@ -1078,7 +1125,7 @@ export const isIdmXml = (content) => {
   if (!content || typeof content !== 'string') return false;
 
   // Check for idmXML indicators
-  const hasIdmNamespace = content.includes('idmXML') || content.includes('standards.buildingsmart.org/IDM');
+  const hasIdmNamespace = content.includes('idmXML') || content.includes('standards.buildingsmart.org/IDM') || content.includes('standards.iso.org/iso/29481');
   const hasIdmRoot = content.includes('<idm') || content.includes('<IDM');
   const hasUseCase = content.includes('<uc>') || content.includes('<uc ');
   const hasEr = content.includes('<er>') || content.includes('<er ');
@@ -1106,10 +1153,10 @@ export const detectIdmXmlVersion = (content) => {
   };
 
   // Check for namespace indicators (most reliable)
-  // v1.0: xmlns:idm="https://standards.buildingsmart.org/IDM/idmXML/0.2" version="1.0"
-  // v2.0: xmlns:idm="https://standards.buildingsmart.org/IDM/idmXML/2.0"
-  const hasV1Namespace = content.includes('idmXML/0.2') || content.includes('idmXML/1.0');
-  const hasV2Namespace = content.includes('idmXML/2.0');
+  // v1.0: xmlns:idm="https://standards.buildingsmart.org/IDM/idmXML/0.2" or "https://standards.iso.org/iso/29481/-3/ed-1/en"
+  // v2.0: xmlns:idm="https://standards.buildingsmart.org/IDM/idmXML/2.0" or "https://standards.iso.org/iso/29481/-3/ed-2/en"
+  const hasV1Namespace = content.includes('idmXML/0.2') || content.includes('idmXML/1.0') || content.includes('29481/-3/ed-1');
+  const hasV2Namespace = content.includes('idmXML/2.0') || content.includes('29481/-3/ed-2');
 
   // Check for version attribute in schema declaration
   const hasV1VersionAttr = /version\s*=\s*["']1\.0["']/.test(content);

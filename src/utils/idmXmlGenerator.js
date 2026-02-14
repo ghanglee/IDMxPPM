@@ -1,16 +1,8 @@
 /**
  * idmXML Generator
- * Generates ISO 29481-3 compliant XML (supports idmXSD 1.0 and 2.0)
+ * Generates ISO 29481-3 compliant XML (idmXSD 2.0)
  *
- * Schema v2.0: https://standards.buildingsmart.org/IDM/idmXML/2.0
- * Schema v1.0: https://standards.buildingsmart.org/IDM/idmXML/0.2
- *
- * Key v2.0 differences from v1.0:
- * - Namespace: idmXML/2.0 (not idmXML/0.2)
- * - Uses standardProjectStage (not standardProjectPhase)
- * - Uses localProjectStage (not localProjectPhase)
- * - author element contains person/organization children
- * - changeLog under authoring (with id, changeDateTime, changeSummary, changedBy attributes)
+ * Schema v2.0: https://standards.iso.org/iso/29481/-3/ed-2/en
  */
 
 // Generate UUID
@@ -22,6 +14,14 @@ const generateUUID = () => {
       return v.toString(16);
     });
 };
+
+// Validate UUID format (idmXSD uuid pattern)
+const isValidUUID = (str) => {
+  return typeof str === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(str);
+};
+
+// Ensure a value is a valid UUID, generating one if not
+const ensureUUID = (value) => isValidUUID(value) ? value : generateUUID();
 
 // Escape XML special characters
 const escapeXml = (str) => {
@@ -225,7 +225,7 @@ const generateInformationUnitXml = (unit, indent = '      ') => {
  */
 const generateErXml = (er, authorName, indent = '  ', isRoot = true) => {
   const lines = [];
-  const erGuid = er.guid || generateUUID();
+  const erGuid = ensureUUID(er.guid);
 
   if (isRoot) {
     lines.push(`${indent}<er>`);
@@ -348,7 +348,7 @@ const generateRootErXml = (erDataMap, headerData, authorName) => {
   // Create a root ER that contains all ERs as subERs
   const rootERName = headerData?.rootERName ||
     (headerData?.shortTitle ? `er_${headerData.shortTitle.replace(/\s+/g, '_')}` : 'er_IDM_Specification');
-  const rootErGuid = headerData?.rootErGuid || generateUUID();
+  const rootErGuid = ensureUUID(headerData?.rootErGuid);
 
   lines.push('  <er>');
 
@@ -394,18 +394,14 @@ const generateRootErXml = (erDataMap, headerData, authorName) => {
  * @param {string} params.bpmnXml - BPMN XML content
  * @param {Object} params.erDataMap - Map of dataObjectId to ER data
  * @param {Array} params.dataObjects - List of data objects from BPMN
- * @param {string} params.idmXsdVersion - idmXSD version ('1.0' or '2.0', default '2.0')
  * @returns {string} idmXML content
  */
-export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, dataObjects = [], idmXsdVersion = '2.0' }) => {
-  const isV1 = idmXsdVersion === '1.0';
-  const namespace = isV1
-    ? 'https://standards.buildingsmart.org/IDM/idmXML/0.2'
-    : 'https://standards.buildingsmart.org/IDM/idmXML/2.0';
+export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, dataObjects = [] }) => {
+  const namespace = 'https://standards.iso.org/iso/29481/-3/ed-2/en';
   // Use persistent GUIDs if available, otherwise generate new ones
-  const idmGuid = headerData?.idmGuid || generateUUID();
-  const ucGuid = headerData?.ucGuid || generateUUID();
-  const bcmGuid = headerData?.bcmGuid || generateUUID();
+  const idmGuid = ensureUUID(headerData?.idmGuid);
+  const ucGuid = ensureUUID(headerData?.ucGuid);
+  const bcmGuid = ensureUUID(headerData?.bcmGuid);
   const pmId = headerData?.pmId || `PM-${Date.now()}`;
 
   // Handle authors array or legacy author string - FIX: properly format author objects
@@ -658,13 +654,15 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, da
     'construction': 'production'
   };
 
-  // Use standardProjectPhase for v1.0, standardProjectStage for v2.0
-  const stdStageElement = isV1 ? 'standardProjectPhase' : 'standardProjectStage';
-  const localStageElement = isV1 ? 'localProjectPhase' : 'localProjectStage';
+  const stdStageElement = 'standardProjectStage';
+  const localStageElement = 'localProjectStage';
 
+  const emittedStages = new Set();
   isoStages.forEach(stage => {
     const normalizedStage = stageMapping[stage?.toLowerCase()] ||
                            (validStagesV2.includes(stage?.toLowerCase()) ? stage.toLowerCase() : 'design');
+    if (emittedStages.has(normalizedStage)) return; // Skip duplicates after normalization
+    emittedStages.add(normalizedStage);
     lines.push(`    <${stdStageElement}>`);
     lines.push(`      <name>${normalizedStage}</name>`);
     lines.push(`    </${stdStageElement}>`);
@@ -692,6 +690,50 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, da
     });
   }
 
+  // Actors (per idmXSD V2 - must come before benefits/limitations per schema sequence)
+  // Actor-to-BPMN shape mapping is now in businessContextMap (shapeAndActor), not in actor element
+  if (headerData?.actorsList && headerData.actorsList.length > 0) {
+    headerData.actorsList.forEach((actor, index) => {
+      const actorId = actor.id || `actor-${index + 1}`;
+      const actorName = actor.name || 'Unnamed Actor';
+      const actorType = actor.actorType || 'group'; // 'group' or 'individual' per IDM 2.0
+
+      const hasSubActors = actor.subActors && actor.subActors.length > 0;
+      const hasRole = actor.role;
+      const hasChildren = hasSubActors || hasRole;
+
+      if (hasChildren) {
+        lines.push(`    <actor id="${escapeXml(actorId)}" name="${escapeXml(actorName)}" actorType="${escapeXml(actorType)}">`);
+
+        // classification for role (per idmXSD V2 - id and name required)
+        if (hasRole) {
+          lines.push(`      <classification id="role-${index + 1}" name="${escapeXml(actor.role)}"/>`);
+        }
+
+        // subActor elements (per idmXSD V2 - direct id/name attributes, optional classification)
+        if (hasSubActors) {
+          actor.subActors.forEach((subActor, subIndex) => {
+            const subActorId = subActor.id || `actor-${index + 1}-sub-${subIndex + 1}`;
+            const subActorName = subActor.name || 'Unnamed Lane';
+            lines.push(`      <subActor id="${escapeXml(subActorId)}" name="${escapeXml(subActorName)}"/>`);
+          });
+        }
+
+        lines.push('    </actor>');
+      } else {
+        lines.push(`    <actor id="${escapeXml(actorId)}" name="${escapeXml(actorName)}" actorType="${escapeXml(actorType)}"/>`);
+      }
+    });
+  } else if (headerData?.actors && typeof headerData.actors === 'string') {
+    // Legacy support - parse text-only actors into structured format
+    const actorNames = headerData.actors.split(/[,;]/).map(s => s.trim()).filter(Boolean);
+    if (actorNames.length > 0) {
+      actorNames.forEach((name, index) => {
+        lines.push(`    <actor id="actor-${index + 1}" name="${escapeXml(name)}" actorType="group"/>`);
+      });
+    }
+  }
+
   // Benefits (optional) - per idmXSD V2, uses description with title attribute
   if (headerData?.benefits || (headerData?.benefitsFigures && headerData.benefitsFigures.length > 0)) {
     lines.push('    <benefits>');
@@ -712,68 +754,6 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, da
       '      '
     ));
     lines.push('    </limitations>');
-  }
-
-  // Actors (per idmXSD V2 - id and name required, actorType attribute, bpmnShapeName and subActor children)
-  if (headerData?.actorsList && headerData.actorsList.length > 0) {
-    headerData.actorsList.forEach((actor, index) => {
-      const actorId = actor.id || `actor-${index + 1}`;
-      const actorName = actor.name || 'Unnamed Actor';
-      const actorType = actor.actorType || 'group'; // 'group' or 'individual' per IDM 2.0
-
-      // Check if actor has children (bpmnShapeName, subActors, classification)
-      const hasBpmnShape = actor.bpmnShapeName || actor.bpmnId;
-      const hasSubActors = actor.subActors && actor.subActors.length > 0;
-      const hasRole = actor.role;
-      const hasChildren = hasBpmnShape || hasSubActors || hasRole;
-
-      if (hasChildren) {
-        lines.push(`    <actor id="${escapeXml(actorId)}" name="${escapeXml(actorName)}" actorType="${escapeXml(actorType)}">`);
-
-        // bpmnShapeName (per idmXSD V2 - links to BPMN Pool/Participant)
-        if (hasBpmnShape) {
-          lines.push(`      <bpmnShapeName>${escapeXml(actor.bpmnShapeName || actor.bpmnId)}</bpmnShapeName>`);
-        }
-
-        // classification for role (per idmXSD V2 - id and name required)
-        if (hasRole) {
-          lines.push(`      <classification id="role-${index + 1}" name="${escapeXml(actor.role)}"/>`);
-        }
-
-        // subActor elements (per idmXSD V2 - for BPMN lanes within pool)
-        if (hasSubActors) {
-          actor.subActors.forEach((subActor, subIndex) => {
-            const subActorId = subActor.id || `actor-${index + 1}-sub-${subIndex + 1}`;
-            const subActorName = subActor.name || 'Unnamed Lane';
-            const subActorHasBpmnShape = subActor.bpmnShapeName;
-
-            if (subActorHasBpmnShape) {
-              lines.push(`      <subActor>`);
-              lines.push(`        <actor id="${escapeXml(subActorId)}" name="${escapeXml(subActorName)}" actorType="individual">`);
-              lines.push(`          <bpmnShapeName>${escapeXml(subActor.bpmnShapeName)}</bpmnShapeName>`);
-              lines.push(`        </actor>`);
-              lines.push(`      </subActor>`);
-            } else {
-              lines.push(`      <subActor>`);
-              lines.push(`        <actor id="${escapeXml(subActorId)}" name="${escapeXml(subActorName)}" actorType="individual"/>`);
-              lines.push(`      </subActor>`);
-            }
-          });
-        }
-
-        lines.push('    </actor>');
-      } else {
-        lines.push(`    <actor id="${escapeXml(actorId)}" name="${escapeXml(actorName)}" actorType="${escapeXml(actorType)}"/>`);
-      }
-    });
-  } else if (headerData?.actors && typeof headerData.actors === 'string') {
-    // Legacy support - parse text-only actors into structured format
-    const actorNames = headerData.actors.split(/[,;]/).map(s => s.trim()).filter(Boolean);
-    if (actorNames.length > 0) {
-      actorNames.forEach((name, index) => {
-        lines.push(`    <actor id="actor-${index + 1}" name="${escapeXml(name)}" actorType="group"/>`);
-      });
-    }
   }
 
   // Required Resources (per idmXSD V2 schema)
@@ -866,9 +846,39 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, da
       const er = erDataMap?.[dataObj.id];
       if (er) {
         lines.push(`      <dataObjectAndEr id="DOER-${index + 1}">`);
-        lines.push(`        <associatedDataObject>${escapeXml(dataObj.id)}</associatedDataObject>`);
-        lines.push(`        <associatedEr>${escapeXml(er.id)}</associatedEr>`);
+        lines.push(`        <associatedDataObject ref="${escapeXml(dataObj.id)}"/>`);
+        lines.push(`        <associatedEr ref="${escapeXml(er.id)}"/>`);
         lines.push('      </dataObjectAndEr>');
+      }
+    });
+  }
+
+  // shapeAndActor links - map BPMN Pools/Lanes to Actors/SubActors
+  if (headerData?.actorsList && headerData.actorsList.length > 0) {
+    let shapeAndActorIndex = 0;
+    headerData.actorsList.forEach(actor => {
+      const actorId = actor.id || '';
+      const bpmnShape = actor.bpmnShapeName || actor.bpmnId;
+      if (bpmnShape && actorId) {
+        shapeAndActorIndex++;
+        lines.push(`      <shapeAndActor id="SA-${shapeAndActorIndex}">`);
+        lines.push(`        <associatedShape ref="${escapeXml(bpmnShape)}"/>`);
+        lines.push(`        <associatedActor ref="${escapeXml(actorId)}"/>`);
+        lines.push('      </shapeAndActor>');
+      }
+      // Also map subActors (lanes) to their BPMN shapes
+      if (actor.subActors && actor.subActors.length > 0) {
+        actor.subActors.forEach(subActor => {
+          const subActorId = subActor.id || '';
+          const subBpmnShape = subActor.bpmnShapeName;
+          if (subBpmnShape && subActorId) {
+            shapeAndActorIndex++;
+            lines.push(`      <shapeAndActor id="SA-${shapeAndActorIndex}">`);
+            lines.push(`        <associatedShape ref="${escapeXml(subBpmnShape)}"/>`);
+            lines.push(`        <associatedActor ref="${escapeXml(subActorId)}"/>`);
+            lines.push('      </shapeAndActor>');
+          }
+        });
       }
     });
   }
@@ -908,9 +918,9 @@ export const generateErXmlStandalone = (er, authorName = 'IDMxPPM User') => {
   const lines = [];
 
   lines.push('<?xml version="1.0" encoding="UTF-8"?>');
-  lines.push('<er xmlns="https://standards.buildingsmart.org/IDM/idmXML/2.0">');
+  lines.push('<er xmlns="https://standards.iso.org/iso/29481/-3/ed-2/en">');
 
-  const erGuid = er.guid || generateUUID();
+  const erGuid = ensureUUID(er.guid);
 
   // specId
   lines.push('  <specId');

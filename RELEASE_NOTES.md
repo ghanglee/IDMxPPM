@@ -1,5 +1,76 @@
 # IDMxPPM neo-Seoul — Release Notes
 
+## v1.2.2 (2026-02-13)
+
+### Highlights
+
+- **idmXSD v2.0 Only** — Removed v1.0 export support; all exports now use idmXSD v2.0 exclusively
+- **ISO Namespace** — Updated XML namespace to the official ISO URI (`standards.iso.org/iso/29481/-3/ed-2/en`)
+- **XSLT v2.0 Compliance** — Fixed HTML/PDF export stylesheet to correctly render v2.0 elements
+- **Parser Fixes** — Fixed multiple import issues including shapeActorMap ordering, subActor parsing, and `ref` attribute handling
+
+---
+
+### Changes
+
+#### Export: v1.0 Removed, v2.0 Standardized
+- Removed the idmXML v1.0 export option from the Save & Export dialog
+- Simplified export UI to show a single "idmXML (.xml)" option (always idmXSD 2.0)
+- Removed `idmXsdVersion` parameter from `generateIdmXml()` — the function now always generates v2.0
+- Updated XML namespace from `buildingsmart.org/IDM/idmXML/2.0` to `standards.iso.org/iso/29481/-3/ed-2/en`
+
+#### UUID Validation
+- Added `ensureUUID()` helper that validates existing GUIDs against the idmXSD uuid pattern before using them
+- Invalid or missing GUIDs are automatically replaced with newly generated UUIDs
+- Prevents malformed GUIDs from being written to exported idmXML files
+
+#### XSLT Stylesheet (HTML Export)
+- Updated namespace binding to `standards.iso.org/iso/29481/-3/ed-2/en` to match v2.0 output
+- Fixed author section to read from nested `<author><person>` / `<organization>` child elements (v2.0 structure)
+- Fixed creation date to read from `<changeLog @changeDateTime>` instead of removed `@creationDate`
+- Fixed description selectors (Summary, Aim & Scope, Benefits, Limitations, ER) to use `@title` attribute
+- Added sub-ER recursive rendering in the HTML output
+- Removed preconditions/postconditions templates (not in idmXSD v2.0)
+
+#### Parser Improvements (Import)
+- Fixed `subActor` parsing: v2.0 uses direct attributes on `<subActor id="..." name="..."/>`, with legacy `<subActor><actor>` fallback
+- Fixed `shapeActorMap` ordering bug: actor-to-BPMN-shape mappings were parsed after BCM but applied inside the UC block (which runs earlier), so they were never applied
+- Fixed `shapeAndActor` link parsing: now reads `ref` attribute with `textContent` fallback for backward compatibility
+- Fixed `dataObjectAndEr` link parsing: same `ref` attribute + `textContent` fallback
+- Updated `isIdmXml()` to detect the new ISO namespace (`standards.iso.org/iso/29481`)
+- Updated `detectIdmXmlVersion()` to recognize both old (`buildingsmart.org`) and new (`iso.org`) namespace URIs
+
+---
+
+### Compatibility
+
+- **Import** — Both idmXSD v1.0 and v2.0 files are accepted (auto-detected)
+- **Export** — idmXSD v2.0 only (v1.0 export removed)
+
+---
+
+## v1.2.1 (2026-02-13)
+
+### Highlights
+
+- **ER Import/Export in Hierarchy** — Import and export individual ERs directly from the ER Hierarchy toolbar
+- **bSDD Search UX** — Improved feedback with rotating hourglass, "Connecting to bSDD server..." message, and better error handling
+- **Example Figures** — Image upload support for the Examples field in Information Unit detail panel
+- **Unsaved Changes Prompt** — Users are prompted to apply unsaved detail panel changes before navigating to a different item
+
+---
+
+### New Features
+
+- Added Import ER and Export ER buttons to the ER Hierarchy toolbar in ContentPane
+- Added figure support (exampleImages) to the Examples field in IU detail panel
+- Improved bSDD search UX with rotating hourglass animation and "Connecting to bSDD server..." message on first search
+- Distinguished timeout vs cancellation errors in bSDD search results
+- Added guard against non-JSON API responses and non-iterable data from bSDD
+- Added snapshot-based detection to prompt users to apply unsaved detail panel changes before navigating
+
+---
+
 ## v1.2.0 (2026-02-09)
 
 ### Highlights
