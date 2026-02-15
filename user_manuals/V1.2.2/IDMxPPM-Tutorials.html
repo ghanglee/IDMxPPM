@@ -1,0 +1,1346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IDMxPPM neo-Seoul — Tutorial Series</title>
+<style>
+  :root {
+    --navy: #0a1628;
+    --blue: #1a73e8;
+    --blue-light: #e8f0fe;
+    --blue-mid: #4a90d9;
+    --accent: #00b4d8;
+    --text: #1a1a2e;
+    --text-light: #555;
+    --bg: #ffffff;
+    --bg-alt: #f8f9fb;
+    --border: #e0e4ea;
+    --success: #10b981;
+    --warning: #f59e0b;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    line-height: 1.7;
+  }
+
+  /* HERO */
+  .hero {
+    background: linear-gradient(135deg, var(--navy) 0%, #1a2744 50%, #1a3a5c 100%);
+    color: white;
+    padding: 4rem 2rem 3rem;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle at 30% 50%, rgba(26, 115, 232, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 70% 30%, rgba(0, 180, 216, 0.1) 0%, transparent 40%);
+  }
+  .hero > * { position: relative; z-index: 1; }
+  .hero .badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 20px;
+    padding: 0.3rem 1rem;
+    font-size: 0.8rem;
+    letter-spacing: 0.5px;
+    margin-bottom: 1.2rem;
+    text-transform: uppercase;
+  }
+  .hero h1 {
+    font-size: 2.6rem;
+    font-weight: 700;
+    margin-bottom: 0.4rem;
+    letter-spacing: -0.5px;
+  }
+  .hero h1 span { color: var(--accent); }
+  .hero .subtitle {
+    font-size: 1.15rem;
+    opacity: 0.85;
+    max-width: 640px;
+    margin: 0.8rem auto 1.5rem;
+  }
+  .hero .meta {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    font-size: 0.85rem;
+    opacity: 0.7;
+  }
+  .hero .meta span { display: flex; align-items: center; gap: 0.4rem; }
+
+  /* NAV */
+  .toc {
+    max-width: 900px;
+    margin: -2rem auto 2rem;
+    padding: 1.5rem 2rem;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.1);
+    position: relative;
+    z-index: 2;
+  }
+  .toc h2 {
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-light);
+    margin-bottom: 1rem;
+  }
+  .toc-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+  }
+  .toc-grid a {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    text-decoration: none;
+    color: var(--text);
+    padding: 0.6rem 0.8rem;
+    border-radius: 8px;
+    transition: background 0.2s, color 0.2s;
+    font-size: 0.92rem;
+  }
+  .toc-grid a:hover { background: var(--blue-light); color: var(--blue); }
+  .toc-grid a .num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--blue-light);
+    color: var(--blue);
+    font-size: 0.75rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .toc-grid a.new-badge::after {
+    content: 'NEW';
+    display: inline-block;
+    background: var(--success);
+    color: white;
+    font-size: 0.6rem;
+    font-weight: 700;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    margin-left: auto;
+    letter-spacing: 0.5px;
+  }
+  .toc-grid a.updated-badge::after {
+    content: 'UPDATED';
+    display: inline-block;
+    background: var(--warning);
+    color: white;
+    font-size: 0.6rem;
+    font-weight: 700;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    margin-left: auto;
+    letter-spacing: 0.5px;
+  }
+
+  /* MAIN */
+  .tutorials { max-width: 900px; margin: 0 auto; padding: 0 2rem 4rem; }
+
+  /* TUTORIAL CARD */
+  .tutorial {
+    margin-bottom: 3.5rem;
+    scroll-margin-top: 2rem;
+  }
+  .tutorial-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.2rem;
+  }
+  .tutorial-num {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--blue), var(--accent));
+    color: white;
+    font-size: 1.1rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .tutorial-header h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--navy);
+  }
+  .tutorial-header .duration {
+    margin-left: auto;
+    font-size: 0.8rem;
+    color: var(--text-light);
+    background: var(--bg-alt);
+    padding: 0.25rem 0.7rem;
+    border-radius: 12px;
+  }
+  .tutorial-header .new-tag {
+    margin-left: auto;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: white;
+    background: var(--success);
+    padding: 0.25rem 0.7rem;
+    border-radius: 12px;
+    letter-spacing: 0.5px;
+  }
+  .tutorial-header .updated-tag {
+    margin-left: auto;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: white;
+    background: var(--warning);
+    padding: 0.25rem 0.7rem;
+    border-radius: 12px;
+    letter-spacing: 0.5px;
+  }
+  .tutorial p {
+    margin-bottom: 1rem;
+    color: var(--text-light);
+  }
+  .tutorial .gif-container {
+    margin: 1.2rem 0;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--bg-alt);
+    text-align: center;
+  }
+  .tutorial .gif-container img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+  }
+  .tutorial .gif-container .gif-caption {
+    padding: 0.6rem 1rem;
+    font-size: 0.82rem;
+    color: var(--text-light);
+    border-top: 1px solid var(--border);
+    background: white;
+  }
+  .tutorial .placeholder-gif {
+    margin: 1.2rem 0;
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 3rem 2rem;
+    text-align: center;
+    background: var(--bg-alt);
+    color: var(--text-light);
+    font-size: 0.9rem;
+  }
+  .tutorial .placeholder-gif .icon { font-size: 2rem; margin-bottom: 0.5rem; display: block; }
+
+  /* STEPS */
+  .steps {
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem 1.5rem;
+    margin: 1rem 0;
+  }
+  .steps h3 {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--blue);
+    margin-bottom: 0.8rem;
+  }
+  .step {
+    display: flex;
+    gap: 0.8rem;
+    padding: 0.5rem 0;
+  }
+  .step:not(:last-child) { border-bottom: 1px solid var(--border); }
+  .step-num {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--blue);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.72rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .step-text { font-size: 0.92rem; color: var(--text); }
+  .step-text strong { color: var(--navy); }
+
+  /* TIP BOX */
+  .tip {
+    display: flex;
+    gap: 0.7rem;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 8px;
+    padding: 0.8rem 1rem;
+    margin: 1rem 0;
+    font-size: 0.9rem;
+    color: #166534;
+  }
+  .tip .icon { font-size: 1.1rem; flex-shrink: 0; }
+
+  .note {
+    display: flex;
+    gap: 0.7rem;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 8px;
+    padding: 0.8rem 1rem;
+    margin: 1rem 0;
+    font-size: 0.9rem;
+    color: #1e40af;
+  }
+  .note .icon { font-size: 1.1rem; flex-shrink: 0; }
+
+  /* KEY POINT PILLS */
+  .key-point {
+    display: inline-block;
+    background: var(--blue-light);
+    color: var(--blue);
+    padding: 0.2rem 0.65rem;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    margin: 0.15rem 0.2rem;
+  }
+
+  /* FORMATS TABLE */
+  .formats-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.9rem;
+  }
+  .formats-table th {
+    background: var(--navy);
+    color: white;
+    padding: 0.6rem 1rem;
+    text-align: left;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .formats-table td {
+    padding: 0.55rem 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .formats-table tr:nth-child(even) { background: var(--bg-alt); }
+  .formats-table .ext {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    color: var(--blue);
+    font-weight: 600;
+  }
+
+  /* BADGE TABLE */
+  .badge-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.9rem;
+  }
+  .badge-table th {
+    background: var(--navy);
+    color: white;
+    padding: 0.6rem 1rem;
+    text-align: left;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .badge-table td {
+    padding: 0.55rem 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .badge-table tr:nth-child(even) { background: var(--bg-alt); }
+  .badge-table .badge-pill {
+    display: inline-block;
+    padding: 0.15rem 0.6rem;
+    border-radius: 10px;
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+  .badge-pool { background: #d1fae5; color: #059669; }
+  .badge-lane { background: #d1fae5; color: #059669; }
+  .badge-manual { background: #e5e7eb; color: #6b7280; }
+
+  /* DIVIDER */
+  .divider {
+    border: none;
+    height: 1px;
+    background: var(--border);
+    margin: 2.5rem 0;
+  }
+
+  /* FOOTER */
+  .footer {
+    text-align: center;
+    padding: 2rem;
+    background: var(--bg-alt);
+    border-top: 1px solid var(--border);
+    font-size: 0.85rem;
+    color: var(--text-light);
+  }
+  .footer a { color: var(--blue); text-decoration: none; }
+  .footer a:hover { text-decoration: underline; }
+
+  @media (max-width: 768px) {
+    .toc-grid { grid-template-columns: 1fr; }
+    .hero h1 { font-size: 1.8rem; }
+    .hero .meta { flex-direction: column; gap: 0.4rem; }
+    .tutorials { padding: 0 1rem 3rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="badge">Tutorial Series</div>
+  <h1>IDMxPPM <span>neo-Seoul</span></h1>
+  <p class="subtitle">
+    A step-by-step guide to authoring ISO 29481-compliant Information Delivery Manuals
+    for the AEC industry
+  </p>
+  <div class="meta">
+    <span>v1.2.2</span>
+    <span>14 Tutorials</span>
+    <span>Building Informatics Group, Yonsei University</span>
+  </div>
+</div>
+
+<!-- TABLE OF CONTENTS -->
+<nav class="toc">
+  <h2>Tutorials</h2>
+  <div class="toc-grid">
+    <a href="#t1"><span class="num">1</span> Overview</a>
+    <a href="#t2"><span class="num">2</span> Quick Start</a>
+    <a href="#t3"><span class="num">3</span> Navigation</a>
+    <a href="#t4"><span class="num">4</span> BPMN Diagram</a>
+    <a href="#t5"><span class="num">5</span> Header Information</a>
+    <a href="#t6" class="updated-badge"><span class="num">6</span> Use Case &amp; Actors</a>
+    <a href="#t7" class="updated-badge"><span class="num">7</span> Exchange Requirements</a>
+    <a href="#t8"><span class="num">8</span> Validation</a>
+    <a href="#t9" class="updated-badge"><span class="num">9</span> Save &amp; Export</a>
+    <a href="#t10"><span class="num">10</span> Server Connection</a>
+    <a href="#t11"><span class="num">11</span> Server Browser</a>
+    <a href="#t12" class="new-badge"><span class="num">12</span> Task Detail Panel</a>
+    <a href="#t13" class="new-badge"><span class="num">13</span> Actor-BPMN Linking</a>
+    <a href="#t14" class="new-badge"><span class="num">14</span> Importing Legacy Files</a>
+  </div>
+</nav>
+
+<!-- TUTORIALS -->
+<main class="tutorials">
+
+  <!-- TUTORIAL 1 -->
+  <section class="tutorial" id="t1">
+    <div class="tutorial-header">
+      <div class="tutorial-num">1</div>
+      <h2>Overview</h2>
+    </div>
+    <p>
+      IDMxPPM neo-Seoul is a desktop application for authoring Information Delivery Manuals (IDMs)
+      compliant with ISO 29481-1 and ISO 29481-3. Built for the AEC industry, it provides an integrated
+      environment to model use cases, define exchange requirements, create BPMN 2.0 process diagrams,
+      and export machine-readable IDM specifications.
+    </p>
+    <div class="gif-container">
+      <img src="https://raw.githubusercontent.com/ghanglee/IDMxPPM/main/user_manuals/V1.1.0/01-Overview.gif" alt="Overview — Startup screen with project options">
+      <div class="gif-caption">The startup screen presents pathways into the application</div>
+    </div>
+    <p>
+      When you launch the application, the startup screen offers these options:
+    </p>
+    <div class="steps">
+      <h3>Startup Options</h3>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text"><strong>Blank Project</strong> — Start a brand-new IDM specification from scratch with an empty BPMN canvas and default metadata.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text"><strong>Sample Project</strong> — Open a pre-built example IDM ("Generic Data Exchange") to explore the application's features with realistic data already populated.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text"><strong>Open File</strong> — Load an existing <code>.idm</code>, <code>.xml</code>, <code>.xppm</code>, <code>.zip</code>, or <code>.bpmn</code> project file from your computer.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-text"><strong>Open from Server</strong> — Browse and open a specification stored on a connected server. This option appears when you are connected and authenticated to a server (see Tutorial 10).</div>
+      </div>
+    </div>
+    <div class="tip">
+      <span class="icon">&#9889;</span>
+      <span>New users should start with the <strong>Sample Project</strong> to familiarize themselves with all features before creating their own IDM specifications.</span>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- TUTORIAL 2 -->
+  <section class="tutorial" id="t2">
+    <div class="tutorial-header">
+      <div class="tutorial-num">2</div>
+      <h2>Quick Start</h2>
+    </div>
+    <p>
+      Get up and running in seconds. This tutorial walks you through opening the sample project
+      and arriving at the main BPMN editor workspace.
+    </p>
+    <div class="gif-container">
+      <img src="https://raw.githubusercontent.com/ghanglee/IDMxPPM/main/user_manuals/V1.1.0/02-QuickStart.gif" alt="Quick Start — Opening the sample project">
+      <div class="gif-caption">From startup to the BPMN editor in one click</div>
+    </div>
+    <div class="steps">
+      <h3>Steps</h3>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text">On the startup screen, click <strong>Sample Project</strong>.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text">The <strong>IDM Header panel</strong> opens automatically on the left, showing the specification title: "Information Delivery Manual for the Generic Data Exchange."</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text">Close the header panel by clicking the <strong>&times;</strong> button (or clicking the Header icon again) to reveal the full BPMN canvas.</div>
+      </div>
+    </div>
+    <p>
+      You are now in the main workspace. The BPMN diagram shows two swim lanes (Sender and Receiver) with tasks,
+      gateways, and data objects representing a complete exchange process.
+    </p>
+    <div class="note">
+      <span class="icon">&#128221;</span>
+      <span>The title bar displays the current specification name. The status bar at the bottom shows the number of Exchange Requirements (ERs), Library items, server connection status, and the validation state.</span>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- TUTORIAL 3 -->
+  <section class="tutorial" id="t3">
+    <div class="tutorial-header">
+      <div class="tutorial-num">3</div>
+      <h2>Navigation</h2>
+    </div>
+    <p>
+      The vertical sidebar on the far left contains all the major function panels.
+      Each icon toggles a dedicated panel that slides open alongside the BPMN canvas.
+    </p>
+    <div class="gif-container">
+      <img src="https://raw.githubusercontent.com/ghanglee/IDMxPPM/main/user_manuals/V1.1.0/03-Navigation.gif" alt="Navigation — Cycling through all sidebar panels">
+      <div class="gif-caption">Sidebar panels: IDM Header, Use Case, Exchange Requirements, and Server</div>
+    </div>
+    <div class="steps">
+      <h3>Sidebar Icons (Top to Bottom)</h3>
+      <div class="step">
+        <div class="step-num">&#128196;</div>
+        <div class="step-text"><strong>IDM Header</strong> — Specification metadata: title, version, status, language, authors, and revision history.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">&#128101;</div>
+        <div class="step-text"><strong>Use Case</strong> — Actors with BPMN linking, classification, purpose, actor roles, and target project phase selections (ISO 22263, AIA B101, RIBA).</div>
+      </div>
+      <div class="step">
+        <div class="step-num">&#128203;</div>
+        <div class="step-text"><strong>Exchange Requirements</strong> — Hierarchical view of all ERs and their Information Units, with add/delete/reorder/import/export controls.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">&#9989;</div>
+        <div class="step-text"><strong>Validate</strong> — Run ISO 29481-3 compliance checks against the current specification, including recursive sub-ER validation.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">&#128190;</div>
+        <div class="step-text"><strong>Save &amp; Export</strong> — Export to IDM, idmXML (v2.0), HTML, ZIP, BPMN, or save to server.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">&#9729;</div>
+        <div class="step-text"><strong>Server</strong> — Connect to a server, log in, and manage your server connection. A green dot indicates an active authenticated session.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">&#10068;</div>
+        <div class="step-text"><strong>Help</strong> — Opens this tutorial page in your browser.</div>
+      </div>
+    </div>
+    <div class="tip">
+      <span class="icon">&#9889;</span>
+      <span>Click any sidebar icon a second time to <strong>close</strong> its panel and reclaim canvas space. Only one panel can be open at a time.</span>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- TUTORIAL 4 -->
+  <section class="tutorial" id="t4">
+    <div class="tutorial-header">
+      <div class="tutorial-num">4</div>
+      <h2>Create a BPMN Diagram</h2>
+    </div>
+    <p>
+      The BPMN editor is the heart of IDMxPPM. It provides a full BPMN 2.0 process diagram canvas where
+      you model the information exchange workflow between participants.
+    </p>
+    <div class="gif-container">
+      <img src="https://raw.githubusercontent.com/ghanglee/IDMxPPM/main/user_manuals/V1.1.0/04-BPMN-Diagram.gif" alt="BPMN Diagram — Interacting with tasks and data objects">
+      <div class="gif-caption">Click BPMN elements to access context actions and assign Exchange Requirements</div>
+    </div>
+    <div class="steps">
+      <h3>Key Interactions</h3>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text"><strong>Add elements</strong> from the vertical palette on the left: tasks, events, gateways, data objects, and sequence flows.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text"><strong>Click a task</strong> to open the <strong>Task Detail Panel</strong> on the right, where you can edit the task's name and documentation (see Tutorial 12).</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text"><strong>Double-click a data object</strong> (e.g., "er_PrepData") to open the <strong>ER Panel</strong>, which lets you edit the Exchange Requirement linked to that data object.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-text">Use <strong>drag-and-drop</strong> to reposition elements. Connect them with sequence flows by dragging from one element's edge to another.</div>
+      </div>
+    </div>
+    <p>
+      The BPMN canvas supports standard BPMN 2.0 elements: start/end events, tasks (User Task, Service Task, etc.), exclusive/parallel gateways,
+      message flows, data objects, and swim lane pools. The toolbar beneath the canvas provides zoom, undo/redo,
+      auto-layout, and export buttons.
+    </p>
+    <div class="note">
+      <span class="icon">&#128221;</span>
+      <span>Data objects are the bridge between the BPMN process map and Exchange Requirements. Each data object should be assigned to an ER to create a complete IDM specification. Tasks can carry their own name and documentation for process documentation purposes.</span>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- TUTORIAL 5 -->
+  <section class="tutorial" id="t5">
+    <div class="tutorial-header">
+      <div class="tutorial-num">5</div>
+      <h2>Header Information</h2>
+    </div>
+    <p>
+      The IDM Header panel captures all the metadata for your specification. This information
+      appears in exported documents and identifies the IDM uniquely.
+    </p>
+    <div class="gif-container">
+      <img src="https://raw.githubusercontent.com/ghanglee/IDMxPPM/main/user_manuals/V1.1.0/05-HeaderInfo.gif" alt="Header Information — IDM Header panel with authors and revision history">
+      <div class="gif-caption">Header metadata: title, version, status, language, authors, and revision history</div>
+    </div>
+    <div class="steps">
+      <h3>Header Fields</h3>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text"><strong>IDM Title</strong> — The full name of your Information Delivery Manual specification (displayed in the title bar).</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text"><strong>Version &amp; Status</strong> — Track the specification version (e.g., "1.0") and its current status (Draft, Review, Published, Deprecated).</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text"><strong>Language</strong> — Set the specification language (e.g., "EN - English") for multi-language IDM support.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-text"><strong>Authors</strong> — Add one or more authors with name, organization, and role fields. Scroll down to access the full author list.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-text"><strong>Revision History</strong> — Maintain a chronological log of changes with date, author, and description for each revision.</div>
+      </div>
+    </div>
+    <div class="tip">
+      <span class="icon">&#9889;</span>
+      <span>The header metadata is included in all export formats (idmXML, HTML, ZIP) and is required for ISO 29481-3 compliance.</span>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- TUTORIAL 6 — UPDATED -->
+  <section class="tutorial" id="t6">
+    <div class="tutorial-header">
+      <div class="tutorial-num">6</div>
+      <h2>Use Case &amp; Actors</h2>
+      <span class="updated-tag">UPDATED in v1.2.2</span>
+    </div>
+    <p>
+      The Use Case panel defines the context and purpose of the information exchange.
+      It captures who is involved, what the exchange achieves, and which project phases it applies to.
+      In v1.2.2, actors are now visually linked to BPMN Pools and Lanes with bidirectional synchronization.
+    </p>
+    <div class="gif-container">
+      <img src="https://raw.githubusercontent.com/ghanglee/IDMxPPM/main/user_manuals/V1.1.0/06-UseCaseInfo.gif" alt="Use Case Information — Actor roles and target project phases">
+      <div class="gif-caption">Use Case: classification, actor roles (Sender/Receiver), and project phase mapping</div>
+    </div>
+    <div class="steps">
+      <h3>Use Case Fields</h3>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text"><strong>Region &amp; Language</strong> — Select the target region and language for the use case. Choose "International" for region-agnostic specifications.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text"><strong>Optional fields</strong> — Expand to add Purpose, Summary, Classification, Aim &amp; Scope, Benefits, Limitations, Preconditions, and Postconditions.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text"><strong>Actor Roles</strong> — Define actors and their roles. Each actor has a two-line layout: Name + Badge on Line 1, Role on Line 2. See Tutorial 13 for BPMN linking details.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-text"><strong>Sub-Actors</strong> — Add sub-actors under each actor. Sub-actors correspond to BPMN Lanes within a Pool and can also have roles.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-text"><strong>Target Project Phases</strong> — Check the applicable project stages from ISO 22263, AIA B101, or RIBA Plan of Work.</div>
+      </div>
+    </div>
+    <p>
+      <span class="key-point">ISO 22263</span>
+      <span class="key-point">AIA B101 (US)</span>
+      <span class="key-point">RIBA Plan of Work (UK)</span>
+    </p>
+
+    <div class="steps">
+      <h3>Actor Swimlane Badges</h3>
+      <p>Each actor displays a colored badge indicating its BPMN association:</p>
+      <div class="step">
+        <div class="step-num" style="background: var(--success);">P</div>
+        <div class="step-text"><strong>Swimlane (Pool)</strong> — Green badge. The actor is linked to a BPMN Pool. Renaming the actor updates the Pool name and vice versa.</div>
+      </div>
+      <div class="step">
+        <div class="step-num" style="background: var(--success);">L</div>
+        <div class="step-text"><strong>Swimlane (Lane)</strong> — Green badge. The sub-actor is linked to a BPMN Lane within a Pool. Names sync bidirectionally.</div>
+      </div>
+      <div class="step">
+        <div class="step-num" style="background: #9ca3af;">M</div>
+        <div class="step-text"><strong>Manual</strong> — Gray badge. The actor is not linked to a BPMN element. Click the badge to open the link modal and associate it with a Pool or Lane.</div>
+      </div>
+    </div>
+    <div class="tip">
+      <span class="icon">&#9889;</span>
+      <span>When you add sub-actors to a Pool-linked actor, BPMN Lanes are <strong>automatically created</strong> in the Pool. See Tutorial 13 for the full actor-BPMN linking workflow.</span>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- TUTORIAL 7 — UPDATED -->
+  <section class="tutorial" id="t7">
+    <div class="tutorial-header">
+      <div class="tutorial-num">7</div>
+      <h2>Exchange Requirements</h2>
+      <span class="updated-tag">UPDATED in v1.2.2</span>
+    </div>
+    <p>
+      Exchange Requirements (ERs) are the core of the IDM specification. They define <em>what information</em>
+      needs to be exchanged, broken down into hierarchical Information Units with data types, optionality, and external schema mappings.
+      In v1.2.2, the ER hierarchy toolbar now includes Import/Export ER buttons, and Information Units support example images.
+    </p>
+    <div class="gif-container">
+      <img src="https://raw.githubusercontent.com/ghanglee/IDMxPPM/main/user_manuals/V1.1.0/07-ExchangeRequirements.gif" alt="Exchange Requirements — Hierarchy and individual ER detail">
+      <div class="gif-caption">ER hierarchy with er_PrepData expanded to show Information Units</div>
+    </div>
+    <div class="steps">
+      <h3>Working with ERs</h3>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text"><strong>Hierarchy View</strong> — The left panel shows the ER tree. The root ER is the top-level node containing all sub-ERs and their information units.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text"><strong>Toolbar</strong> — Use the toolbar to add (+), delete, reorder, expand, or collapse ERs. <strong>Import ER</strong> and <strong>Export ER</strong> buttons let you share ERs as erXML files.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text"><strong>Individual ER View</strong> — Click any ER to open its detail panel on the right. The root ER itself appears as the first row in the tree table and can be selected for editing.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-text"><strong>Information Units</strong> — Each unit has a name, data type, description, required/optional toggle, and support for <strong>example images</strong> (upload reference images in the detail panel).</div>
+      </div>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-text"><strong>Detail Panel</strong> — The resizable bottom panel provides an editor for the selected item (ER, Sub-ER, or IU). Drag the resize handle to adjust the split.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">6</div>
+        <div class="step-text"><strong>Unsaved Changes</strong> — If you have pending edits in the detail panel and click another item, you'll be prompted to apply or discard your changes.</div>
+      </div>
+    </div>
+    <div class="tip">
+      <span class="icon">&#9889;</span>
+      <span>ERs can be nested to create complex hierarchies. Leaf ERs (those without sub-ERs) must have at least one Information Unit. ERs that only contain sub-ERs are valid per ISO 29481-3.</span>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- TUTORIAL 8 -->
+  <section class="tutorial" id="t8">
+    <div class="tutorial-header">
+      <div class="tutorial-num">8</div>
+      <h2>Validation</h2>
+    </div>
+    <p>
+      Before exporting, validate your IDM specification against ISO 29481-3 requirements.
+      The validation engine checks for completeness, consistency, and compliance automatically.
+      In v1.2.2, validation recursively checks all sub-ERs in the hierarchy.
+    </p>
+    <div class="gif-container">
+      <img src="https://raw.githubusercontent.com/ghanglee/IDMxPPM/main/user_manuals/V1.1.0/08-Validation.gif" alt="Validation — All checks passed with ISO 29481-3 compliance">
+      <div class="gif-caption">Validation Results: 0 errors, 0 warnings — ready for export</div>
+    </div>
+    <div class="steps">
+      <h3>Steps</h3>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text">Click the <strong>Validate</strong> button (checkmark icon) in the left sidebar.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text">The <strong>Validation Results</strong> dialog appears, showing the count of <strong>Errors</strong>, <strong>Warnings</strong>, and <strong>Total</strong> issues.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text">If all checks pass, you will see a green checkmark with <strong>"All validation checks passed!"</strong> and the message "Your IDM specification is ready for export."</div>
+      </div>
+    </div>
+    <p>
+      The validation engine performs an <strong>ISO 29481-3 Compliance Check</strong> that verifies:
+    </p>
+    <p>
+      <span class="key-point">BPMN structure</span>
+      <span class="key-point">ER hierarchy (recursive)</span>
+      <span class="key-point">Data object linkages</span>
+      <span class="key-point">Required metadata</span>
+      <span class="key-point">Information Unit integrity</span>
+      <span class="key-point">Sub-ER validation</span>
+    </p>
+    <div class="note">
+      <span class="icon">&#128221;</span>
+      <span>If errors are found, each issue is listed with a description and a link to the offending element. Fix the issues and re-validate until all checks pass. You can still save incomplete work even with validation errors.</span>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- TUTORIAL 9 — UPDATED -->
+  <section class="tutorial" id="t9">
+    <div class="tutorial-header">
+      <div class="tutorial-num">9</div>
+      <h2>Save &amp; Export</h2>
+      <span class="updated-tag">UPDATED in v1.2.2</span>
+    </div>
+    <p>
+      IDMxPPM supports multiple export formats to suit different downstream workflows — from
+      full project files to ISO-compliant XML, self-contained HTML documents, and server storage.
+      As of v1.2.2, all idmXML exports use <strong>idmXSD v2.0 exclusively</strong> with the official ISO namespace.
+    </p>
+    <div class="gif-container">
+      <img src="https://raw.githubusercontent.com/ghanglee/IDMxPPM/main/user_manuals/V1.1.0/09-SaveExport.gif" alt="Save and Export — Dialog showing export formats">
+      <div class="gif-caption">Choose from multiple export formats, each suited to a different workflow</div>
+    </div>
+    <div class="steps">
+      <h3>Steps</h3>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text">Click the <strong>Save &amp; Export</strong> button (download icon) in the left sidebar.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text">Enter a <strong>File name</strong> (defaults to the Short Title, e.g., "GDE-IDM").</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text">Select an <strong>export format</strong> from the list (see table below).</div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-text">Click <strong>Export</strong>. In the desktop app, a native <strong>OS save dialog</strong> lets you choose the save location and confirm overwrites.</div>
+      </div>
+    </div>
+
+    <table class="formats-table">
+      <thead>
+        <tr>
+          <th>Format</th>
+          <th>Extension</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>IDM Project</strong></td>
+          <td class="ext">.idm</td>
+          <td>Full project file with all data and library — use this to save your work and reopen later.</td>
+        </tr>
+        <tr>
+          <td><strong>idmXML</strong></td>
+          <td class="ext">.xml</td>
+          <td>ISO 29481-3 compliant XML (idmXSD 2.0) with official ISO namespace. The standard format for machine-readable IDM exchange.</td>
+        </tr>
+        <tr>
+          <td><strong>HTML Document</strong></td>
+          <td class="ext">.html</td>
+          <td>Self-contained HTML with embedded images and BPMN diagram (SVG). Ideal for sharing and printing to PDF.</td>
+        </tr>
+        <tr>
+          <td><strong>ZIP Bundle</strong></td>
+          <td class="ext">.zip</td>
+          <td>Archive containing idmXML + BPMN + images + project data in one package.</td>
+        </tr>
+        <tr>
+          <td><strong>BPMN Only</strong></td>
+          <td class="ext">.bpmn</td>
+          <td>Process map diagram only — standard BPMN 2.0 XML for use in other BPM tools.</td>
+        </tr>
+        <tr>
+          <td><strong>Save to Server</strong></td>
+          <td class="ext">cloud</td>
+          <td>Save/update the specification on the connected server. Requires authentication (see Tutorial 10).</td>
+        </tr>
+        <tr>
+          <td><strong>XSLT Template</strong></td>
+          <td class="ext">.xsl</td>
+          <td>Download the default XSLT stylesheet to customize HTML export formatting.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="note">
+      <span class="icon">&#128221;</span>
+      <span>The v1.0 idmXML export option has been removed in v1.2.2. All exports now use idmXSD v2.0 with the official ISO namespace (<code>standards.iso.org/iso/29481/-3/ed-2/en</code>). Import still supports both v1.0 and v2.0 files.</span>
+    </div>
+    <div class="tip">
+      <span class="icon">&#9889;</span>
+      <span>Quick-export buttons are also available in the bottom toolbar: <strong>SVG | BPMN | PNG</strong> for rapid diagram-only exports. When closing a project with unsaved changes, choosing "Save" opens the export dialog and automatically closes the project after saving.</span>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- TUTORIAL 10 -->
+  <section class="tutorial" id="t10">
+    <div class="tutorial-header">
+      <div class="tutorial-num">10</div>
+      <h2>Server Connection</h2>
+    </div>
+    <p>
+      IDMxPPM can optionally connect to a self-hosted server for centralized IDM specification storage and multi-user collaboration.
+      The server is fully optional — the app works 100% offline with local file save/load.
+    </p>
+    <div class="steps">
+      <h3>Server Prerequisites</h3>
+      <p>Before connecting, a server must be deployed. The following are required on the machine hosting the server:</p>
+      <div class="step">
+        <div class="step-num">&#9670;</div>
+        <div class="step-text"><strong>Docker Desktop</strong> (v4.0+) — download from <a href="https://www.docker.com/products/docker-desktop/" target="_blank">docker.com</a>. Includes Docker Engine and Docker Compose. Available for Linux, macOS, and Windows.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">&#9670;</div>
+        <div class="step-text"><strong>RAM:</strong> 1 GB minimum (2 GB recommended) for MongoDB and the API server.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">&#9670;</div>
+        <div class="step-text"><strong>Disk:</strong> 1 GB minimum, plus storage for specifications.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">&#9670;</div>
+        <div class="step-text"><strong>Network:</strong> Client machines must be able to reach the server via HTTP/HTTPS (same LAN, VPN, or public URL).</div>
+      </div>
+    </div>
+    <div class="note">
+      <span class="icon">&#128221;</span>
+      <span>If you prefer not to use Docker, you can install the server manually with <strong>Node.js 20+</strong> and <strong>MongoDB 7+</strong>. See the <strong>API User Manual</strong> (<code>docs/API_User_Manual.md</code>) for manual deployment instructions.</span>
+    </div>
+    <div class="steps">
+      <h3>Connecting to a Server</h3>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text">Click the <strong>Server</strong> icon in the vertical menu bar (cloud icon).</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text">Enter the <strong>Server URL</strong> (e.g., <code>http://localhost:3001</code>) and click <strong>Connect</strong>.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text"><strong>Login</strong> with your email and password, or <strong>Register</strong> a new account (the first user automatically becomes admin).</div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-text">Once authenticated, a <strong>green dot</strong> appears on the server icon and the status bar shows <strong>"Server"</strong>.</div>
+      </div>
+    </div>
+    <p>
+      The server connection modal has three states:
+    </p>
+    <p>
+      <span class="key-point">Not Connected</span>
+      <span class="key-point">Connected (login/register)</span>
+      <span class="key-point">Authenticated</span>
+    </p>
+    <div class="steps">
+      <h3>User Roles</h3>
+      <div class="step">
+        <div class="step-num">A</div>
+        <div class="step-text"><strong>Admin</strong> — Full access to all specs. Can update and delete any specification. The first registered user becomes admin.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">E</div>
+        <div class="step-text"><strong>Editor</strong> — Can create, update, and delete own specs. Cannot modify others' specifications.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">V</div>
+        <div class="step-text"><strong>Viewer</strong> — Can browse and open any spec. Can create and manage own specs only.</div>
+      </div>
+    </div>
+    <div class="tip">
+      <span class="icon">&#9889;</span>
+      <span>With Docker Desktop installed, server deployment is as simple as: <code>cd server && cp .env.example .env && docker-compose up -d</code>. See the <strong>API User Manual</strong> for details.</span>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- TUTORIAL 11 -->
+  <section class="tutorial" id="t11">
+    <div class="tutorial-header">
+      <div class="tutorial-num">11</div>
+      <h2>Server Browser</h2>
+    </div>
+    <p>
+      The Server Browser lets you browse, search, and open IDM specifications stored on the connected server.
+      It provides a full-featured table with search, filtering, sorting, and pagination.
+    </p>
+    <div class="steps">
+      <h3>Opening the Server Browser</h3>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text">Click <strong>"Open from Server"</strong> on the Startup Screen (requires server connection), or use the server connection modal.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text">The Server Browser modal opens, showing all available specifications on the server.</div>
+      </div>
+    </div>
+    <div class="steps">
+      <h3>Browsing &amp; Searching</h3>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text"><strong>Search</strong> — Type in the search box to filter by title or short title (full-text search).</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text"><strong>Filter by Status</strong> — Use the dropdown to show only specs with a specific status (NP, WD, CD, DIS, IS).</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text"><strong>Sort</strong> — Click any column header to sort by Title, Status, Version, ER Count, Author, or Modified Date.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-text"><strong>Paginate</strong> — 15 specs per page with Previous/Next navigation.</div>
+      </div>
+    </div>
+    <p>
+      Status badges are color-coded:
+      <span class="key-point" style="background: #e5e7eb; color: #6b7280;">NP</span>
+      <span class="key-point" style="background: #dbeafe; color: #2563eb;">WD</span>
+      <span class="key-point" style="background: #fed7aa; color: #c2410c;">CD</span>
+      <span class="key-point" style="background: #e9d5ff; color: #7c3aed;">DIS</span>
+      <span class="key-point" style="background: #d1fae5; color: #059669;">IS</span>
+    </p>
+    <div class="tip">
+      <span class="icon">&#9889;</span>
+      <span>After opening a spec from the server, use <strong>"Save to Server"</strong> in the export dialog to push your changes back. The status bar shows <strong>"Server (synced)"</strong> to confirm.</span>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- TUTORIAL 12 — NEW -->
+  <section class="tutorial" id="t12">
+    <div class="tutorial-header">
+      <div class="tutorial-num">12</div>
+      <h2>Task Detail Panel</h2>
+      <span class="new-tag">NEW in v1.2.2</span>
+    </div>
+    <p>
+      The Task Detail Panel allows you to edit the <strong>name</strong> and <strong>documentation</strong>
+      (description) of any BPMN task directly from the UI. Task properties are stored as standard BPMN 2.0
+      elements and are automatically preserved through all save and export operations.
+    </p>
+    <div class="placeholder-gif">
+      <span class="icon">&#128466;</span>
+      Click any BPMN task to open the Task Detail Panel on the right
+    </div>
+    <div class="steps">
+      <h3>Opening the Panel</h3>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text"><strong>Click any task</strong> on the BPMN canvas (Task, User Task, Service Task, Send Task, Receive Task, Manual Task, Business Rule Task, Script Task, Call Activity, or Sub Process).</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text">The <strong>Task Detail Panel</strong> opens on the right side, showing the task type (e.g., "UserTask") and editable fields for Name and Documentation.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text">Edit the <strong>Name</strong> (updates the label on the BPMN canvas) and <strong>Documentation</strong> (a longer description of the task's purpose).</div>
+      </div>
+    </div>
+    <div class="steps">
+      <h3>Saving Changes</h3>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text">Click the <strong>Save</strong> button, or use the keyboard shortcut <strong>Ctrl/Cmd + Enter</strong>.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text">An <strong>"Unsaved"</strong> badge appears when you have pending changes. The Save button is disabled when there are no changes.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text">Click the <strong>&times;</strong> button or click on an empty area of the canvas to close the panel.</div>
+      </div>
+    </div>
+    <div class="note">
+      <span class="icon">&#128221;</span>
+      <span>The Task Detail Panel and the ER Panel are <strong>mutually exclusive</strong> — opening one automatically closes the other. Click a task to see its details; double-click a data object to see its ER.</span>
+    </div>
+    <div class="tip">
+      <span class="icon">&#9889;</span>
+      <span>Task name and documentation are standard BPMN 2.0 properties. They are preserved in all export formats (.idm, .xml, .zip, .bpmn, server) without any extra configuration.</span>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- TUTORIAL 13 — NEW -->
+  <section class="tutorial" id="t13">
+    <div class="tutorial-header">
+      <div class="tutorial-num">13</div>
+      <h2>Actor-to-BPMN Linking</h2>
+      <span class="new-tag">NEW in v1.2.2</span>
+    </div>
+    <p>
+      Actors in the Use Case panel can be linked to BPMN Pools and Lanes, creating a
+      <strong>bidirectional relationship</strong> between the process map and the use case specification.
+      When linked, names stay synchronized — renaming an actor updates the Pool/Lane on the canvas, and vice versa.
+    </p>
+    <div class="placeholder-gif">
+      <span class="icon">&#128279;</span>
+      Link actors to BPMN Pools and Lanes with visual badges and automatic synchronization
+    </div>
+    <div class="steps">
+      <h3>Linking an Actor to a Pool</h3>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text">Open the <strong>Use Case</strong> panel from the sidebar. Each actor shows a colored badge indicating its BPMN association.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text">Click the <strong>Manual</strong> badge (gray) on an unlinked actor. A <strong>Link Modal</strong> appears listing all available BPMN Pools and Lanes.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text">Click on an available Pool to establish the link. The badge changes to <strong>Swimlane (Pool)</strong> (green).</div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-text">The actor name and Pool name are now <strong>synchronized</strong>. Editing either one updates the other automatically.</div>
+      </div>
+    </div>
+    <div class="steps">
+      <h3>Automatic Lane Creation</h3>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text">With a Pool-linked actor selected, click <strong>+ Sub-Actor</strong> to add a sub-actor.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text">A <strong>BPMN Lane</strong> is automatically created inside the linked Pool for each sub-actor.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text">Sub-actor names are synced with Lane names. Each sub-actor can also have a <strong>Role</strong> field.</div>
+      </div>
+    </div>
+    <div class="steps">
+      <h3>Merging Actors</h3>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text">If you link an actor to a Pool that is <strong>already linked to another actor</strong>, a merge confirmation dialog appears.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text"><strong>Merge</strong> — The source actor is removed and its data (role, sub-actors) is merged into the existing actor linked to that Pool.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text"><strong>Cancel</strong> — The link operation is cancelled and both actors remain unchanged.</div>
+      </div>
+    </div>
+    <div class="steps">
+      <h3>Bidirectional Sync</h3>
+      <div class="step">
+        <div class="step-num">&#8644;</div>
+        <div class="step-text"><strong>Rename Actor</strong> in Use Case panel &#8594; Pool/Lane name updates on BPMN canvas.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">&#8644;</div>
+        <div class="step-text"><strong>Rename Pool/Lane</strong> on BPMN canvas &#8594; Actor/sub-actor name updates in Use Case panel.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">&#8644;</div>
+        <div class="step-text"><strong>Delete Pool</strong> from BPMN &#8594; Linked actor is removed (with confirmation dialog).</div>
+      </div>
+      <div class="step">
+        <div class="step-num">&#8644;</div>
+        <div class="step-text"><strong>Delete Lane</strong> from BPMN &#8594; Linked sub-actor is removed from the actor's list.</div>
+      </div>
+    </div>
+    <div class="note">
+      <span class="icon">&#128221;</span>
+      <span>Sub-actor roles are exported to idmXML as <code>&lt;subActor&gt;&lt;classification name="role"/&gt;&lt;/subActor&gt;</code> and properly restored on import.</span>
+    </div>
+    <div class="tip">
+      <span class="icon">&#9889;</span>
+      <span>When adding actors manually (via the <strong>+ Add Actor</strong> button), a BPMN Pool is automatically created if a project is open. You can also create Pools on the BPMN canvas first — they will appear as actors in the Use Case panel.</span>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- TUTORIAL 14 — NEW -->
+  <section class="tutorial" id="t14">
+    <div class="tutorial-header">
+      <div class="tutorial-num">14</div>
+      <h2>Importing Legacy Files</h2>
+      <span class="new-tag">NEW in v1.2.2</span>
+    </div>
+    <p>
+      IDMxPPM supports importing from multiple file formats, including full support for legacy xPPM files.
+      In v1.2.2, the xPPM importer can automatically load external BPMN diagrams and images from adjacent folders,
+      and the idmXML importer can resolve external file references from v1.0 files.
+    </p>
+    <div class="placeholder-gif">
+      <span class="icon">&#128194;</span>
+      Import from .idm, .xml, .zip, .xppm, .bpmn, and .erxml files
+    </div>
+    <div class="steps">
+      <h3>Supported Import Formats</h3>
+      <div class="step">
+        <div class="step-num">&#9899;</div>
+        <div class="step-text"><strong>.idm</strong> — Full IDMxPPM project file with BPMN diagram, ERs, header, and use case data.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">&#9899;</div>
+        <div class="step-text"><strong>.xml</strong> — idmXML (ISO 29481-3). Supports both v1.0 and v2.0 with automatic version detection. Embedded BPMN and images are restored.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">&#9899;</div>
+        <div class="step-text"><strong>.zip</strong> — ZIP bundle containing idmXML, BPMN, images, and project data.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">&#9899;</div>
+        <div class="step-text"><strong>.xppm</strong> — Legacy xPPM format. Converts header, use case, actors with roles, ERs with description figures, and IU example images.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">&#9899;</div>
+        <div class="step-text"><strong>.bpmn</strong> — BPMN 2.0 diagram only (no ER or header data).</div>
+      </div>
+    </div>
+    <div class="steps">
+      <h3>xPPM Import (Electron Desktop App)</h3>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text">Click <strong>Open Project</strong> and select a <code>.xppm</code> file.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text">The BPMN diagram is <strong>automatically loaded</strong> from the <code>Diagram/</code> folder adjacent to the .xppm file.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text">All referenced images are <strong>automatically loaded</strong> from the <code>Image/</code> folder and converted to embedded base64.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-text">If the xPPM file contains multiple top-level ERs, a <strong>Root ER Selection</strong> dialog lets you choose or create a root ER.</div>
+      </div>
+    </div>
+    <div class="steps">
+      <h3>idmXML v1.0 External References</h3>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text">When importing a v1.0 idmXML file that references external files (BPMN diagrams and images) instead of embedding them, the app attempts to load them automatically.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text">The app tries multiple candidate paths: the original path, <code>./Diagram/</code> subfolder, and <code>./Image/</code> subfolder.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text">If some files cannot be found, the import continues with placeholder references. Missing images can be re-added manually.</div>
+      </div>
+    </div>
+    <div class="note">
+      <span class="icon">&#128221;</span>
+      <span>Full xPPM and external reference resolution requires the <strong>Electron desktop app</strong>. In the browser version, external files (BPMN diagrams and images stored as separate files) cannot be loaded automatically.</span>
+    </div>
+    <div class="tip">
+      <span class="icon">&#9889;</span>
+      <span>When importing files with UTF-8 BOM (byte order mark), the app automatically strips the BOM to prevent XML parsing errors. This is common with files saved by some Windows text editors.</span>
+    </div>
+  </section>
+
+</main>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <p>
+    <strong>IDMxPPM neo-Seoul</strong> v1.2.2 &nbsp;|&nbsp;
+    Building Informatics Group (BIG), Yonsei University &nbsp;|&nbsp;
+    <a href="http://big.yonsei.ac.kr" target="_blank">big.yonsei.ac.kr</a>
+  </p>
+  <p style="margin-top: 0.4rem; opacity: 0.7;">
+    &copy; 2026 Yonsei University &nbsp;&bull;&nbsp; Licensed under GPL-3.0-or-later
+  </p>
+</footer>
+
+</body>
+</html>

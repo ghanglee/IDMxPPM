@@ -18,27 +18,18 @@ import {
 } from '../icons';
 import './BPMNEditor.css';
 
-/**
- * BPMN Editor Component
- *
- * ISO 29481-1 Annex C compliant BPMN 2.0 editor
- * Uses bpmn-js for full BPMN modeling capabilities
- * Toolbar contains BPMN-specific tools only (zoom, export, etc.)
- *
- * @param {Object} props
- * @param {string} props.xml - Initial BPMN XML to load
- * @param {function} props.onDataObjectSelect - Callback when Data Object is selected (for ER editing)
- * @param {function} props.onNewDataObject - Callback when a new Data Object is created (for ER-first workflow)
- * @param {function} props.onChange - Callback when diagram changes
- * @param {function} props.onReady - Callback when modeler is ready
- * @param {function} props.onImportBpmn - Callback when BPMN is imported (receives new XML content)
- * @param {function} props.onToggleCollapse - Callback to toggle BPMN visibility
- * @param {boolean} props.canCollapse - Whether the collapse button should be shown
- */
+const TASK_TYPES = new Set([
+  'bpmn:Task', 'bpmn:UserTask', 'bpmn:ServiceTask',
+  'bpmn:SendTask', 'bpmn:ReceiveTask', 'bpmn:ManualTask',
+  'bpmn:BusinessRuleTask', 'bpmn:ScriptTask',
+  'bpmn:CallActivity', 'bpmn:SubProcess'
+]);
+
 const BPMNEditor = ({
   xml,
   onDataObjectSelect,
   onNewDataObject,
+  onTaskSelect,
   onChange,
   onReady,
   onImportBpmn,
@@ -176,6 +167,21 @@ const BPMNEditor = ({
             element: selected
           });
         }
+        if (onTaskSelect) onTaskSelect(null);
+      } else if (selected && TASK_TYPES.has(selected.type)) {
+        if (onTaskSelect) {
+          const businessObject = selected.businessObject;
+          const docText = businessObject?.documentation?.[0]?.text || '';
+          onTaskSelect({
+            id: selected.id,
+            type: selected.type,
+            name: businessObject?.name || '',
+            documentation: docText,
+            element: selected
+          });
+        }
+      } else {
+        if (onTaskSelect) onTaskSelect(null);
       }
     });
 
@@ -191,6 +197,20 @@ const BPMNEditor = ({
             id: element.id,
             type: element.type,
             name: businessObject?.name || '',
+            element: element,
+            forceOpen: true
+          });
+        }
+        setTooltip({ visible: false, x: 0, y: 0, text: '' });
+      } else if (TASK_TYPES.has(element.type)) {
+        if (onTaskSelect) {
+          const businessObject = element.businessObject;
+          const docText = businessObject?.documentation?.[0]?.text || '';
+          onTaskSelect({
+            id: element.id,
+            type: element.type,
+            name: businessObject?.name || '',
+            documentation: docText,
             element: element,
             forceOpen: true
           });
@@ -222,6 +242,21 @@ const BPMNEditor = ({
             text: 'Double-click to specify this Exchange Requirement'
           });
         }
+      } else if (TASK_TYPES.has(element.type)) {
+        const canvas = modeler.get('canvas');
+        const viewbox = canvas.viewbox();
+        const containerRect = containerRef.current?.getBoundingClientRect();
+        if (containerRect) {
+          const scale = viewbox.scale || 1;
+          const x = (element.x - viewbox.x) * scale + containerRect.left + (element.width * scale) / 2;
+          const y = (element.y - viewbox.y) * scale + containerRect.top - 10;
+          setTooltip({
+            visible: true,
+            x,
+            y,
+            text: 'Double-click to edit task details'
+          });
+        }
       }
     });
 
@@ -229,7 +264,8 @@ const BPMNEditor = ({
       const element = e.element;
       if (element.type === 'bpmn:DataObjectReference' ||
           element.type === 'bpmn:DataObject' ||
-          element.type === 'bpmn:DataStoreReference') {
+          element.type === 'bpmn:DataStoreReference' ||
+          TASK_TYPES.has(element.type)) {
         setTooltip({ visible: false, x: 0, y: 0, text: '' });
       }
     });

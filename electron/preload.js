@@ -32,6 +32,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 리스너 제거
   removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel),
   
+  // File system (for reading relative files during import)
+  readRelativeFile: (basePath, relativePath) => ipcRenderer.invoke('fs:readRelativeFile', { basePath, relativePath }),
+  readRelativeFileBase64: (basePath, relativePath) => ipcRenderer.invoke('fs:readRelativeFileBase64', { basePath, relativePath }),
+
   // 플랫폼 정보
   platform: process.platform
 });

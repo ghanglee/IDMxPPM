@@ -57,7 +57,7 @@ const uuid = () => crypto.randomUUID?.() || `IU-${Date.now()}-${Math.random().to
  * Compact definition field with figure upload support.
  * Used for ER descriptions and IU definitions.
  */
-const DefinitionWithFigures = ({ value, figures = [], onChange, onFiguresChange, placeholder, rows = 2, label = 'Definition', className = 'er-textarea' }) => {
+const DefinitionWithFigures = ({ value, figures = [], onChange, onFiguresChange, placeholder, rows = 4, label = 'Definition', className = 'er-textarea' }) => {
   const fileRef = React.useRef(null);
 
   const handleFileChange = (e) => {
@@ -210,11 +210,11 @@ const ERPanel = ({
   const newlyAddedMappingRef = useRef(null);
   const mappingInputRefs = useRef({});
 
-  // Detail panel resize state
-  const [detailPanelHeight, setDetailPanelHeight] = useState(250);
+  // Detail panel resize state (proportion-based)
+  const [detailPanelRatio, setDetailPanelRatio] = useState(0.7);
   const resizingRef = useRef(false);
   const resizeStartYRef = useRef(0);
-  const resizeStartHeightRef = useRef(0);
+  const resizeStartRatioRef = useRef(0);
   const panelContainerRef = useRef(null);
 
   // Snapshot of selectedItem.data when first selected (for dirty detection)
@@ -609,12 +609,29 @@ const ERPanel = ({
       });
     };
 
-    // First, add the selected ER's Information Units at depth 0
-    addIURows(er.informationUnits, 0, er.id, er.id);
+    // Add the selected ER itself as the root row
+    const erHasChildren = (er.informationUnits?.length > 0) || (er.subERs?.length > 0);
+    rows.push({
+      id: er.id,
+      type: 'er',
+      name: er.name || '(unnamed ER)',
+      depth: 0,
+      hasChildren: erHasChildren,
+      isExpanded: expandedNodes.has(er.id),
+      data: er,
+      parentId: null,
+      erParent: er.id
+    });
 
-    // Then, add Sub-ERs and their content at depth 0
-    if (er.subERs?.length > 0) {
-      addSubErRows(er.subERs, 0, er.id);
+    // Show children only when the root ER is expanded
+    if (expandedNodes.has(er.id)) {
+      // Add the selected ER's Information Units at depth 1
+      addIURows(er.informationUnits, 1, er.id, er.id);
+
+      // Add Sub-ERs and their content at depth 1
+      if (er.subERs?.length > 0) {
+        addSubErRows(er.subERs, 1, er.id);
+      }
     }
 
     return rows;
@@ -900,7 +917,9 @@ const ERPanel = ({
       onUpdateER(selectedItem.id, {
         name: trim(selectedItem.data?.name),
         description: trim(selectedItem.data?.description),
-        descriptionFigures: selectedItem.data?.descriptionFigures
+        descriptionFigures: selectedItem.data?.descriptionFigures,
+        examples: trim(selectedItem.data?.examples),
+        exampleImages: selectedItem.data?.exampleImages
       });
     }
   }, [selectedItem, selectedIULocation, erHierarchy, onUpdateER]);
@@ -945,22 +964,23 @@ const ERPanel = ({
     nextItemFn();
   }, [hasUnsavedDetailChanges, commitCurrentEdit]);
 
-  // Detail panel resize handlers
+  // Detail panel resize handlers (proportion-based)
   const handleResizeMouseDown = useCallback((e) => {
     e.preventDefault();
     resizingRef.current = true;
     resizeStartYRef.current = e.clientY;
-    resizeStartHeightRef.current = detailPanelHeight;
+    resizeStartRatioRef.current = detailPanelRatio;
     document.body.style.cursor = 'ns-resize';
     document.body.style.userSelect = 'none';
-  }, [detailPanelHeight]);
+  }, [detailPanelRatio]);
 
   useEffect(() => {
     const handleResizeMouseMove = (e) => {
       if (!resizingRef.current) return;
+      const containerH = panelContainerRef.current?.clientHeight || 400;
       const delta = resizeStartYRef.current - e.clientY;
-      const newHeight = Math.max(120, Math.min(resizeStartHeightRef.current + delta, 600));
-      setDetailPanelHeight(newHeight);
+      const newRatio = Math.max(0.15, Math.min(resizeStartRatioRef.current + delta / containerH, 0.85));
+      setDetailPanelRatio(newRatio);
     };
 
     const handleResizeMouseUp = () => {
@@ -2424,7 +2444,7 @@ const ERPanel = ({
 
   if (isErFirstMode) {
     return (
-      <div className={`er-panel er-panel-first-mode ${!showBpmnEditor ? 'er-panel-expanded' : ''}`}>
+      <div ref={panelContainerRef} className={`er-panel er-panel-first-mode ${!showBpmnEditor ? 'er-panel-expanded' : ''}`}>
         {/* Header */}
         <div className="er-panel-header">
           <div className="er-panel-title">
@@ -2547,10 +2567,10 @@ const ERPanel = ({
           </button>
         </div>
 
-        {/* Information Units Section Header */}
+        {/* Information Units and Sub-ERs Section Header */}
         {selectedErId && (
           <div className="er-iu-section-header">
-            <span>Information Units</span>
+            <span>Information Units and Sub-ERs</span>
             <span className="er-iu-count">{selectedErData?.informationUnits?.length || 0} IU(s)</span>
           </div>
         )}
@@ -2566,8 +2586,8 @@ const ERPanel = ({
           ) : treeRows.length === 0 ? (
             <div className="er-empty-state">
               <DocumentIcon size={32} />
-              <p>No Information Units</p>
-              <span className="er-hint">Click "+IU" to add an Information Unit</span>
+              <p>No Information Units or ERs</p>
+              <span className="er-hint">Click "+IU" to add an Information Unit or "+ER" to add a Sub-ER</span>
             </div>
           ) : (
             <div className="er-tree-container">
@@ -2696,7 +2716,7 @@ const ERPanel = ({
             onMouseDown={handleResizeMouseDown}
             title="Drag to resize"
           />
-          <div className="er-detail-panel" ref={detailPanelRef} style={{ height: detailPanelHeight }}>
+          <div className="er-detail-panel" ref={detailPanelRef} style={{ height: `${detailPanelRatio * 100}%` }}>
             {selectedItem.type === 'iu' ? (
               /* IU Detail Editor */
               <>
@@ -2765,6 +2785,7 @@ const ERPanel = ({
                         setSelectedItem(prev => ({ ...prev, data: { ...prev.data, definitionFigures: figs } }));
                       }}
                       placeholder="Describe this information unit..."
+                      rows={6}
                     />
                   </div>
                   <div className="er-detail-field">
@@ -2779,7 +2800,7 @@ const ERPanel = ({
                         setSelectedItem(prev => ({ ...prev, data: { ...prev.data, exampleImages: figs } }));
                       }}
                       placeholder="e.g., Wall-001, Level-1"
-                      rows={1}
+                      rows={3}
                     />
                   </div>
                   {/* External Mappings */}
@@ -2942,7 +2963,22 @@ const ERPanel = ({
                         setSelectedItem(prev => ({ ...prev, data: { ...prev.data, descriptionFigures: figs } }));
                       }}
                       placeholder="Brief description of this Exchange Requirement..."
-                      rows={2}
+                      rows={4}
+                    />
+                  </div>
+                  <div className="er-detail-field">
+                    <DefinitionWithFigures
+                      label="Examples"
+                      value={selectedItem.data?.examples || ''}
+                      figures={selectedItem.data?.exampleImages || []}
+                      onChange={(val) => {
+                        setSelectedItem(prev => ({ ...prev, data: { ...prev.data, examples: val } }));
+                      }}
+                      onFiguresChange={(figs) => {
+                        setSelectedItem(prev => ({ ...prev, data: { ...prev.data, exampleImages: figs } }));
+                      }}
+                      placeholder="Examples for this Exchange Requirement..."
+                      rows={3}
                     />
                   </div>
                   <div className="er-detail-section">

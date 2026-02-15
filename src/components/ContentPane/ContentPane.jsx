@@ -1590,16 +1590,24 @@ const ContentPane = ({
   onImportER,
   onExportER,
   selectedErId = null,           // Currently selected ER for operations
+  bpmnActorsList = [],           // BPMN Pools/Lanes for actor linking
   onClose
 }) => {
   // Determine if using ER-first mode
-  const isErFirstMode = erHierarchy.length > 0;
+  // Always use ER-first mode unless there's legacy erDataMap data without erHierarchy
+  const hasLegacyData = Object.keys(erDataMap || {}).length > 0;
+  const isErFirstMode = erHierarchy.length > 0 || !hasLegacyData;
   // Ref to prevent double-clicks on Add buttons (React StrictMode can cause double invocations)
   const lastAddTimeRef = useRef(0);
   // Refs for scrolling to newly added ER
   const erItemRefs = useRef({});
   // Ref for hidden file input (ER import)
   const erImportFileRef = useRef(null);
+  // Ref to track newly added actor for auto-focus
+  const newActorIdRef = useRef(null);
+  // State for actor-to-BPMN link modal
+  const [linkModalState, setLinkModalState] = useState(null); // { actorIndex, subActorIndex? }
+  const [mergeModalState, setMergeModalState] = useState(null); // { item, sourceActorIndex, sourceSubActorIndex?, isSubActorLink }
 
   // Determine which optional fields have data and should be visible
   const getInitialVisibleFields = useCallback((data) => {
@@ -1682,6 +1690,12 @@ const ContentPane = ({
   if (!type) return null;
 
   const handleHeaderFieldChange = useCallback((field, value) => {
+    // Skip if value hasn't actually changed (prevents isDirty false positives from dropdown re-selection)
+    const currentValue = headerData[field];
+    if (currentValue === value) return;
+    if (value != null && currentValue != null && typeof value === 'object' && typeof currentValue === 'object') {
+      if (JSON.stringify(value) === JSON.stringify(currentValue)) return;
+    }
     onHeaderChange?.({
       ...headerData,
       [field]: value
@@ -2062,6 +2076,7 @@ const ContentPane = ({
                   bpmnShapeName: '',
                   subActors: [] // For BPMN lanes within a pool
                 };
+                newActorIdRef.current = newActor.id;
                 handleHeaderFieldChange('actorsList', [...currentActors, newActor]);
               }}
               title="Add a new actor (Pool)"
@@ -2077,10 +2092,15 @@ const ContentPane = ({
           <div className="actors-list-items">
             {(Array.isArray(headerData.actorsList) ? headerData.actorsList : []).map((actor, index) => (
               <div key={actor.id || index} className="actor-card">
-                {/* Actor Header Row */}
+                {/* Line 1: Actor Name + Badge + Remove */}
                 <div className="actor-header-row">
-                  <input
-                    type="text"
+                  <textarea
+                    ref={el => {
+                      if (el && newActorIdRef.current === actor.id) {
+                        el.focus();
+                        newActorIdRef.current = null;
+                      }
+                    }}
                     value={actor.name || ''}
                     onChange={(e) => {
                       const newActors = [...headerData.actorsList];
@@ -2089,34 +2109,31 @@ const ContentPane = ({
                     }}
                     placeholder="Actor name (e.g., Design Team, Client)"
                     className="pane-input actor-name-input"
+                    rows={1}
                   />
-                  <input
-                    type="text"
-                    value={actor.role || ''}
-                    onChange={(e) => {
-                      const newActors = [...headerData.actorsList];
-                      newActors[index] = { ...actor, role: e.target.value };
-                      handleHeaderFieldChange('actorsList', newActors);
-                    }}
-                    placeholder="Role"
-                    className="pane-input actor-role-input"
-                    title="Role of this actor in the process"
-                  />
-                  {/* Swimlane Association Badge */}
-                  {actor.bpmnShapeName || actor.bpmnId ? (
-                    <span className="actor-swimlane-badge" title={`Linked to BPMN: ${actor.bpmnShapeName || actor.bpmnId}`}>
+                  {actor.bpmnId ? (
+                    <span className="actor-swimlane-badge" title={`Linked to BPMN Pool: ${actor.bpmnShapeName || actor.bpmnId}`}>
                       Pool
                     </span>
-                  ) : (
-                    <span className="actor-manual-badge" title="Manually added actor">
-                      Manual
+                  ) : actor.bpmnLaneId ? (
+                    <span className="actor-lane-badge" title={`Linked to BPMN Lane: ${actor.bpmnLaneId}`}>
+                      Lane
                     </span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="actor-manual-badge actor-manual-badge-clickable"
+                      title="Click to link to a BPMN Pool"
+                      onClick={() => setLinkModalState({ actorIndex: index })}
+                    >
+                      Manual
+                    </button>
                   )}
                   <button
                     type="button"
                     className="actor-remove-btn"
                     onClick={() => {
-                      if (actor.bpmnShapeName || actor.bpmnId) {
+                      if (actor.bpmnId) {
                         const confirmed = window.confirm(
                           `This actor "${actor.name || 'Unnamed'}" is linked to a BPMN Pool.\n\n` +
                           `Removing this actor will also delete the corresponding Pool in the process map.\n\n` +
@@ -2133,93 +2150,428 @@ const ContentPane = ({
                   </button>
                 </div>
 
-                {/* Sub-Actors (Lanes) Section */}
+                {/* Line 2: Role */}
+                <div className="actor-role-row">
+                  <textarea
+                    value={actor.role || ''}
+                    onChange={(e) => {
+                      const newActors = [...headerData.actorsList];
+                      newActors[index] = { ...actor, role: e.target.value };
+                      handleHeaderFieldChange('actorsList', newActors);
+                    }}
+                    placeholder="Role"
+                    className="pane-input actor-role-input"
+                    title="Role of this actor in the process"
+                    rows={1}
+                  />
+                </div>
+
+                {/* Line 3: sub-actors list + Sub-actor button below */}
                 <div className="actor-subactors-section">
-                  <div className="actor-subactors-header">
-                    <span className="actor-subactors-label">Swimlanes (Individuals)</span>
-                    <button
-                      type="button"
-                      className="actor-add-lane-btn"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        const newActors = [...headerData.actorsList];
-                        const subActors = actor.subActors || [];
-                        const newSubActor = {
-                          id: `subactor-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                          name: '',
-                          role: '', // Role field for lanes
-                          bpmnShapeName: ''
-                        };
-                        newActors[index] = { ...actor, subActors: [...subActors, newSubActor] };
-                        handleHeaderFieldChange('actorsList', newActors);
-                      }}
-                      title="Add a swimlane (individual) to this pool"
-                    >
-                      + Swimlane
-                    </button>
-                  </div>
-                  {(actor.subActors || []).length === 0 ? (
-                    <div className="actor-no-lanes">No swimlanes defined</div>
-                  ) : (
+                  {(actor.subActors || []).length > 0 && (
                     <div className="actor-lanes-list">
                       {(actor.subActors || []).map((subActor, subIndex) => (
                         <div key={subActor.id || subIndex} className="actor-lane-item">
-                          <span className="actor-lane-indent">└</span>
-                          <input
-                            type="text"
-                            value={subActor.name || ''}
-                            onChange={(e) => {
-                              const newActors = [...headerData.actorsList];
-                              const newSubActors = [...(actor.subActors || [])];
-                              newSubActors[subIndex] = { ...subActor, name: e.target.value };
-                              newActors[index] = { ...actor, subActors: newSubActors };
-                              handleHeaderFieldChange('actorsList', newActors);
-                            }}
-                            placeholder="Swimlane name (e.g., Architect, Engineer)"
-                            className="pane-input actor-lane-input"
-                          />
-                          <input
-                            type="text"
-                            value={subActor.role || ''}
-                            onChange={(e) => {
-                              const newActors = [...headerData.actorsList];
-                              const newSubActors = [...(actor.subActors || [])];
-                              newSubActors[subIndex] = { ...subActor, role: e.target.value };
-                              newActors[index] = { ...actor, subActors: newSubActors };
-                              handleHeaderFieldChange('actorsList', newActors);
-                            }}
-                            placeholder="Role"
-                            className="pane-input actor-lane-role-input"
-                            title="Role of this individual"
-                          />
-                          {subActor.bpmnShapeName ? (
-                            <span className="actor-lane-badge" title={`Linked to BPMN Lane: ${subActor.bpmnShapeName}`}>
-                              Lane
-                            </span>
-                          ) : null}
-                          <button
-                            type="button"
-                            className="actor-lane-remove-btn"
-                            onClick={() => {
-                              const newActors = [...headerData.actorsList];
-                              const newSubActors = (actor.subActors || []).filter((_, i) => i !== subIndex);
-                              newActors[index] = { ...actor, subActors: newSubActors };
-                              handleHeaderFieldChange('actorsList', newActors);
-                            }}
-                            title="Remove swimlane"
-                          >
-                            ×
-                          </button>
+                          {/* Sub-actor Line 1: Name + Badge + Remove */}
+                          <div className="actor-lane-header-row">
+                            <span className="actor-lane-indent">└</span>
+                            <textarea
+                              value={subActor.name || ''}
+                              onChange={(e) => {
+                                const newActors = [...headerData.actorsList];
+                                const newSubActors = [...(actor.subActors || [])];
+                                newSubActors[subIndex] = { ...subActor, name: e.target.value };
+                                newActors[index] = { ...actor, subActors: newSubActors };
+                                handleHeaderFieldChange('actorsList', newActors);
+                              }}
+                              placeholder="Sub-actor name (e.g., Architect, Engineer)"
+                              className="pane-input actor-lane-input"
+                              rows={1}
+                            />
+                            {subActor.bpmnShapeName ? (
+                              <span className="actor-lane-badge" title={`Linked to BPMN Lane: ${subActor.bpmnShapeName}`}>
+                                Lane
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                className="actor-manual-badge actor-manual-badge-clickable"
+                                title="Click to link to a BPMN Lane"
+                                onClick={() => setLinkModalState({ actorIndex: index, subActorIndex: subIndex })}
+                              >
+                                Manual
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              className="actor-lane-remove-btn"
+                              onClick={() => {
+                                const newActors = [...headerData.actorsList];
+                                const newSubActors = (actor.subActors || []).filter((_, i) => i !== subIndex);
+                                newActors[index] = { ...actor, subActors: newSubActors };
+                                handleHeaderFieldChange('actorsList', newActors);
+                              }}
+                              title="Remove sub-actor"
+                            >
+                              ×
+                            </button>
+                          </div>
+                          {/* Sub-actor Line 2: Role */}
+                          <div className="actor-lane-role-row">
+                            <textarea
+                              value={subActor.role || ''}
+                              onChange={(e) => {
+                                const newActors = [...headerData.actorsList];
+                                const newSubActors = [...(actor.subActors || [])];
+                                newSubActors[subIndex] = { ...subActor, role: e.target.value };
+                                newActors[index] = { ...actor, subActors: newSubActors };
+                                handleHeaderFieldChange('actorsList', newActors);
+                              }}
+                              placeholder="Role"
+                              className="pane-input actor-lane-role-input"
+                              title="Role of this individual"
+                              rows={1}
+                            />
+                          </div>
                         </div>
                       ))}
                     </div>
                   )}
+                  <button
+                    type="button"
+                    className="actor-add-lane-btn"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const newActors = [...headerData.actorsList];
+                      const subActors = actor.subActors || [];
+                      const makeSubActor = () => ({
+                        id: `subactor-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                        name: '',
+                        role: '',
+                        bpmnShapeName: ''
+                      });
+                      if (subActors.length === 0) {
+                        newActors[index] = { ...actor, subActors: [makeSubActor(), makeSubActor()] };
+                      } else {
+                        newActors[index] = { ...actor, subActors: [...subActors, makeSubActor()] };
+                      }
+                      handleHeaderFieldChange('actorsList', newActors);
+                    }}
+                    title="Add a sub-actor (individual) to this actor"
+                  >
+                    + Sub-actor
+                  </button>
                 </div>
               </div>
             ))}
           </div>
         )}
+
+        {/* Link to BPMN Pool/Lane Modal */}
+        {linkModalState && (() => {
+          const isSubActorLink = linkModalState.subActorIndex !== undefined;
+          const currentActors = Array.isArray(headerData.actorsList) ? headerData.actorsList : [];
+
+          // Build separate maps for Pool links, top-level Lane links, and sub-actor Lane links
+          const linkedByPoolId = {}; // poolId -> { actorIndex, actorName }
+          const linkedLaneByActor = {}; // laneId -> { actorIndex, actorName } (top-level actor bpmnLaneId)
+          const linkedLaneBySub = {}; // laneId -> { actorIndex, subActorIndex, actorName, subActorName }
+          currentActors.forEach((a, ai) => {
+            if (a.bpmnId) {
+              linkedByPoolId[a.bpmnId] = { actorIndex: ai, actorName: a.name || '(unnamed)' };
+            }
+            if (a.bpmnLaneId) {
+              linkedLaneByActor[a.bpmnLaneId] = { actorIndex: ai, actorName: a.name || '(unnamed)' };
+            }
+            (a.subActors || []).forEach((s, si) => {
+              if (s.bpmnShapeName) {
+                linkedLaneBySub[s.bpmnShapeName] = { actorIndex: ai, subActorIndex: si, actorName: a.name || '(unnamed)', subActorName: s.name || '(unnamed)' };
+              }
+            });
+          });
+
+          // Show ALL Pools and Lanes regardless of link status
+          let allItems = [];
+          (bpmnActorsList || []).forEach(pool => {
+            const linked = linkedByPoolId[pool.id];
+            allItems.push({
+              id: pool.id,
+              name: pool.name || '(unnamed)',
+              type: 'pool',
+              linkedTo: linked ? linked.actorName : null,
+              linkedActorIndex: linked ? linked.actorIndex : null
+            });
+            (pool.subActors || []).forEach(lane => {
+              const topLinked = linkedLaneByActor[lane.id];
+              const subLinked = linkedLaneBySub[lane.id];
+              const displayLinked = topLinked ? topLinked.actorName : (subLinked ? subLinked.subActorName : null);
+              allItems.push({
+                id: lane.id,
+                name: lane.name || '(unnamed)',
+                poolName: pool.name,
+                type: 'lane',
+                linkedTo: displayLinked,
+                topLevelLink: topLinked || null,
+                subActorLink: subLinked || null
+              });
+            });
+          });
+
+          const handleLinkSelect = (item) => {
+            const sourceActorIndex = linkModalState.actorIndex;
+            const sourceSubActorIndex = linkModalState.subActorIndex;
+
+            // Check for same-level conflicts only
+            if (item.linkedTo !== null) {
+              let conflictItem = null;
+              if (item.type === 'pool' && item.linkedTo) {
+                // Pool links are always top-level — same-level conflict
+                conflictItem = { ...item, linkedActorIndex: item.linkedActorIndex, linkedSubActorIndex: undefined };
+              } else if (item.type === 'lane') {
+                if (isSubActorLink && item.subActorLink) {
+                  // Sub-actor linking to lane already linked by another sub-actor
+                  conflictItem = { ...item, linkedActorIndex: item.subActorLink.actorIndex, linkedSubActorIndex: item.subActorLink.subActorIndex };
+                } else if (!isSubActorLink && item.topLevelLink) {
+                  // Top-level actor linking to lane already linked by another top-level actor
+                  conflictItem = { ...item, linkedActorIndex: item.topLevelLink.actorIndex, linkedSubActorIndex: undefined };
+                } else if (!isSubActorLink && item.subActorLink) {
+                  // Top-level actor linking to lane linked by a sub-actor — cross-level merge
+                  conflictItem = { ...item, linkedActorIndex: item.subActorLink.actorIndex, linkedSubActorIndex: item.subActorLink.subActorIndex };
+                }
+              }
+              if (conflictItem) {
+                setMergeModalState({
+                  item: conflictItem,
+                  sourceActorIndex,
+                  sourceSubActorIndex,
+                  isSubActorLink
+                });
+                return;
+              }
+            }
+
+            // Recommend Pool for actors with sub-actors
+            if (!isSubActorLink && item.type === 'lane') {
+              const sourceActor = currentActors[sourceActorIndex];
+              if (sourceActor?.subActors?.length > 0) {
+                const proceed = window.confirm(
+                  `"${sourceActor.name || '(unnamed)'}" has sub-actors. ` +
+                  `Consider mapping it to a Pool instead, so sub-actors can map to Lanes within it.\n\n` +
+                  `Link to this Lane anyway?`
+                );
+                if (!proceed) return;
+              }
+            }
+
+            // No conflict — apply link
+            const newActors = [...currentActors];
+            if (isSubActorLink) {
+              const actor = newActors[sourceActorIndex];
+              const newSubActors = [...(actor.subActors || [])];
+              newSubActors[sourceSubActorIndex] = {
+                ...newSubActors[sourceSubActorIndex],
+                bpmnShapeName: item.id
+              };
+              newActors[sourceActorIndex] = { ...actor, subActors: newSubActors };
+            } else if (item.type === 'lane') {
+              // Top-level actor linking to a Lane
+              newActors[sourceActorIndex] = {
+                ...newActors[sourceActorIndex],
+                bpmnId: null,
+                bpmnLaneId: item.id
+              };
+            } else {
+              // Top-level actor linking to a Pool
+              newActors[sourceActorIndex] = {
+                ...newActors[sourceActorIndex],
+                bpmnId: item.id,
+                bpmnShapeName: item.name,
+                bpmnLaneId: null
+              };
+            }
+            handleHeaderFieldChange('actorsList', newActors);
+            setLinkModalState(null);
+            setMergeModalState(null);
+          };
+
+          return (
+            <div className="actor-link-modal-overlay" onClick={() => { setLinkModalState(null); setMergeModalState(null); }}>
+              <div className="actor-link-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="actor-link-modal-header">
+                  <h4>Link to BPMN Pool or Swimlane</h4>
+                  <button className="actor-link-modal-close" onClick={() => { setLinkModalState(null); setMergeModalState(null); }}>×</button>
+                </div>
+                <div className="actor-link-modal-body">
+                  {allItems.length === 0 ? (
+                    <div className="actor-link-modal-empty">
+                      No Pools or Swimlanes available. Create Pools or Swimlanes in the BPMN editor first.
+                    </div>
+                  ) : (
+                    <div className="actor-link-modal-list">
+                      {allItems.map(item => (
+                        <button
+                          key={item.id}
+                          className={`actor-link-modal-item${item.linkedTo ? ' actor-link-modal-item-linked' : ''}`}
+                          onClick={() => handleLinkSelect(item)}
+                        >
+                          <span className={item.type === 'pool' ? 'actor-swimlane-badge' : 'actor-lane-badge'}>
+                            {item.type === 'pool' ? 'Pool' : 'Lane'}
+                          </span>
+                          <span className="actor-link-modal-item-name">{item.name}</span>
+                          {item.poolName && <span className="actor-link-modal-item-pool">in {item.poolName}</span>}
+                          {item.linkedTo && <span className="actor-link-modal-item-linked-label">linked to: {item.linkedTo}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+        {/* Merge options modal — shown when user clicks a Pool/Lane that is already linked */}
+        {mergeModalState && (() => {
+          const { item, sourceActorIndex, sourceSubActorIndex, isSubActorLink: isSub } = mergeModalState;
+          const actors = Array.isArray(headerData.actorsList) ? headerData.actorsList : [];
+
+          // A = the currently unconnected actor (clicked "Manual")
+          // B = the already-connected actor (linked to the selected Pool/Lane)
+          let nameA, roleA, nameB, roleB;
+          if (isSub) {
+            const subA = actors[sourceActorIndex]?.subActors?.[sourceSubActorIndex];
+            nameA = subA?.name || '(unnamed)';
+            roleA = subA?.role || '';
+            if (item.linkedSubActorIndex !== undefined) {
+              const subB = actors[item.linkedActorIndex]?.subActors?.[item.linkedSubActorIndex];
+              nameB = subB?.name || '(unnamed)';
+              roleB = subB?.role || '';
+            } else {
+              nameB = actors[item.linkedActorIndex]?.name || '(unnamed)';
+              roleB = actors[item.linkedActorIndex]?.role || '';
+            }
+          } else {
+            nameA = actors[sourceActorIndex]?.name || '(unnamed)';
+            roleA = actors[sourceActorIndex]?.role || '';
+            if (item.linkedSubActorIndex !== undefined) {
+              // Cross-level: B is a sub-actor
+              const subB = actors[item.linkedActorIndex]?.subActors?.[item.linkedSubActorIndex];
+              nameB = subB?.name || '(unnamed)';
+              roleB = subB?.role || '';
+            } else {
+              nameB = actors[item.linkedActorIndex]?.name || '(unnamed)';
+              roleB = actors[item.linkedActorIndex]?.role || '';
+            }
+          }
+
+          // Always: remove unlinked A, keep linked B, apply chosen name/role to B
+          const applyMerge = (mode) => {
+            const newActors = [...actors];
+
+            let mergedName, mergedRole;
+            if (mode === 'keepB') { mergedName = nameB; mergedRole = roleB; }
+            else if (mode === 'keepA') { mergedName = nameA; mergedRole = roleA; }
+            else { // merge
+              mergedName = [nameA, nameB].filter(Boolean).join('; ');
+              mergedRole = [roleA, roleB].filter(Boolean).join('; ');
+            }
+
+            if (isSub) {
+              // --- A is a sub-actor (unlinked) — remove it, update B ---
+              if (item.linkedSubActorIndex !== undefined) {
+                // B is also a sub-actor — update B's name/role, then remove A
+                let adjLinkedSubIdx = item.linkedSubActorIndex;
+                if (item.linkedActorIndex === sourceActorIndex && item.linkedSubActorIndex > sourceSubActorIndex) {
+                  adjLinkedSubIdx = item.linkedSubActorIndex - 1;
+                }
+                // Remove sub-actor A
+                const parentA = newActors[sourceActorIndex];
+                const subsA = [...(parentA.subActors || [])];
+                subsA.splice(sourceSubActorIndex, 1);
+                newActors[sourceActorIndex] = { ...parentA, subActors: subsA };
+                // Update sub-actor B
+                const parentB = newActors[item.linkedActorIndex];
+                const subsB = [...(parentB.subActors || [])];
+                subsB[adjLinkedSubIdx] = { ...subsB[adjLinkedSubIdx], name: mergedName, role: mergedRole };
+                newActors[item.linkedActorIndex] = { ...parentB, subActors: subsB };
+              } else {
+                // B is a top-level actor — update B's name/role, remove sub-actor A
+                newActors[item.linkedActorIndex] = { ...newActors[item.linkedActorIndex], name: mergedName, role: mergedRole };
+                const parentA = newActors[sourceActorIndex];
+                const subsA = [...(parentA.subActors || [])];
+                subsA.splice(sourceSubActorIndex, 1);
+                newActors[sourceActorIndex] = { ...parentA, subActors: subsA };
+              }
+            } else {
+              // --- A is a top-level actor (unlinked) — remove it, update B ---
+              const aSubActors = newActors[sourceActorIndex]?.subActors || [];
+
+              if (item.linkedSubActorIndex !== undefined) {
+                // B is a sub-actor (cross-level) — update B, move A's sub-actors to B's parent, remove A
+                const parentBIdx = item.linkedActorIndex;
+                const parentB = newActors[parentBIdx];
+                const subsB = [...(parentB.subActors || [])];
+                subsB[item.linkedSubActorIndex] = { ...subsB[item.linkedSubActorIndex], name: mergedName, role: mergedRole };
+                newActors[parentBIdx] = { ...parentB, subActors: [...subsB, ...aSubActors] };
+                newActors.splice(sourceActorIndex, 1);
+              } else {
+                // B is also a top-level actor (same-level) — update B, move A's sub-actors to B, remove A
+                const bSubActors = newActors[item.linkedActorIndex]?.subActors || [];
+                newActors[item.linkedActorIndex] = {
+                  ...newActors[item.linkedActorIndex],
+                  name: mergedName,
+                  role: mergedRole,
+                  subActors: [...bSubActors, ...aSubActors]
+                };
+                newActors.splice(sourceActorIndex, 1);
+              }
+            }
+
+            handleHeaderFieldChange('actorsList', newActors);
+            setMergeModalState(null);
+            setLinkModalState(null);
+          };
+
+          return (
+            <div className="actor-link-modal-overlay" onClick={() => setMergeModalState(null)}>
+              <div className="actor-link-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420 }}>
+                <div className="actor-link-modal-header">
+                  <h4>Resolve Link Conflict</h4>
+                  <button className="actor-link-modal-close" onClick={() => setMergeModalState(null)}>×</button>
+                </div>
+                <div className="actor-link-modal-body" style={{ padding: '12px 16px' }}>
+                  <p style={{ margin: '0 0 12px', fontSize: 13, lineHeight: 1.5, color: 'var(--text-secondary)' }}>
+                    <strong>{item.name}</strong> is already linked to <strong>"{nameB}"</strong>.
+                    The unlinked actor <strong>"{nameA}"</strong> will be removed. Choose how to resolve:
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <button className="actor-link-modal-item" onClick={() => applyMerge('keepB')}
+                      style={{ textAlign: 'left', padding: '8px 12px', flexDirection: 'column', alignItems: 'flex-start' }}>
+                      <strong style={{ fontSize: 13 }}>Keep linked actor information</strong>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                        Keep "{nameB}" and discard "{nameA}"
+                      </span>
+                    </button>
+                    <button className="actor-link-modal-item" onClick={() => applyMerge('keepA')}
+                      style={{ textAlign: 'left', padding: '8px 12px', flexDirection: 'column', alignItems: 'flex-start' }}>
+                      <strong style={{ fontSize: 13 }}>Replace with unlinked actor information</strong>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                        Rename linked actor to "{nameA}" and remove the unlinked actor
+                      </span>
+                    </button>
+                    <button className="actor-link-modal-item" onClick={() => applyMerge('merge')}
+                      style={{ textAlign: 'left', padding: '8px 12px', flexDirection: 'column', alignItems: 'flex-start' }}>
+                      <strong style={{ fontSize: 13 }}>Merge both</strong>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                        Rename linked actor to "{[nameA, nameB].filter(Boolean).join('; ')}" and remove the unlinked actor
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </Section>
 
       {/* TARGET PROJECT PHASES Section */}

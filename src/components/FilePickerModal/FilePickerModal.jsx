@@ -32,6 +32,13 @@ const FilePickerModal = ({ isOpen, onClose, onFileSelected }) => {
       description: 'Archive with idmXML, BPMN, and images'
     },
     {
+      id: 'xppm',
+      name: 'xPPM Legacy',
+      extension: '.xppm',
+      accept: '.xppm',
+      description: 'Legacy xPPM format import'
+    },
+    {
       id: 'bpmn',
       name: 'BPMN Diagram',
       extension: '.bpmn',
@@ -42,7 +49,7 @@ const FilePickerModal = ({ isOpen, onClose, onFileSelected }) => {
       id: 'all',
       name: 'All Supported Formats',
       extension: '.*',
-      accept: '.idm,.json,.xml,.zip,.idmx,.bpmn',
+      accept: '.idm,.json,.xml,.zip,.idmx,.xppm,.bpmn',
       description: 'Show all supported file types'
     }
   ];
@@ -106,6 +113,11 @@ const FilePickerModal = ({ isOpen, onClose, onFileSelected }) => {
                   {format.id === 'zip' && (
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-6 10h-2v-2h2v2zm0-4h-2V8h2v4z"/>
+                    </svg>
+                  )}
+                  {format.id === 'xppm' && (
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 9V3.5L18.5 9H13zM9.5 13l2 3-2 3H11l1.25-2 1.25 2h1.5l-2-3 2-3H13.5l-1 1.5L11.5 13H9.5z"/>
                     </svg>
                   )}
                   {format.id === 'bpmn' && (

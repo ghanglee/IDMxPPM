@@ -12,17 +12,20 @@ import RootERSelectionModal from './components/RootERSelectionModal/RootERSelect
 import RootSwitchModal from './components/RootSwitchModal/RootSwitchModal';
 import ServerConnectionModal from './components/ServerConnectionModal/ServerConnectionModal';
 import ServerBrowser from './components/ServerBrowser/ServerBrowser';
+import TaskDetailPanel from './components/TaskDetailPanel/TaskDetailPanel';
 import { ThemeProvider } from './hooks/useTheme';
 import { useServerConnection } from './hooks/useServerConnection';
 import { api } from './utils/apiClient';
 import { generateIdmXml, generateErXmlStandalone } from './utils/idmXmlGenerator';
-import { downloadIdmBundle } from './utils/idmBundleExporter';
+import { downloadIdmBundle, exportIdmBundle } from './utils/idmBundleExporter';
 import { importIdmBundle, isZipBundle } from './utils/idmBundleImporter';
 import { validateProject, getValidationStatusLabel } from './utils/validation';
 import { parseIdmXml, isIdmXml, detectIdmXmlVersion, getFirstChild, getDirectChildren, parseErElement } from './utils/idmXmlParser';
 import { readFileAsText } from './utils/pdfExporter';
 import { defaultIdmXslt } from './utils/defaultIdmXslt';
 import { generateStandaloneHtml } from './utils/htmlExporter';
+import { importXppm } from './utils/xppmImporter';
+import { normalizePath, basename as fpBasename, bpmnCandidates, imageCandidates } from './utils/filePathUtils.js';
 import {
   SAMPLE_BPMN_XML,
   SAMPLE_HEADER_DATA,
@@ -61,6 +64,11 @@ const App = () => {
   const [currentFilePath, setCurrentFilePath] = useState(null);
   const [isDirty, setIsDirty] = useState(false);
   const [bpmnDataObjects, setBpmnDataObjects] = useState([]); // Track all data objects from BPMN
+  const [bpmnActorsList, setBpmnActorsList] = useState([]); // Track BPMN Pools/Lanes for actor linking
+
+  // Task Detail Panel state
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [showTaskDetailPanel, setShowTaskDetailPanel] = useState(false);
 
   // Explicit project state - true only when user creates/opens a project
   const [hasActiveProject, setHasActiveProject] = useState(false);
@@ -183,6 +191,13 @@ const App = () => {
   const isLoadingProjectRef = useRef(false); // Track when loading a project to skip marking dirty
   const extractDataObjectsTimeoutRef = useRef(null); // Track timeout for cancellation
   const isProgrammaticDataObjectRef = useRef(false); // Track when creating data object programmatically (to skip modal)
+  const headerDataRef = useRef(headerData); // Shadow headerData for actor→BPMN sync comparison
+  const pendingCloseRef = useRef(false); // Track if project should close after Save & Export completes
+
+  // Keep headerDataRef in sync with headerData state
+  useEffect(() => {
+    headerDataRef.current = headerData;
+  }, [headerData]);
 
   // Check if ER hierarchy needs root selection (multiple top-level ERs)
   const needsRootSelection = useCallback((hierarchy) => {
@@ -253,6 +268,109 @@ const App = () => {
     // Single or no top-level ER - can proceed directly
     // Single or no top-level ER - can proceed directly
     return false;
+  }, []);
+
+  // Resolve external BPMN and image references from idmXML v1.0 files
+  // v1.0 files store BPMN under ./Diagram/ and images under ./Image/ relative to the XML file
+  const resolveExternalReferences = useCallback(async (idmData, sourceFilePath) => {
+    if (!window.electronAPI?.readRelativeFile) {
+      console.warn('resolveExternalReferences: electronAPI.readRelativeFile not available');
+      return idmData;
+    }
+    if (!sourceFilePath) {
+      console.warn('resolveExternalReferences: no sourceFilePath provided');
+      return idmData;
+    }
+
+    console.info('resolveExternalReferences: resolving from', sourceFilePath);
+    console.info('  bpmnXml present:', !!idmData.bpmnXml, '| bpmnFilePath:', idmData.bpmnFilePath || '(none)');
+
+    // Helper: try reading a file at multiple relative paths
+    const tryReadFile = async (relPaths, readFn) => {
+      for (const relPath of relPaths) {
+        try {
+          const result = await readFn(sourceFilePath, relPath);
+          if (result.success) {
+            return { success: true, relPath, result };
+          }
+          console.info(`  tried "${relPath}" -> ${result.error || 'not found'}`);
+        } catch (err) {
+          console.warn(`  IPC error for "${relPath}":`, err.message);
+        }
+      }
+      return { success: false };
+    };
+
+    // 1. Resolve BPMN diagram if not embedded
+    if (!idmData.bpmnXml && idmData.bpmnFilePath) {
+      const pathsToTry = bpmnCandidates(idmData.bpmnFilePath);
+      const bpmnResult = await tryReadFile(pathsToTry, window.electronAPI.readRelativeFile);
+      if (bpmnResult.success) {
+        idmData.bpmnXml = bpmnResult.result.content;
+        console.info(`Loaded external BPMN from: ${bpmnResult.relPath}`);
+      } else {
+        console.warn('Failed to load external BPMN from any path:', pathsToTry);
+      }
+    }
+
+    // 2. Resolve image file paths in all figure arrays
+    const resolveFigures = async (figures) => {
+      if (!figures?.length) return figures;
+      const resolved = [];
+      for (const fig of figures) {
+        if (fig.filePath && !fig.data) {
+          const pathsToTry = imageCandidates(fig.filePath);
+          const imgResult = await tryReadFile(pathsToTry, window.electronAPI.readRelativeFileBase64);
+          if (imgResult.success) {
+            resolved.push({ ...fig, data: imgResult.result.data });
+            console.info(`Loaded external image: ${fpBasename(fig.filePath)}`);
+          } else {
+            resolved.push(fig); // Keep as-is with filePath reference
+          }
+        } else {
+          resolved.push(fig);
+        }
+      }
+      return resolved;
+    };
+
+    // Resolve header figures
+    const hd = idmData.headerData || {};
+    if (hd.summaryFigures?.length) hd.summaryFigures = await resolveFigures(hd.summaryFigures);
+    if (hd.aimAndScopeFigures?.length) hd.aimAndScopeFigures = await resolveFigures(hd.aimAndScopeFigures);
+    if (hd.benefitsFigures?.length) hd.benefitsFigures = await resolveFigures(hd.benefitsFigures);
+    if (hd.limitationsFigures?.length) hd.limitationsFigures = await resolveFigures(hd.limitationsFigures);
+
+    // Resolve ER figures (works for both erHierarchy and erDataMap)
+    const resolveErFigures = async (ers) => {
+      if (!ers?.length) return;
+      for (const er of ers) {
+        if (er.descriptionFigures?.length) er.descriptionFigures = await resolveFigures(er.descriptionFigures);
+        // Resolve IU figures
+        const resolveIuFigures = async (units) => {
+          if (!units?.length) return;
+          for (const iu of units) {
+            if (iu.definitionFigures?.length) iu.definitionFigures = await resolveFigures(iu.definitionFigures);
+            if (iu.exampleImages?.length) iu.exampleImages = await resolveFigures(iu.exampleImages);
+            if (iu.subInformationUnits?.length) await resolveIuFigures(iu.subInformationUnits);
+          }
+        };
+        await resolveIuFigures(er.informationUnits);
+        if (er.subERs?.length) await resolveErFigures(er.subERs);
+        if (er.subErs?.length) await resolveErFigures(er.subErs);
+      }
+    };
+    if (idmData.erHierarchy?.length) await resolveErFigures(idmData.erHierarchy);
+
+    // Also resolve figures in erDataMap (used by xPPM import before migration to erHierarchy)
+    if (idmData.erDataMap) {
+      const erDataValues = Object.values(idmData.erDataMap);
+      if (erDataValues.length > 0) {
+        await resolveErFigures(erDataValues);
+      }
+    }
+
+    return idmData;
   }, []);
 
   // Helper function to extract data objects after project load
@@ -378,6 +496,9 @@ const App = () => {
           };
         });
 
+        // Update bpmnActorsList so the link modal has access to all Pools/Lanes
+        setBpmnActorsList(bpmnActors);
+
         // Update headerData: sync actor names with Pool names, subActor names with Lane names
         setHeaderData(prevHeaderData => {
           const currentActors = prevHeaderData.actorsList || [];
@@ -419,7 +540,8 @@ const App = () => {
               let needsUpdate = false;
 
               // Link by bpmnId if matched by name (first time linking)
-              if (matchedByName && !updatedActor.bpmnId) {
+              // Skip if actor is already linked to a Lane (has bpmnLaneId)
+              if (matchedByName && !updatedActor.bpmnId && !updatedActor.bpmnLaneId) {
                 updatedActor.bpmnId = bpmnActor.id;
                 updatedActor.actorType = 'group';
                 needsUpdate = true;
@@ -640,6 +762,10 @@ const App = () => {
 
   // Handle Data Object selection from BPMN editor
   const handleDataObjectSelect = useCallback((dataObject) => {
+    // Close Task Detail Panel (mutual exclusivity)
+    setShowTaskDetailPanel(false);
+    setSelectedTask(null);
+
     setSelectedDataObject(dataObject);
 
     // Check if data object has an ER mapping (ER-first architecture)
@@ -1681,6 +1807,7 @@ const App = () => {
       // Sync swimlanes (Pools/Lanes) with Actor Roles per IDM 2.0 schema
       // Pools = groups (external exchanges), Lanes = individuals/subActors (internal exchanges)
       const bpmnActors = extractSwimlanesFromModeler();
+      setBpmnActorsList(bpmnActors);
       setHeaderData(prevHeaderData => {
         const currentActors = prevHeaderData.actorsList || [];
         const bpmnPoolIds = new Set(bpmnActors.map(a => a.id));
@@ -1691,8 +1818,8 @@ const App = () => {
         const actorsByBpmnId = {};
         const actorsByName = {};
         currentActors.forEach(actor => {
-          if (actor.bpmnId || actor.bpmnShapeName) {
-            actorsByBpmnId[actor.bpmnId || actor.bpmnShapeName] = actor;
+          if (actor.bpmnId) {
+            actorsByBpmnId[actor.bpmnId] = actor;
           }
           if (actor.name) {
             actorsByName[actor.name.toLowerCase().trim()] = actor;
@@ -1717,13 +1844,14 @@ const App = () => {
             // Actor exists - find its index
             const existingIndex = matchedByName
               ? updatedActors.findIndex(a => a.name?.toLowerCase().trim() === bpmnActor.name?.toLowerCase().trim())
-              : updatedActors.findIndex(a => (a.bpmnId || a.bpmnShapeName) === bpmnActor.id);
+              : updatedActors.findIndex(a => a.bpmnId === bpmnActor.id);
             if (existingIndex !== -1) {
               let needsUpdate = false;
               const updatedActor = { ...updatedActors[existingIndex] };
 
               // If matched by name (not bpmnId), link the actor to the BPMN Pool
-              if (matchedByName && !updatedActor.bpmnId) {
+              // But skip if actor is already linked to a Lane (has bpmnLaneId)
+              if (matchedByName && !updatedActor.bpmnId && !updatedActor.bpmnLaneId) {
                 updatedActor.bpmnId = bpmnActor.id;
                 updatedActor.bpmnShapeName = bpmnActor.name;
                 updatedActor.actorType = 'group'; // Pool = group
@@ -1809,25 +1937,26 @@ const App = () => {
         });
 
         // Remove actors whose linked Pools no longer exist (deleted in BPMN)
-        const actorsToRemove = updatedActors.filter(a => (a.bpmnId || a.bpmnShapeName) && !bpmnPoolIds.has(a.bpmnId || a.bpmnShapeName));
-        // Only remove actors that are linked to BPMN (not manually added)
-        const linkedActorsToRemove = actorsToRemove.filter(a => a.bpmnId);
-        if (linkedActorsToRemove.length > 0) {
+        // Only consider Pool-linked actors (have bpmnId), not Lane-linked actors (only bpmnShapeName)
+        const actorsToRemove = updatedActors.filter(a => a.bpmnId && !bpmnPoolIds.has(a.bpmnId));
+        if (actorsToRemove.length > 0) {
           updatedActors = updatedActors.filter(a => !a.bpmnId || bpmnPoolIds.has(a.bpmnId));
           hasChanges = true;
 
           // Notify user about auto-removed actors
-          const removedNames = linkedActorsToRemove.map(a => a.name || 'Unnamed').join(', ');
+          const removedNames = actorsToRemove.map(a => a.name || 'Unnamed').join(', ');
           setTimeout(() => {
             console.info(`Actors removed due to Pool deletion: ${removedNames}`);
-            if (linkedActorsToRemove.some(a => a.name)) {
+            if (actorsToRemove.some(a => a.name)) {
               alert(`The following actors were automatically removed because their linked Pools were deleted:\n\n${removedNames}`);
             }
           }, 100);
         }
 
         if (hasChanges) {
-          return { ...prevHeaderData, actorsList: updatedActors };
+          const newState = { ...prevHeaderData, actorsList: updatedActors };
+          headerDataRef.current = newState; // Keep ref in sync with state
+          return newState;
         }
         return prevHeaderData;
       });
@@ -1838,6 +1967,64 @@ const App = () => {
   const handleCloseERPanel = useCallback(() => {
     setShowERPanel(false);
     setSelectedDataObject(null);
+  }, []);
+
+  // Handle Task selection from BPMN editor
+  const handleTaskSelect = useCallback((task) => {
+    if (!task) {
+      setSelectedTask(null);
+      setShowTaskDetailPanel(false);
+      return;
+    }
+
+    setSelectedTask(task);
+
+    // Open Task panel on any click (single or double)
+    setShowERPanel(false);
+    setSelectedDataObject(null);
+    setShowTaskDetailPanel(true);
+    setActivePane(null);
+  }, []);
+
+  // Save task details (name + documentation) to BPMN element
+  const handleTaskSave = useCallback((taskId, { name, documentation }) => {
+    if (!modelerRef.current) return;
+
+    try {
+      const modeling = modelerRef.current.get('modeling');
+      const elementRegistry = modelerRef.current.get('elementRegistry');
+      const moddle = modelerRef.current.get('moddle');
+      const element = elementRegistry.get(taskId);
+
+      if (!element) return;
+
+      const props = { name };
+
+      if (documentation && documentation.trim()) {
+        const docElement = moddle.create('bpmn:Documentation', { text: documentation });
+        props.documentation = [docElement];
+      } else {
+        props.documentation = [];
+      }
+
+      modeling.updateProperties(element, props);
+
+      // Update selectedTask state so the panel reflects saved data
+      setSelectedTask(prev => prev && prev.id === taskId
+        ? { ...prev, name, documentation }
+        : prev
+      );
+
+      setIsDirty(true);
+    } catch (err) {
+      console.error('Failed to save task details:', err);
+    }
+  }, []);
+
+  // Close Task Detail panel
+  const handleCloseTaskDetailPanel = useCallback(() => {
+    setShowTaskDetailPanel(false);
+    setSelectedTask(null);
   }, []);
 
   // Create a swimlane (Pool) in BPMN for a given actor
@@ -1887,6 +2074,61 @@ const App = () => {
     } catch (error) {
       console.error('Error creating swimlane for actor:', error);
       return null;
+    }
+  }, []);
+
+  // Create BPMN Lanes inside a Pool for sub-actors
+  // Returns a map of { subActorId → bpmnShapeName } for updated sub-actors
+  const createLaneForSubActors = useCallback((actorBpmnId, allSubActors) => {
+    if (!modelerRef.current || !actorBpmnId) return {};
+
+    try {
+      const modeling = modelerRef.current.get('modeling');
+      const elementRegistry = modelerRef.current.get('elementRegistry');
+
+      const pool = elementRegistry.get(actorBpmnId);
+      if (!pool || pool.type !== 'bpmn:Participant') return {};
+
+      // Helper to get lanes in this pool, sorted top-to-bottom
+      const getPoolLanes = () =>
+        (pool.children || [])
+          .filter(c => c.type === 'bpmn:Lane')
+          .sort((a, b) => (a.y || 0) - (b.y || 0));
+
+      const existingLanes = getPoolLanes();
+      const bpmnShapeUpdates = {};
+
+      if (existingLanes.length === 0) {
+        // No lanes yet — split pool into lanes (first click always adds ≥2 sub-actors)
+        modeling.splitLane(pool, allSubActors.length);
+
+        const newLanes = getPoolLanes();
+        allSubActors.forEach((sub, idx) => {
+          if (idx < newLanes.length) {
+            modeling.updateProperties(newLanes[idx], { name: sub.name || '' });
+            bpmnShapeUpdates[sub.id] = newLanes[idx].id;
+          }
+        });
+      } else {
+        // Pool already has lanes — add one for each new sub-actor
+        allSubActors.forEach(sub => {
+          if (!sub.bpmnShapeName) {
+            const lastLane = getPoolLanes().pop();
+            if (lastLane) {
+              const newLane = modeling.addLane(lastLane, 'bottom');
+              if (newLane) {
+                modeling.updateProperties(newLane, { name: sub.name || '' });
+                bpmnShapeUpdates[sub.id] = newLane.id;
+              }
+            }
+          }
+        });
+      }
+
+      return bpmnShapeUpdates;
+    } catch (error) {
+      console.error('Error creating lanes for sub-actors:', error);
+      return {};
     }
   }, []);
 
@@ -1983,69 +2225,119 @@ const App = () => {
   }, []);
 
   // Handle Header Data change with actor-to-swimlane sync
-  // Uses functional update to avoid race conditions with concurrent state updates
+  // Side effects (BPMN modeler updates) are executed OUTSIDE the state updater
+  // to avoid React anti-patterns with React 18 batching
   const handleHeaderChange = useCallback((newHeaderData) => {
-    // Use functional update to ensure we work with the latest state
-    setHeaderData(prevHeaderData => {
-      // Detect actor changes and sync to BPMN
-      const oldActors = prevHeaderData.actorsList || [];
-      const newActors = newHeaderData.actorsList || [];
+    // Compare against the ref (latest known headerData) for actor change detection
+    const prevHeaderData = headerDataRef.current;
+    const oldActors = prevHeaderData.actorsList || [];
+    const newActors = newHeaderData.actorsList || [];
 
-      // Build a map of old actors by id for comparison
-      const oldActorsById = {};
-      oldActors.forEach(a => {
-        oldActorsById[a.id] = a;
-      });
-
-      // Find newly added actors (actors without bpmnId that weren't in old list)
-      const oldActorIds = new Set(oldActors.map(a => a.id));
-      const newlyAddedActors = newActors.filter(a => !a.bpmnId && !oldActorIds.has(a.id));
-
-      // Find actors that were renamed (have bpmnId and name changed)
-      const renamedActors = newActors.filter(a => {
-        if (!a.bpmnId) return false;
-        const oldActor = oldActorsById[a.id];
-        return oldActor && oldActor.name !== a.name;
-      });
-
-      // Update swimlane names for renamed actors (side effect, but safe)
-      renamedActors.forEach(actor => {
-        updateSwimlaneName(actor.bpmnId, actor.name);
-      });
-
-      // Find actors that were removed (with bpmnId)
-      const newActorBpmnIds = new Set(newActors.filter(a => a.bpmnId).map(a => a.bpmnId));
-      const removedActors = oldActors.filter(a => a.bpmnId && !newActorBpmnIds.has(a.bpmnId));
-
-      // Remove corresponding swimlanes for deleted actors (side effect, but safe)
-      removedActors.forEach(actor => {
-        if (actor.bpmnId) {
-          removeSwimlanFromBpmn(actor.bpmnId);
-        }
-      });
-
-      // Create swimlanes for newly added actors
-      if (newlyAddedActors.length > 0 && modelerRef.current) {
-        const updatedActors = newActors.map(actor => {
-          if (newlyAddedActors.includes(actor)) {
-            const bpmnId = createSwimlanForActor(actor.name);
-            if (bpmnId) {
-              return { ...actor, bpmnId };
-            }
-          }
-          return actor;
-        });
-
-        // Merge newHeaderData with updated actors, preserving all other fields
-        return { ...newHeaderData, actorsList: updatedActors };
-      }
-
-      // Return newHeaderData directly (this includes regions, uses, etc.)
-      return newHeaderData;
+    // Build a map of old actors by id for comparison
+    const oldActorsById = {};
+    oldActors.forEach(a => {
+      oldActorsById[a.id] = a;
     });
 
+    // Find actors that were renamed (have bpmnId, same bpmnId as before, and name changed)
+    const renamedActors = newActors.filter(a => {
+      if (!a.bpmnId) return false;
+      const oldActor = oldActorsById[a.id];
+      return oldActor && oldActor.bpmnId === a.bpmnId && oldActor.name !== a.name;
+    });
+
+    // Update Pool names for renamed actors
+    renamedActors.forEach(actor => {
+      updateSwimlaneName(actor.bpmnId, actor.name);
+    });
+
+    // Find sub-actors (Lanes) that were renamed (have bpmnShapeName and name changed)
+    newActors.forEach(newActor => {
+      const oldActor = oldActorsById[newActor.id];
+      if (!oldActor) return;
+      const oldSubs = oldActor.subActors || [];
+      const newSubs = newActor.subActors || [];
+      const oldSubsById = {};
+      oldSubs.forEach(s => { oldSubsById[s.id] = s; });
+
+      newSubs.forEach(newSub => {
+        if (!newSub.bpmnShapeName) return;
+        const oldSub = oldSubsById[newSub.id];
+        if (oldSub && oldSub.bpmnShapeName === newSub.bpmnShapeName && oldSub.name !== newSub.name) {
+          updateSwimlaneName(newSub.bpmnShapeName, newSub.name);
+        }
+      });
+    });
+
+    // Find actors that were actually removed from the list (by id, not by bpmnId change)
+    // This prevents link/merge operations from deleting BPMN Pools
+    const newActorIds = new Set(newActors.map(a => a.id));
+    const removedActors = oldActors.filter(a => a.bpmnId && !newActorIds.has(a.id));
+
+    // Only remove BPMN Pool if no other actor has taken over the same bpmnId
+    const newActorBpmnIds = new Set(newActors.filter(a => a.bpmnId).map(a => a.bpmnId));
+    removedActors.forEach(actor => {
+      if (actor.bpmnId && !newActorBpmnIds.has(actor.bpmnId)) {
+        removeSwimlanFromBpmn(actor.bpmnId);
+      }
+    });
+
+    // Create swimlanes for newly added actors
+    const oldActorIds = new Set(oldActors.map(a => a.id));
+    const newlyAddedActors = newActors.filter(a => !a.bpmnId && !a.bpmnLaneId && !oldActorIds.has(a.id));
+
+    let finalHeaderData = newHeaderData;
+    if (newlyAddedActors.length > 0 && modelerRef.current) {
+      const updatedActors = newActors.map(actor => {
+        if (newlyAddedActors.includes(actor)) {
+          const bpmnId = createSwimlanForActor(actor.name);
+          if (bpmnId) {
+            return { ...actor, bpmnId };
+          }
+        }
+        return actor;
+      });
+      finalHeaderData = { ...newHeaderData, actorsList: updatedActors };
+    }
+
+    // Create lanes for newly added sub-actors
+    if (modelerRef.current) {
+      const currentActors = finalHeaderData.actorsList || [];
+      let actorsModified = false;
+      const updatedActorsForLanes = currentActors.map(actor => {
+        if (!actor.bpmnId) return actor;
+        const oldActor = oldActorsById[actor.id];
+        if (!oldActor) return actor; // Newly created actor, skip
+
+        const oldSubIds = new Set((oldActor.subActors || []).map(s => s.id));
+        const newSubs = actor.subActors || [];
+        const newlyAddedSubs = newSubs.filter(s => !oldSubIds.has(s.id));
+
+        if (newlyAddedSubs.length > 0) {
+          const updates = createLaneForSubActors(actor.bpmnId, newSubs);
+          if (Object.keys(updates).length > 0) {
+            actorsModified = true;
+            return {
+              ...actor,
+              subActors: newSubs.map(s =>
+                updates[s.id] ? { ...s, bpmnShapeName: updates[s.id] } : s
+              )
+            };
+          }
+        }
+        return actor;
+      });
+
+      if (actorsModified) {
+        finalHeaderData = { ...finalHeaderData, actorsList: updatedActorsForLanes };
+      }
+    }
+
+    // Update ref synchronously so rapid calls see the latest value
+    headerDataRef.current = finalHeaderData;
+    setHeaderData(finalHeaderData);
     setIsDirty(true);
-  }, [createSwimlanForActor, removeSwimlanFromBpmn, updateSwimlaneName]);
+  }, [createSwimlanForActor, createLaneForSubActors, removeSwimlanFromBpmn, updateSwimlaneName]);
 
   // Handle menu item click
   const handleMenuItemClick = useCallback((pane) => {
@@ -2075,7 +2367,9 @@ const App = () => {
         if (!currentEr.description || !currentEr.description.trim()) {
           missingParts.push('a description');
         }
-        if (!currentEr.informationUnits || currentEr.informationUnits.length === 0) {
+        // Only leaf ERs (no sub-ERs) require IUs — ERs that only compose sub-ERs are valid per ISO 29481-3
+        const hasSubERs = currentEr.subERs && currentEr.subERs.length > 0;
+        if (!hasSubERs && (!currentEr.informationUnits || currentEr.informationUnits.length === 0)) {
           missingParts.push('at least one Information Unit');
         }
         if (missingParts.length > 0) {
@@ -2160,13 +2454,19 @@ const App = () => {
     // Do NOT create BPMN data object when adding ER from Individual ER panel
     // Data objects should only be created when user adds them directly to BPMN diagram
     // The new ER will appear as a sub-ER in the tree view
-    // Do NOT change selectedErId - keep displaying the current ER in Individual ER panel
+
+    // If this is the first ER in an empty project, auto-select it to open Individual ER pane
+    if (erHierarchy.length === 0) {
+      setSelectedErId(newER.id);
+      setSelectedDataObject({ id: newER.id, name: newER.id });
+      setErPanelMode('detail');
+    }
 
     // Set newly added ER ID to trigger scroll in ERPanel
     setNewlyAddedErId(newER.id);
     setShowERPanel(true);
     setIsDirty(true);
-  }, [selectedErId]);
+  }, [selectedErId, erHierarchy.length]);
 
   // Handle validation error navigation
   const handleValidationNavigate = useCallback((path) => {
@@ -2440,12 +2740,62 @@ const App = () => {
         setHasActiveProject(true);
         extractDataObjectsAfterLoad(); // Extract data objects from loaded BPMN
         linkActorsToSwimlanesByName(); // Sync actors with BPMN Pools
+      } else if (fileName.endsWith('.xppm')) {
+        // Parse as xPPM legacy file
+        try {
+          isLoadingProjectRef.current = true;
+          const xppmResult = importXppm(content);
+
+          // Use ER hierarchy directly from the xPPM importer (preserves root ER + sub-ER nesting)
+          const erHierarchyToImport = xppmResult.erHierarchy || [];
+          const dataObjectErMapToImport = xppmResult.dataObjectErMap || {};
+
+          // Check if we need to show root selection modal
+          if (handleErHierarchyImport(erHierarchyToImport, {
+            bpmnXml: xppmResult.bpmnXml || 'EMPTY',
+            headerData: xppmResult.headerData,
+            dataObjectErMap: dataObjectErMapToImport,
+            erDataMap: xppmResult.erDataMap,
+            erLibrary: xppmResult.erLibrary,
+            filePath: file.name,
+            isDirtyAfterImport: !xppmResult.bpmnXml,
+            source: 'xppm'
+          })) {
+            if (!xppmResult.bpmnXml) {
+              alert('xPPM imported. Note: No BPMN diagram found. The process map canvas will be blank.');
+            }
+            return;
+          }
+
+          // No modal needed - proceed with direct import
+          if (xppmResult.headerData) setHeaderData(xppmResult.headerData);
+          setErHierarchy(erHierarchyToImport);
+          setDataObjectErMap(dataObjectErMapToImport);
+          if (xppmResult.erDataMap) setErDataMap(xppmResult.erDataMap);
+          if (xppmResult.erLibrary) setErLibrary(xppmResult.erLibrary);
+          setBpmnXml(xppmResult.bpmnXml || 'EMPTY');
+          if (!xppmResult.bpmnXml) {
+            alert('xPPM imported successfully. Note: No BPMN diagram found. The process map canvas is blank and needs to be created manually.');
+          }
+          setCurrentFilePath(file.name);
+          setIsDirty(!xppmResult.bpmnXml);
+          setValidationResults(null);
+          setHasActiveProject(true);
+          setActivePane('specification');
+          setTimeout(() => { isLoadingProjectRef.current = false; }, 2000);
+          extractDataObjectsAfterLoad();
+          linkActorsToSwimlanesByName();
+        } catch (xppmErr) {
+          console.error('Failed to parse xPPM file:', xppmErr);
+          alert('Failed to parse xPPM file: ' + xppmErr.message);
+          isLoadingProjectRef.current = false;
+        }
       }
     } catch (err) {
       console.error('Failed to parse file:', err);
-      alert('Failed to open file. Please ensure it is a valid project, idmXML, or BPMN file.');
+      alert('Failed to open file. Please ensure it is a valid project, idmXML, BPMN, or xPPM file.');
     }
-  }, [extractDataObjectsAfterLoad, linkActorsToSwimlanesByName]);
+  }, [extractDataObjectsAfterLoad, linkActorsToSwimlanesByName, migrateErDataMap]);
 
   // Open project
   const handleOpenProject = useCallback(async () => {
@@ -2570,7 +2920,9 @@ const App = () => {
       setErHierarchy([]);
       setDataObjectErMap({});
       setErLibrary([]);
+      isLoadingProjectRef.current = true;
       setBpmnXml('BLANK'); // Signal for empty canvas with just a start event
+      setTimeout(() => { isLoadingProjectRef.current = false; }, 2000);
     }
     extractDataObjectsAfterLoad(); // Extract data objects from loaded BPMN
     linkActorsToSwimlanesByName(); // Sync actors with BPMN Pools
@@ -2613,6 +2965,8 @@ const App = () => {
     setDataObjectErMap({});
     setSelectedDataObject(null);
     setShowERPanel(false);
+    setShowTaskDetailPanel(false);
+    setSelectedTask(null);
     setActivePane(null);
     setCurrentFilePath(null);
     setIsDirty(false);
@@ -2632,71 +2986,12 @@ const App = () => {
     }
   }, [isDirty, resetProjectState]);
 
-  // Handle close confirmation dialog response
-  const handleCloseConfirmResponse = useCallback(async (response) => {
-    setShowCloseConfirmDialog(false);
-
-    if (response === 'cancel') {
-      // User cancelled, do nothing
-      return;
-    }
-
-    if (response === 'save') {
-      // Save first, then close
-      try {
-        // Get current BPMN XML
-        let currentBpmnXml = bpmnXml;
-        if (modelerRef.current) {
-          try {
-            const { xml } = await modelerRef.current.saveXML({ format: true });
-            currentBpmnXml = xml;
-          } catch (e) {
-            console.error('Failed to get current BPMN XML:', e);
-          }
-        }
-
-        // Generate idmXML
-        const dataObjects = Object.keys(erDataMap).map(id => ({ id, name: id }));
-        const result = generateIdmXml({
-          headerData,
-          bpmnXml: currentBpmnXml,
-          erDataMap,
-          erHierarchy,
-          dataObjects
-        });
-
-        // Download the file - use shortTitle as default filename
-        const blob = new Blob([result.xml], { type: 'application/xml' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        const fileName = (headerData.shortTitle || headerData.title)
-          ? `${(headerData.shortTitle || headerData.title).replace(/[/\\?%*:|"<>]/g, '_').trim()}.xml`
-          : 'idm_specification.xml';
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-
-        // Now close
-        resetProjectState();
-      } catch (error) {
-        console.error('Failed to save before closing:', error);
-        alert('Failed to save. Project not closed.');
-      }
-    } else if (response === 'discard') {
-      // Discard changes and close
-      resetProjectState();
-    }
-  }, [bpmnXml, erDataMap, headerData, resetProjectState]);
-
   // Open User Manual / Help
   const handleHelp = useCallback(() => {
     // Open the user manual in a new browser tab/window
     // In Electron, this will use the shell.openExternal
     // In browser, this will open the markdown file or a hosted version
-    const manualUrl = 'https://htmlpreview.github.io/?https://github.com/ghanglee/IDMxPPM/blob/main/user_manuals/V1.2.0/IDMxPPM-Tutorials.html';
+    const manualUrl = 'https://htmlpreview.github.io/?https://github.com/ghanglee/IDMxPPM/blob/main/user_manuals/V1.2.2/IDMxPPM-Tutorials.html';
 
     if (window.electronAPI && window.electronAPI.openExternal) {
       window.electronAPI.openExternal(manualUrl);
@@ -2722,11 +3017,12 @@ const App = () => {
     const results = validateProject({
       headerData,
       bpmnXml: currentBpmnXml,
-      erDataMap
+      erDataMap,
+      erHierarchy
     });
     setValidationResults(results);
     setShowValidationPanel(true);
-  }, [headerData, bpmnXml, erDataMap]);
+  }, [headerData, bpmnXml, erDataMap, erHierarchy]);
 
   // Export idmXML / Save & Export
   const handleSaveExport = useCallback(async () => {
@@ -2745,7 +3041,8 @@ const App = () => {
     const results = validateProject({
       headerData,
       bpmnXml: currentBpmnXml,
-      erDataMap
+      erDataMap,
+      erHierarchy
     });
     setValidationResults(results);
 
@@ -2760,6 +3057,25 @@ const App = () => {
     // Users may want to save incomplete work to continue later
     setShowExportDialog(true);
   }, [headerData, bpmnXml, erDataMap]);
+
+  // Handle close confirmation dialog response
+  const handleCloseConfirmResponse = useCallback((response) => {
+    setShowCloseConfirmDialog(false);
+
+    if (response === 'cancel') {
+      // User cancelled, do nothing
+      return;
+    }
+
+    if (response === 'save') {
+      // Open Save & Export dialog; project will close after export completes
+      pendingCloseRef.current = true;
+      handleSaveExport();
+    } else if (response === 'discard') {
+      // Discard changes and close
+      resetProjectState();
+    }
+  }, [handleSaveExport, resetProjectState]);
 
   // Browse for save location (Electron only)
   const handleBrowseSaveLocation = useCallback(async () => {
@@ -2848,6 +3164,20 @@ const App = () => {
       .replace(/[/\\?%*:|"<>]/g, '_') // Remove filesystem-invalid characters only
       .trim();
 
+    // Helper: finalize after a successful save
+    const finalizeSave = (savedPath) => {
+      setShowExportDialog(false);
+      setIsDirty(false);
+      // Track file path for IDM project files
+      if (savedPath && exportFormat === 'idm') {
+        setCurrentFilePath(savedPath);
+      }
+      if (pendingCloseRef.current) {
+        pendingCloseRef.current = false;
+        resetProjectState();
+      }
+    };
+
     // Save file - uses Electron's save API if a path is set, otherwise downloads in browser
     const saveFile = async (content, filename, mimeType) => {
       // If a save path was selected via browse, save directly to that path
@@ -2858,12 +3188,32 @@ const App = () => {
           isBinary: false
         });
         if (result.success) {
-          setShowExportDialog(false);
+          finalizeSave(exportSavePath);
           return;
         }
       }
 
-      // Otherwise download in browser
+      // In Electron without a browsed path: show OS save dialog (handles overwrite prompt)
+      if (window.electronAPI?.showSaveLocation && window.electronAPI?.saveToPath) {
+        const locResult = await window.electronAPI.showSaveLocation({
+          defaultName: filename,
+          format: exportFormat
+        });
+        if (locResult.success && locResult.filePath) {
+          const saveResult = await window.electronAPI.saveToPath({
+            content,
+            filePath: locResult.filePath,
+            isBinary: false
+          });
+          if (saveResult.success) {
+            finalizeSave(locResult.filePath);
+            return;
+          }
+        }
+        return; // User cancelled OS dialog — don't fall through to browser download
+      }
+
+      // Browser fallback
       const blob = new Blob([content], { type: mimeType });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -2871,6 +3221,7 @@ const App = () => {
       a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
+      finalizeSave(null);
     };
 
     try {
@@ -2968,7 +3319,8 @@ const App = () => {
             if (!bundleErDataMap[dataObjectId]) bundleErDataMap[dataObjectId] = er;
           });
 
-          await downloadIdmBundle({
+          const zipFilename = `${fileName}.zip`;
+          const bundleParams = {
             headerData,
             bpmnXml: currentBpmnXml,
             erDataMap: bundleErDataMap,
@@ -2976,7 +3328,36 @@ const App = () => {
             dataObjectErMap,
             dataObjects,
             erLibrary
-          }, `${fileName}.zip`);
+          };
+
+          // In Electron: use save dialog for overwrite handling
+          if (window.electronAPI?.showSaveLocation && window.electronAPI?.saveToPath) {
+            const zipBlob = await exportIdmBundle(bundleParams);
+            const locResult = await window.electronAPI.showSaveLocation({
+              defaultName: zipFilename,
+              format: 'zip'
+            });
+            if (locResult.success && locResult.filePath) {
+              // Convert blob to base64 for Electron IPC
+              const arrayBuffer = await zipBlob.arrayBuffer();
+              const uint8Array = new Uint8Array(arrayBuffer);
+              const binaryStr = Array.from(uint8Array, b => String.fromCharCode(b)).join('');
+              const base64Content = btoa(binaryStr);
+              const saveResult = await window.electronAPI.saveToPath({
+                content: base64Content,
+                filePath: locResult.filePath,
+                isBinary: true
+              });
+              if (saveResult.success) {
+                finalizeSave(null);
+                return; // Already handled — skip the main finalizeSave at switch end
+              }
+            }
+            break; // User cancelled
+          }
+
+          // Browser fallback
+          await downloadIdmBundle(bundleParams, zipFilename);
           break;
         }
 
@@ -3054,12 +3435,14 @@ const App = () => {
           console.warn('Unknown export format:', exportFormat);
       }
 
-      setShowExportDialog(false);
+      // finalizeSave is already called by saveFile for most formats;
+      // this covers ZIP browser fallback and any remaining cases
+      finalizeSave(null);
     } catch (err) {
       console.error('Export failed:', err);
       alert('Export failed: ' + err.message);
     }
-  }, [bpmnXml, headerData, erDataMap, erLibrary, exportFormat, exportFilename, exportSavePath, exportOptions, customXslt, handleSaveToServer]);
+  }, [bpmnXml, headerData, erDataMap, erLibrary, exportFormat, exportFilename, exportSavePath, exportOptions, customXslt, handleSaveToServer, resetProjectState]);
 
   // Save project
   const saveProject = async (saveAs = false) => {
@@ -3239,7 +3622,8 @@ const App = () => {
           isLoadingProjectRef.current = false;
         }
       } else if (data.type === 'idmxml') {
-        // Parse idmXML file
+        // Parse idmXML file (async to allow resolving external BPMN/image references)
+        (async () => {
         try {
           // Set loading flag to prevent marking dirty during load
           isLoadingProjectRef.current = true;
@@ -3254,6 +3638,15 @@ const App = () => {
           idmData.headerData = idmData.headerData || {};
           idmData.headerData.idmXsdVersion = versionInfo.version;
           idmData.headerData.idmXsdVersionConfidence = versionInfo.confidence;
+
+          // Apply pre-loaded BPMN from main process if not already embedded
+          if (!idmData.bpmnXml && data.bpmnContent) {
+            idmData.bpmnXml = data.bpmnContent;
+            console.log('[idmXML import] BPMN loaded from main process, length:', data.bpmnContent.length);
+          }
+
+          // Resolve external references (BPMN if still missing, plus all image filePaths)
+          await resolveExternalReferences(idmData, data.filePath);
 
           // Build dataObjectErMap from dataObjectErLinks
           const newDataObjectErMap = {};
@@ -3312,6 +3705,7 @@ const App = () => {
           alert('Failed to parse idmXML file: ' + err.message);
           isLoadingProjectRef.current = false;
         }
+        })();
       } else if (data.type === 'bpmn') {
         setBpmnXml(data.content);
         // Clear data object-to-ER mappings since old BPMN data object IDs are no longer valid
@@ -3325,6 +3719,109 @@ const App = () => {
       } else if (data.type === 'zip') {
         // Handle ZIP bundle - note: Electron sends file content as string, need binary handling
         alert('ZIP import via Electron menu is not yet supported. Please use the browser file picker via Open Project button.');
+      } else if (data.type === 'xppm') {
+        // Handle xPPM legacy import
+        (async () => {
+        try {
+          isLoadingProjectRef.current = true;
+          // Pass bpmnContent from main process (pre-loaded alongside the xPPM file)
+          const xppmResult = importXppm(data.content, data.bpmnContent || null);
+          console.log('[xPPM import] bpmnXml present:', !!xppmResult.bpmnXml, '| bpmnContent from main:', !!data.bpmnContent);
+
+          // Apply pre-loaded images from the main process to ER figures
+          if (data.imageMap && Object.keys(data.imageMap).length > 0) {
+            console.log('[xPPM import] Applying', Object.keys(data.imageMap).length, 'pre-loaded images');
+            const applyImages = (figures) => {
+              if (!figures?.length) return;
+              for (const fig of figures) {
+                if (fig.filePath && !fig.data) {
+                  const normalized = normalizePath(fig.filePath);
+                  if (data.imageMap[normalized]) {
+                    fig.data = data.imageMap[normalized];
+                    fig.needsLoading = false;
+                  }
+                }
+              }
+            };
+            // Apply to header figures
+            const hd = xppmResult.headerData || {};
+            applyImages(hd.summaryFigures);
+            applyImages(hd.aimAndScopeFigures);
+            applyImages(hd.benefitsFigures);
+            applyImages(hd.limitationsFigures);
+            // Apply to ER figures recursively
+            const applyErImages = (ers) => {
+              if (!ers) return;
+              const erList = Array.isArray(ers) ? ers : Object.values(ers);
+              for (const er of erList) {
+                applyImages(er.descriptionFigures);
+                if (er.informationUnits) {
+                  const applyIuImages = (units) => {
+                    for (const iu of units) {
+                      applyImages(iu.definitionFigures);
+                      applyImages(iu.exampleImages);
+                      if (iu.subInformationUnits) applyIuImages(iu.subInformationUnits);
+                    }
+                  };
+                  applyIuImages(er.informationUnits);
+                }
+                if (er.subErs?.length) applyErImages(er.subErs);
+                if (er.subERs?.length) applyErImages(er.subERs);
+              }
+            };
+            if (xppmResult.erDataMap) applyErImages(xppmResult.erDataMap);
+            if (xppmResult.erHierarchy) applyErImages(xppmResult.erHierarchy);
+          }
+
+          // Resolve external references (BPMN if still missing, plus all image filePaths)
+          await resolveExternalReferences(xppmResult, data.filePath);
+
+          // Use ER hierarchy directly from the xPPM importer (preserves root ER + sub-ER nesting)
+          const erHierarchyToImport = xppmResult.erHierarchy || [];
+          const dataObjectErMapToImport = xppmResult.dataObjectErMap || {};
+
+          // Check if we need to show root selection modal
+          if (handleErHierarchyImport(erHierarchyToImport, {
+            bpmnXml: xppmResult.bpmnXml || 'EMPTY',
+            headerData: xppmResult.headerData,
+            dataObjectErMap: dataObjectErMapToImport,
+            erDataMap: xppmResult.erDataMap,
+            erLibrary: xppmResult.erLibrary,
+            filePath: data.filePath,
+            isDirtyAfterImport: !xppmResult.bpmnXml,
+            source: 'xppm'
+          })) {
+            if (!xppmResult.bpmnXml) {
+              alert('xPPM imported. Note: No BPMN diagram found. The process map canvas will be blank.');
+            }
+            return;
+          }
+
+          // No modal needed - proceed with direct import
+          if (xppmResult.headerData) setHeaderData(xppmResult.headerData);
+          setErHierarchy(erHierarchyToImport);
+          setDataObjectErMap(dataObjectErMapToImport);
+          if (xppmResult.erDataMap) setErDataMap(xppmResult.erDataMap);
+          if (xppmResult.erLibrary) setErLibrary(xppmResult.erLibrary);
+          setBpmnXml(xppmResult.bpmnXml || 'EMPTY');
+          if (!xppmResult.bpmnXml) {
+            alert('xPPM imported successfully. Note: No BPMN diagram found. The process map canvas is blank and needs to be created manually.');
+          }
+          setCurrentFilePath(data.filePath);
+          setIsDirty(!xppmResult.bpmnXml);
+          setValidationResults(null);
+          setHasActiveProject(true);
+          setActivePane('specification');
+          extractDataObjectsAfterLoad();
+          linkActorsToSwimlanesByName();
+
+          setTimeout(() => { isLoadingProjectRef.current = false; }, 2000);
+        } catch (err) {
+          console.error('Failed to parse xPPM file:', err);
+          alert('Failed to parse xPPM file: ' + err.message);
+          isLoadingProjectRef.current = false;
+        }
+        })();
       }
     });
 
@@ -3338,6 +3835,7 @@ const App = () => {
     });
 
     window.electronAPI.onMenuNew(() => {
+      isLoadingProjectRef.current = true;
       setBpmnXml('DEFAULT'); // Signal to load DEFAULT_DIAGRAM
       setBpmnDataObjects([]); // Clear data objects
       setHeaderData({
@@ -3381,6 +3879,7 @@ const App = () => {
       setHasActiveProject(true); // Mark project as active
       extractDataObjectsAfterLoad(); // Extract data objects from loaded BPMN
       linkActorsToSwimlanesByName(); // Sync actors with BPMN Pools
+      setTimeout(() => { isLoadingProjectRef.current = false; }, 2000);
     });
 
     window.electronAPI.onMenuSave(() => saveProject(false));
@@ -3458,6 +3957,7 @@ const App = () => {
                     onOutdent={handleOutdentEr}
                     onImportER={handleImportErXml}
                     onExportER={handleExportErXml}
+                    bpmnActorsList={bpmnActorsList}
                     onClose={() => {
                       setActivePane(null);
                       if (activePane === 'exchangeReq') {
@@ -3475,6 +3975,7 @@ const App = () => {
                       xml={bpmnXml}
                       onDataObjectSelect={handleDataObjectSelect}
                       onNewDataObject={handleNewDataObject}
+                      onTaskSelect={handleTaskSelect}
                       onChange={handleBpmnChange}
                       onReady={handleModelerReady}
                       onImportBpmn={(newBpmnXml) => {
@@ -3540,6 +4041,15 @@ const App = () => {
                     onMoveERAsSubER={handleMoveErAsSubER}
                     newlyAddedErId={newlyAddedErId}
                     onClearNewlyAddedErId={() => setNewlyAddedErId(null)}
+                  />
+                )}
+
+                {/* Task Detail Panel (Right side) - Shows when a BPMN task is double-clicked */}
+                {showTaskDetailPanel && selectedTask && (
+                  <TaskDetailPanel
+                    task={selectedTask}
+                    onSave={handleTaskSave}
+                    onClose={handleCloseTaskDetailPanel}
                   />
                 )}
               </>
@@ -3656,7 +4166,7 @@ const App = () => {
         {/* Save & Export Dialog */}
         {showExportDialog && (
           <>
-            <div className="modal-overlay" onClick={() => setShowExportDialog(false)} />
+            <div className="modal-overlay" onClick={() => { setShowExportDialog(false); pendingCloseRef.current = false; }} />
             <div className="export-dialog">
               <div className="export-dialog-header">
                 <h3>Save & Export</h3>
@@ -3850,7 +4360,7 @@ const App = () => {
               <div className="export-dialog-footer">
                 <button
                   className="close-confirm-btn close-confirm-btn-secondary"
-                  onClick={() => setShowExportDialog(false)}
+                  onClick={() => { setShowExportDialog(false); pendingCloseRef.current = false; }}
                 >
                   Cancel
                 </button>

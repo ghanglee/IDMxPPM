@@ -6,6 +6,7 @@
 
 import JSZip from 'jszip';
 import { generateIdmXml } from './idmXmlGenerator';
+import { isDataUri, parseDataUri, getExtension } from './filePathUtils.js';
 
 /**
  * Extract images from a single ER (and its subERs recursively)
@@ -20,8 +21,8 @@ const extractImagesFromEr = (er, images) => {
   // Extract ER description figures
   if (cloned.descriptionFigures && cloned.descriptionFigures.length > 0) {
     cloned.descriptionFigures = cloned.descriptionFigures.map((img, imgIndex) => {
-      if (img.data && img.data.startsWith('data:')) {
-        const ext = getExtensionFromMimeType(img.type || 'image/png');
+      if (img.data && isDataUri(img.data)) {
+        const ext = getExtension(img.type || 'image/png');
         const fileName = `images/er_${sanitizeFilename(cloned.id || 'unknown')}_desc_img${imgIndex}.${ext}`;
         images.push({ fileName, data: img.data, type: img.type || 'image/png', caption: img.caption || img.name });
         return { ...img, filePath: fileName, data: undefined };
@@ -34,8 +35,8 @@ const extractImagesFromEr = (er, images) => {
     // Extract IU definition figures
     if (unit.definitionFigures && unit.definitionFigures.length > 0) {
       unit.definitionFigures = unit.definitionFigures.map((img, imgIndex) => {
-        if (img.data && img.data.startsWith('data:')) {
-          const ext = getExtensionFromMimeType(img.type || 'image/png');
+        if (img.data && isDataUri(img.data)) {
+          const ext = getExtension(img.type || 'image/png');
           const fileName = `images/er_${sanitizeFilename(cloned.id || 'unknown')}_iu${path}_def${imgIndex}.${ext}`;
           images.push({ fileName, data: img.data, type: img.type || 'image/png', caption: img.caption || img.name });
           return { ...img, filePath: fileName, data: undefined };
@@ -46,8 +47,8 @@ const extractImagesFromEr = (er, images) => {
     // Extract IU example images
     if (unit.exampleImages && unit.exampleImages.length > 0) {
       unit.exampleImages = unit.exampleImages.map((img, imgIndex) => {
-        if (img.data && img.data.startsWith('data:')) {
-          const ext = getExtensionFromMimeType(img.type || 'image/png');
+        if (img.data && isDataUri(img.data)) {
+          const ext = getExtension(img.type || 'image/png');
           const fileName = `images/er_${sanitizeFilename(cloned.id || 'unknown')}_iu${path}_img${imgIndex}.${ext}`;
           images.push({ fileName, data: img.data, type: img.type || 'image/png', caption: img.caption || img.name });
           return { ...img, filePath: fileName, data: undefined };
@@ -104,8 +105,8 @@ const extractImages = (erDataMap, headerData, erHierarchy) => {
     const processUnit = (unit, path) => {
       if (unit.exampleImages && unit.exampleImages.length > 0) {
         unit.exampleImages = unit.exampleImages.map((img, imgIndex) => {
-          if (img.data && img.data.startsWith('data:')) {
-            const ext = getExtensionFromMimeType(img.type || 'image/png');
+          if (img.data && isDataUri(img.data)) {
+            const ext = getExtension(img.type || 'image/png');
             const fileName = `images/er_${sanitizeFilename(er.id || dataObjectId)}_iu${path}_img${imgIndex}.${ext}`;
 
             if (!existingFileNames.has(fileName)) {
@@ -148,8 +149,8 @@ const extractImages = (erDataMap, headerData, erHierarchy) => {
   figureSections.forEach(section => {
     if (headerDataWithPaths[section] && headerDataWithPaths[section].length > 0) {
       headerDataWithPaths[section] = headerDataWithPaths[section].map((fig, figIndex) => {
-        if (fig.data && fig.data.startsWith('data:')) {
-          const ext = getExtensionFromMimeType(fig.type || 'image/png');
+        if (fig.data && isDataUri(fig.data)) {
+          const ext = getExtension(fig.type || 'image/png');
           const fileName = `images/uc_${section}_fig${figIndex}.${ext}`;
 
           images.push({
@@ -178,21 +179,6 @@ const extractImages = (erDataMap, headerData, erHierarchy) => {
   };
 };
 
-/**
- * Get file extension from MIME type
- */
-const getExtensionFromMimeType = (mimeType) => {
-  const map = {
-    'image/png': 'png',
-    'image/jpeg': 'jpg',
-    'image/jpg': 'jpg',
-    'image/gif': 'gif',
-    'image/webp': 'webp',
-    'image/svg+xml': 'svg',
-    'image/bmp': 'bmp'
-  };
-  return map[mimeType] || 'png';
-};
 
 /**
  * Sanitize filename for use in paths
@@ -207,8 +193,8 @@ const sanitizeFilename = (name) => {
  * Convert base64 data URL to binary array buffer
  */
 const base64ToArrayBuffer = (dataUrl) => {
-  // Extract base64 data after the comma
-  const base64 = dataUrl.split(',')[1];
+  const parsed = parseDataUri(dataUrl);
+  const base64 = parsed ? parsed.base64Data : dataUrl.split(',')[1];
   const binaryString = atob(base64);
   const bytes = new Uint8Array(binaryString.length);
   for (let i = 0; i < binaryString.length; i++) {

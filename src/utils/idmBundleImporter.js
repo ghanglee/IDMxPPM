@@ -6,6 +6,7 @@
 
 import JSZip from 'jszip';
 import { parseIdmXml } from './idmXmlParser';
+import { getMimeType, buildDataUri } from './filePathUtils.js';
 
 /**
  * Import an IDM bundle from a ZIP file
@@ -162,9 +163,8 @@ export const importIdmBundle = async (zipData) => {
       for (const { path, file } of imageFiles) {
         try {
           const data = await file.async('base64');
-          const ext = path.split('.').pop()?.toLowerCase();
-          const mimeType = getMimeTypeFromExtension(ext);
-          result.images[path] = `data:${mimeType};base64,${data}`;
+          const mimeType = getMimeType(path);
+          result.images[path] = buildDataUri(mimeType, data);
         } catch (err) {
           console.warn(`Failed to load image ${path}:`, err);
         }
@@ -191,21 +191,6 @@ export const importIdmBundle = async (zipData) => {
   }
 };
 
-/**
- * Get MIME type from file extension
- */
-const getMimeTypeFromExtension = (ext) => {
-  const map = {
-    'png': 'image/png',
-    'jpg': 'image/jpeg',
-    'jpeg': 'image/jpeg',
-    'gif': 'image/gif',
-    'webp': 'image/webp',
-    'svg': 'image/svg+xml',
-    'bmp': 'image/bmp'
-  };
-  return map[ext] || 'image/png';
-};
 
 /**
  * Restore base64 image data in ER data map from extracted images

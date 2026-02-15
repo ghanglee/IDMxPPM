@@ -14,6 +14,7 @@
  */
 
 import { normalizeRegionCode } from './idmXmlParser.js';
+import { getMimeType, basename as getBasename } from './filePathUtils.js';
 
 /**
  * Remove BOM and clean XML content
@@ -84,9 +85,10 @@ export const parseXppm = (xppmContent, bpmnContent = null) => {
   console.log('Data object mappings:', result.dataObjectErMap);
 
   // Parse Exchange Requirements
-  const { erDataMap, erLibrary } = parseExchangeRequirements(doc);
+  const { erDataMap, erLibrary, rootEr } = parseExchangeRequirements(doc);
   result.erDataMap = erDataMap;
   result.erLibrary = erLibrary;
+  result.rootEr = rootEr;
   console.log('Parsed ERs:', Object.keys(erDataMap).length);
 
   return result;
@@ -225,7 +227,7 @@ const parseImageElements = (parentElement, sectionName = '') => {
   imageElements.forEach((img, index) => {
     const filePath = img.getAttribute('filePath') || '';
     const caption = img.getAttribute('caption') || '';
-    const fileName = filePath.split(/[/\\]/).pop() || `image_${index + 1}`;
+    const fileName = getBasename(filePath) || `image_${index + 1}`;
 
     images.push({
       id: `fig-${sectionName}-${Date.now()}-${index}`,
@@ -233,29 +235,12 @@ const parseImageElements = (parentElement, sectionName = '') => {
       caption: caption,
       filePath: filePath, // Original file path for later loading
       data: null, // Will be populated when images are loaded
-      type: getImageMimeType(fileName),
+      type: getMimeType(fileName),
       needsLoading: true // Flag to indicate image needs to be loaded
     });
   });
 
   return images;
-};
-
-/**
- * Get MIME type from filename
- */
-const getImageMimeType = (fileName) => {
-  const ext = fileName.toLowerCase().split('.').pop();
-  const mimeTypes = {
-    'jpg': 'image/jpeg',
-    'jpeg': 'image/jpeg',
-    'png': 'image/png',
-    'gif': 'image/gif',
-    'bmp': 'image/bmp',
-    'svg': 'image/svg+xml',
-    'webp': 'image/webp'
-  };
-  return mimeTypes[ext] || 'image/png';
 };
 
 /**
@@ -316,12 +301,15 @@ const parseUseCase = (doc) => {
 
   // Actors
   const actors = uc.querySelectorAll('actor');
-  ucData.actorsList = Array.from(actors).map(actor => ({
-    id: actor.getAttribute('id') || generateUUID(),
-    name: actor.getAttribute('name') || '',
-    role: '',
-    bpmnId: null
-  }));
+  ucData.actorsList = Array.from(actors).map(actor => {
+    const classification = actor.querySelector('classification');
+    return {
+      id: actor.getAttribute('id') || generateUUID(),
+      name: actor.getAttribute('name') || '',
+      role: classification ? (classification.getAttribute('name') || '') : '',
+      bpmnId: null
+    };
+  });
   console.log('Actors found:', ucData.actorsList.length);
 
   // Project Phases
@@ -450,28 +438,46 @@ const parseExchangeRequirements = (doc) => {
       localCode: specId.getAttribute('localCode') || '',
       status: specId.getAttribute('documentStatus') || 'NP',
       version: specId.getAttribute('version') || '',
-      definition: '',
+      description: '',
+      descriptionFigures: [],
       informationUnits: [],
       constraints: [],
-      subErs: [],
+      subERs: [],
       correspondingMvd: null,
       parentId: parentId
     };
 
-    // Parse description - try multiple paths
-    let description = erElement.querySelector(':scope > description > content');
-    if (!description) {
-      description = erElement.querySelector(':scope > description');
-      if (description) {
-        const content = description.querySelector('content');
-        if (content) {
-          erData.definition = content.textContent || '';
-        } else {
-          erData.definition = description.textContent || '';
-        }
+    // Parse ALL <description> children — merge text and extract images
+    const descriptionElements = erElement.querySelectorAll(':scope > description');
+    const descriptionTexts = [];
+    const descriptionImages = [];
+    descriptionElements.forEach((descEl) => {
+      const contentEl = descEl.querySelector('content');
+      if (contentEl) {
+        const text = contentEl.textContent?.trim();
+        if (text) descriptionTexts.push(text);
       }
-    } else {
-      erData.definition = description.textContent || '';
+      // Collect <image> elements from each <description>
+      const imgElements = descEl.querySelectorAll(':scope > image');
+      imgElements.forEach((img, idx) => {
+        const filePath = img.getAttribute('filePath') || '';
+        const caption = img.getAttribute('caption') || '';
+        const fileName = getBasename(filePath) || `er_image_${idx + 1}`;
+        descriptionImages.push({
+          id: `fig-er-${guid}-${Date.now()}-${descriptionImages.length}`,
+          name: fileName,
+          caption: caption,
+          filePath: filePath,
+          data: null,
+          type: getMimeType(fileName),
+          needsLoading: true
+        });
+      });
+    });
+    erData.description = descriptionTexts.join('\n');
+    erData.descriptionFigures = descriptionImages;
+    if (descriptionImages.length > 0) {
+      console.log(`ER "${erData.name}" has ${descriptionImages.length} description images`);
     }
 
     // Parse information units
@@ -497,22 +503,25 @@ const parseExchangeRequirements = (doc) => {
       id: guid,
       name: erData.name,
       shortTitle: erData.shortTitle,
-      definition: erData.definition
+      definition: erData.description
     });
 
     // Parse nested ERs (sub-ERs) - store full sub-ER data, not just reference
-    const nestedErs = erElement.querySelectorAll(':scope > er');
+    // xPPM wraps sub-ERs in <subEr> elements: <subEr><er>...</er></subEr>
+    // Also handle direct <er> children for compatibility
+    const nestedErs = erElement.querySelectorAll(':scope > subEr > er, :scope > er');
     nestedErs.forEach(nestedEr => {
       const subErData = parseErElement(nestedEr, guid);
       if (subErData) {
         // Store the complete sub-ER data including all information units and nested sub-ERs
-        erData.subErs.push({
+        erData.subERs.push({
           id: subErData.id,
           name: subErData.name,
           shortTitle: subErData.shortTitle,
-          definition: subErData.definition,
+          description: subErData.description,
+          descriptionFigures: subErData.descriptionFigures || [],
           informationUnits: subErData.informationUnits || [],
-          subErs: subErData.subErs || [],
+          subERs: subErData.subERs || [],
           constraints: subErData.constraints || [],
           correspondingMvd: subErData.correspondingMvd || null
         });
@@ -527,7 +536,7 @@ const parseExchangeRequirements = (doc) => {
   const rootEr = parseErElement(erRoot);
   console.log('Root ER parsed:', rootEr?.name);
 
-  return { erDataMap, erLibrary };
+  return { erDataMap, erLibrary, rootEr };
 };
 
 /**
@@ -546,18 +555,34 @@ const parseInformationUnit = (iuElement) => {
     subInformationUnits: []
   };
 
-  // Parse description/examples - try multiple paths
-  let descriptionContent = iuElement.querySelector(':scope > description > content');
-  if (!descriptionContent) {
-    descriptionContent = iuElement.querySelector(':scope > description');
-  }
-  if (descriptionContent) {
-    const content = descriptionContent.querySelector('content');
-    if (content) {
-      iu.examples = content.textContent || '';
-    } else {
-      iu.examples = descriptionContent.textContent || '';
+  // Parse ALL <description> children — merge text and extract images
+  const iuDescElements = iuElement.querySelectorAll(':scope > description');
+  const iuDescTexts = [];
+  iuDescElements.forEach((descEl) => {
+    const contentEl = descEl.querySelector('content');
+    if (contentEl) {
+      const text = contentEl.textContent?.trim();
+      if (text) iuDescTexts.push(text);
     }
+    // Collect <image> elements from each <description>
+    const imgElements = descEl.querySelectorAll(':scope > image');
+    imgElements.forEach((img, idx) => {
+      const filePath = img.getAttribute('filePath') || '';
+      const caption = img.getAttribute('caption') || '';
+      const fileName = getBasename(filePath) || `iu_image_${idx + 1}`;
+      iu.exampleImages.push({
+        id: `fig-iu-${iu.id}-${Date.now()}-${iu.exampleImages.length}`,
+        name: fileName,
+        caption: caption,
+        filePath: filePath,
+        data: null,
+        type: getMimeType(fileName),
+        needsLoading: true
+      });
+    });
+  });
+  if (iuDescTexts.length > 0) {
+    iu.examples = iuDescTexts.join('\n');
   }
 
   // Parse corresponding external elements (IFC, bSDD, etc.) - skip empty mappings
@@ -639,7 +664,7 @@ const generateUUID = () => {
  * This creates the erDataMap keyed by BPMN data object IDs
  */
 export const convertToNeoSeoul = (parsedData) => {
-  const { headerData, erDataMap, erLibrary, bpmnXml, dataObjectErMap } = parsedData;
+  const { headerData, erDataMap, erLibrary, bpmnXml, dataObjectErMap, rootEr } = parsedData;
 
   // Create a new erDataMap keyed by data object IDs for bpmn-js compatibility
   const newErDataMap = {};
@@ -739,6 +764,7 @@ export const convertToNeoSeoul = (parsedData) => {
       revisionHistory: headerData.modificationHistory || []
     },
     erDataMap: newErDataMap,
+    erHierarchy: rootEr ? [rootEr] : [],
     erLibrary: erLibrary,
     bpmnXml: bpmnXml,
     originalErDataMap: erDataMap, // Keep original for reference

@@ -137,7 +137,7 @@ function createWindow() {
         {
           label: 'About IDMxPPM - Neo Seoul',
           click: () => {
-            dialog.showMessageBox(mainWindow, {
+            dialog.showMessageBox({
               type: 'info',
               title: 'About IDMxPPM - Neo Seoul',
               message: 'IDMxPPM - Neo Seoul v1.0.0',
@@ -188,16 +188,17 @@ function createWindow() {
   });
 }
 
-// 프로젝트 열기 (.json, .idm, .xml for idmXML, .bpmn, .zip)
+// 프로젝트 열기 (.json, .idm, .xml for idmXML, .bpmn, .zip, .xppm)
 async function handleOpenProject() {
-  const result = await dialog.showOpenDialog(mainWindow, {
+  const result = await dialog.showOpenDialog({
     title: 'Open IDMxPPM Project',
     filters: [
       { name: 'IDMxPPM Project (.idm)', extensions: ['idm', 'json'] },
-      { name: 'idmXML - ISO 29481-3 (.xml)', extensions: ['xml'] },
+      { name: 'idmXML (.xml)', extensions: ['xml'] },
       { name: 'ZIP Bundle (.zip)', extensions: ['zip', 'idmx'] },
+      { name: 'xPPM Legacy (.xppm)', extensions: ['xppm'] },
       { name: 'BPMN Diagram (.bpmn)', extensions: ['bpmn'] },
-      { name: 'All Supported Formats', extensions: ['idm', 'json', 'xml', 'zip', 'idmx', 'bpmn'] },
+      { name: 'All Supported Formats', extensions: ['idm', 'json', 'xml', 'zip', 'idmx', 'xppm', 'bpmn'] },
       { name: 'All Files', extensions: ['*'] }
     ],
     properties: ['openFile']
@@ -205,7 +206,11 @@ async function handleOpenProject() {
 
   if (!result.canceled && result.filePaths.length > 0) {
     const filePath = result.filePaths[0];
-    const content = fs.readFileSync(filePath, 'utf-8');
+    let content = fs.readFileSync(filePath, 'utf-8');
+    // Strip UTF-8 BOM if present (causes XML parsing issues)
+    if (content.charCodeAt(0) === 0xFEFF) {
+      content = content.slice(1);
+    }
     const ext = path.extname(filePath).toLowerCase();
 
     let type = 'project';
@@ -213,6 +218,8 @@ async function handleOpenProject() {
       type = 'bpmn';
     } else if (ext === '.zip' || ext === '.idmx') {
       type = 'zip';
+    } else if (ext === '.xppm') {
+      type = 'xppm';
     } else if (ext === '.xml') {
       // Check if it's an idmXML file or BPMN
       const isIdmXml = content.includes('idmXML') ||
@@ -222,13 +229,62 @@ async function handleOpenProject() {
     }
     // .json and .idm are treated as 'project' type
 
-    mainWindow.webContents.send('file-opened', { filePath, content, type });
+    // For xPPM and idmXML files, also read external BPMN diagram and images from adjacent folders
+    let bpmnContent = null;
+    let imageMap = {};
+    if (type === 'xppm' || type === 'idmxml') {
+      const baseDir = path.dirname(filePath);
+
+      // Extract BPMN file path from xPPM XML content
+      const bpmnMatch = content.match(/filePath="([^"]*\.bpmn)"/i);
+      if (bpmnMatch) {
+        const bpmnRelPath = bpmnMatch[1].replace(/\\/g, '/');
+        const bpmnFullPath = path.resolve(baseDir, bpmnRelPath);
+        console.log('[file-import] BPMN file path extracted:', bpmnRelPath, '-> resolved:', bpmnFullPath);
+        if (fs.existsSync(bpmnFullPath)) {
+          try {
+            bpmnContent = fs.readFileSync(bpmnFullPath, 'utf-8');
+            // Strip UTF-8 BOM
+            if (bpmnContent.charCodeAt(0) === 0xFEFF) {
+              bpmnContent = bpmnContent.slice(1);
+            }
+            console.log('[file-import] BPMN loaded successfully, length:', bpmnContent.length);
+          } catch (err) {
+            console.error('[file-import] Failed to read BPMN file:', err.message);
+          }
+        } else {
+          console.warn('[file-import] BPMN file not found:', bpmnFullPath);
+        }
+      }
+
+      // Extract and read image files from xPPM content
+      const imageMatches = content.matchAll(/filePath="([^"]*\.(png|jpg|jpeg|gif|svg|bmp|webp))"/gi);
+      for (const match of imageMatches) {
+        const imgRelPath = match[1].replace(/\\/g, '/');
+        const imgFullPath = path.resolve(baseDir, imgRelPath);
+        if (fs.existsSync(imgFullPath)) {
+          try {
+            const buffer = fs.readFileSync(imgFullPath);
+            const base64 = buffer.toString('base64');
+            const imgExt = path.extname(imgFullPath).toLowerCase();
+            const mimeMap = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.svg': 'image/svg+xml', '.bmp': 'image/bmp', '.webp': 'image/webp' };
+            const mimeType = mimeMap[imgExt] || 'image/png';
+            imageMap[imgRelPath] = `data:${mimeType};base64,${base64}`;
+            console.log('[file-import] Image loaded:', imgRelPath);
+          } catch (err) {
+            console.error('[file-import] Failed to read image:', imgRelPath, err.message);
+          }
+        }
+      }
+    }
+
+    mainWindow.webContents.send('file-opened', { filePath, content, type, bpmnContent, imageMap });
   }
 }
 
 // BPMN 파일 열기 (.bpmn)
 async function handleOpenBPMN() {
-  const result = await dialog.showOpenDialog(mainWindow, {
+  const result = await dialog.showOpenDialog({
     title: 'Open BPMN File',
     filters: [
       { name: 'BPMN Files', extensions: ['bpmn', 'xml'] },
@@ -239,14 +295,18 @@ async function handleOpenBPMN() {
 
   if (!result.canceled && result.filePaths.length > 0) {
     const filePath = result.filePaths[0];
-    const content = fs.readFileSync(filePath, 'utf-8');
+    let content = fs.readFileSync(filePath, 'utf-8');
+    // Strip UTF-8 BOM if present
+    if (content.charCodeAt(0) === 0xFEFF) {
+      content = content.slice(1);
+    }
     mainWindow.webContents.send('file-opened', { filePath, content, type: 'bpmn' });
   }
 }
 
 // ER Import (.erxml)
 async function handleImportER() {
-  const result = await dialog.showOpenDialog(mainWindow, {
+  const result = await dialog.showOpenDialog({
     title: 'Import Exchange Requirement',
     filters: [
       { name: 'ER XML Files', extensions: ['erxml', 'xml'] },
@@ -258,10 +318,83 @@ async function handleImportER() {
 
   if (!result.canceled && result.filePaths.length > 0) {
     const filePath = result.filePaths[0];
-    const content = fs.readFileSync(filePath, 'utf-8');
+    let content = fs.readFileSync(filePath, 'utf-8');
+    // Strip UTF-8 BOM if present
+    if (content.charCodeAt(0) === 0xFEFF) {
+      content = content.slice(1);
+    }
     mainWindow.webContents.send('er-imported', { filePath, content });
   }
 }
+
+// Read a file relative to a base directory (for idmXML import with external BPMN/images)
+ipcMain.handle('fs:readRelativeFile', async (event, { basePath, relativePath, encoding }) => {
+  console.log('[IPC fs:readRelativeFile] basePath:', basePath, '| relativePath:', relativePath);
+  try {
+    const baseDir = path.dirname(basePath);
+    // Normalize the relative path: convert backslashes to OS-appropriate separator
+    const normalizedRelPath = relativePath.replace(/\\/g, '/');
+    const fullPath = path.resolve(baseDir, normalizedRelPath);
+    console.log('[IPC fs:readRelativeFile] resolved fullPath:', fullPath, '| exists:', fs.existsSync(fullPath));
+    // Security: ensure the resolved path is within the base directory (case-insensitive on Windows)
+    const normalizedFull = path.normalize(fullPath);
+    const normalizedBase = path.normalize(baseDir);
+    if (process.platform === 'win32') {
+      if (!normalizedFull.toLowerCase().startsWith(normalizedBase.toLowerCase())) {
+        return { success: false, error: 'Path traversal not allowed' };
+      }
+    } else {
+      if (!normalizedFull.startsWith(normalizedBase)) {
+        return { success: false, error: 'Path traversal not allowed' };
+      }
+    }
+    if (!fs.existsSync(fullPath)) {
+      return { success: false, error: 'File not found' };
+    }
+    let content = fs.readFileSync(fullPath, encoding || 'utf-8');
+    // Strip UTF-8 BOM if present (causes XML parsing issues in bpmn-js)
+    if (content.charCodeAt(0) === 0xFEFF) {
+      content = content.slice(1);
+    }
+    return { success: true, content, filePath: fullPath };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+// Read a file as base64 relative to a base directory (for images)
+ipcMain.handle('fs:readRelativeFileBase64', async (event, { basePath, relativePath }) => {
+  console.log('[IPC fs:readRelativeFileBase64] basePath:', basePath, '| relativePath:', relativePath);
+  try {
+    const baseDir = path.dirname(basePath);
+    // Normalize the relative path: convert backslashes to OS-appropriate separator
+    const normalizedRelPath = relativePath.replace(/\\/g, '/');
+    const fullPath = path.resolve(baseDir, normalizedRelPath);
+    // Security: case-insensitive path comparison on Windows
+    const normalizedFull = path.normalize(fullPath);
+    const normalizedBase = path.normalize(baseDir);
+    if (process.platform === 'win32') {
+      if (!normalizedFull.toLowerCase().startsWith(normalizedBase.toLowerCase())) {
+        return { success: false, error: 'Path traversal not allowed' };
+      }
+    } else {
+      if (!normalizedFull.startsWith(normalizedBase)) {
+        return { success: false, error: 'Path traversal not allowed' };
+      }
+    }
+    if (!fs.existsSync(fullPath)) {
+      return { success: false, error: 'File not found' };
+    }
+    const buffer = fs.readFileSync(fullPath);
+    const base64 = buffer.toString('base64');
+    const ext = path.extname(fullPath).toLowerCase();
+    const mimeMap = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.svg': 'image/svg+xml', '.bmp': 'image/bmp', '.webp': 'image/webp' };
+    const mimeType = mimeMap[ext] || 'image/png';
+    return { success: true, data: `data:${mimeType};base64,${base64}`, filePath: fullPath };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
 
 // IPC 핸들러들
 ipcMain.handle('dialog:openProject', handleOpenProject);
@@ -270,7 +403,7 @@ ipcMain.handle('dialog:importER', handleImportER);
 
 // 프로젝트 저장
 ipcMain.handle('dialog:saveProject', async (event, { content, defaultName }) => {
-  const result = await dialog.showSaveDialog(mainWindow, {
+  const result = await dialog.showSaveDialog({
     title: 'Save IDMxPPM Project',
     defaultPath: defaultName || 'idm-project.json',
     filters: [
@@ -297,7 +430,7 @@ ipcMain.handle('dialog:saveFile', async (event, { content, filePath }) => {
 
 // BPMN 내보내기
 ipcMain.handle('dialog:exportBPMN', async (event, { content, defaultName }) => {
-  const result = await dialog.showSaveDialog(mainWindow, {
+  const result = await dialog.showSaveDialog({
     title: 'Export BPMN',
     defaultPath: defaultName || 'process-map.bpmn',
     filters: [
@@ -315,7 +448,7 @@ ipcMain.handle('dialog:exportBPMN', async (event, { content, defaultName }) => {
 
 // SVG 내보내기
 ipcMain.handle('dialog:exportSVG', async (event, { content, defaultName }) => {
-  const result = await dialog.showSaveDialog(mainWindow, {
+  const result = await dialog.showSaveDialog({
     title: 'Export SVG',
     defaultPath: defaultName || 'process-map.svg',
     filters: [
@@ -336,7 +469,7 @@ ipcMain.handle('dialog:exportER', async (event, { content, defaultName, format }
     ? [{ name: 'JSON Files', extensions: ['json'] }]
     : [{ name: 'ER XML Files', extensions: ['erxml', 'xml'] }];
 
-  const result = await dialog.showSaveDialog(mainWindow, {
+  const result = await dialog.showSaveDialog({
     title: 'Export Exchange Requirement',
     defaultPath: defaultName || `exchange-requirement.${format === 'json' ? 'json' : 'erxml'}`,
     filters
@@ -351,7 +484,7 @@ ipcMain.handle('dialog:exportER', async (event, { content, defaultName, format }
 
 // idmXML 내보내기 (ISO 29481-3)
 ipcMain.handle('dialog:exportIdmXML', async (event, { content, defaultName }) => {
-  const result = await dialog.showSaveDialog(mainWindow, {
+  const result = await dialog.showSaveDialog({
     title: 'Export idmXML (ISO 29481-3)',
     defaultPath: defaultName || 'idm-specification.xml',
     filters: [
@@ -379,7 +512,7 @@ ipcMain.handle('dialog:showSaveLocation', async (event, { defaultName, format })
     'bpmn': [{ name: 'BPMN Files', extensions: ['bpmn'] }]
   };
 
-  const result = await dialog.showSaveDialog(mainWindow, {
+  const result = await dialog.showSaveDialog({
     title: 'Choose Save Location',
     defaultPath: defaultName || 'idm-specification',
     filters: filters[format] || [{ name: 'All Files', extensions: ['*'] }]

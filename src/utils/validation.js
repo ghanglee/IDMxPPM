@@ -159,8 +159,10 @@ export const validateIdmXsdCompliance = (headerData) => {
 };
 
 /**
- * Validate ER per ISO 29481-3 Clause 10
- * An ER shall not be empty and shall have at least one information unit or a sub-ER
+ * Validate ER per ISO 29481-3 Clause 10 (idmXSD v2.0)
+ * An ER shall not be empty: it must have at least one informationUnit or subEr.
+ * Leaf ERs (no sub-ERs) must have at least one informationUnit.
+ * Validates recursively through sub-ERs.
  * @param {Object} er
  * @param {string} dataObjectId
  * @returns {ValidationError[]}
@@ -180,6 +182,13 @@ export const validateERIdmXsd = (er, dataObjectId) => {
       path: `${erPath}.content`,
       message: `ER "${er.name || 'unnamed'}" must have at least one Information Unit or Sub-ER (ISO 29481-3 Clause 10)`,
       severity: 'error'
+    });
+  }
+
+  // Recursively validate sub-ERs
+  if (hasSubERs) {
+    er.subERs.forEach(subER => {
+      errors.push(...validateERIdmXsd(subER, subER.id || dataObjectId));
     });
   }
 
@@ -278,19 +287,31 @@ export const validateER = (er, dataObjectId) => {
     });
   }
 
-  // ISO 29481-3 Clause 10: ER shall have at least one information unit
-  if (!er.informationUnits || er.informationUnits.length === 0) {
+  const hasSubERs = er.subERs && er.subERs.length > 0;
+
+  // ISO 29481-3 Clause 10: Leaf ERs (no sub-ERs) must have at least one IU.
+  // ERs that compose only sub-ERs are valid — they inherit IUs transitively.
+  if (!hasSubERs && (!er.informationUnits || er.informationUnits.length === 0)) {
     errors.push({
       category: 'er',
       field: 'informationUnits',
       path: `${erPath}.informationUnits`,
-      message: `ER "${er.name || 'unnamed'}" must have at least one Information Unit`,
+      message: `ER "${er.name || 'unnamed'}" must have at least one Information Unit (leaf ER without sub-ERs)`,
       severity: 'error'
     });
-  } else {
-    // Validate each information unit
+  }
+
+  // Validate each information unit
+  if (er.informationUnits && er.informationUnits.length > 0) {
     er.informationUnits.forEach(unit => {
       errors.push(...validateInformationUnit(unit, erPath));
+    });
+  }
+
+  // Recursively validate sub-ERs
+  if (hasSubERs) {
+    er.subERs.forEach(subER => {
+      errors.push(...validateER(subER, subER.id || dataObjectId));
     });
   }
 
@@ -316,21 +337,6 @@ export const validateDiagram = (bpmnXml) => {
     return errors;
   }
 
-  // Check for data objects
-  const hasDataObject = bpmnXml.includes('bpmn:dataObjectReference') ||
-                        bpmnXml.includes('bpmn:DataObjectReference') ||
-                        bpmnXml.includes('dataObjectReference');
-
-  if (!hasDataObject) {
-    errors.push({
-      category: 'diagram',
-      field: 'dataObjects',
-      path: 'diagram.dataObjects',
-      message: 'Process map should contain at least one Data Object for ER definition',
-      severity: 'warning'
-    });
-  }
-
   return errors;
 };
 
@@ -340,9 +346,10 @@ export const validateDiagram = (bpmnXml) => {
  * @param {Object} params.headerData
  * @param {string} params.bpmnXml
  * @param {Object} params.erDataMap
+ * @param {Array} params.erHierarchy - ER-first architecture tree (takes precedence over erDataMap)
  * @returns {Object} { errors: ValidationError[], isValid: boolean, summary: Object }
  */
-export const validateProject = ({ headerData, bpmnXml, erDataMap }) => {
+export const validateProject = ({ headerData, bpmnXml, erDataMap, erHierarchy }) => {
   const errors = [];
 
   // Validate header (basic required fields)
@@ -354,18 +361,29 @@ export const validateProject = ({ headerData, bpmnXml, erDataMap }) => {
   // Validate diagram
   errors.push(...validateDiagram(bpmnXml));
 
-  // Validate ERs
-  if (erDataMap && Object.keys(erDataMap).length > 0) {
+  // Validate ERs — use erHierarchy (tree) when available, otherwise fall back to erDataMap (flat)
+  const hasErHierarchy = erHierarchy && erHierarchy.length > 0;
+  const hasErDataMap = erDataMap && Object.keys(erDataMap).length > 0;
+
+  if (hasErHierarchy) {
+    // ER-first mode: validate the entire hierarchy tree recursively
+    // validateER and validateERIdmXsd already recurse into sub-ERs
+    erHierarchy.forEach(er => {
+      errors.push(...validateER(er, er.id));
+      errors.push(...validateERIdmXsd(er, er.id));
+    });
+  } else if (hasErDataMap) {
+    // Legacy mode: validate from flat erDataMap
     Object.entries(erDataMap).forEach(([dataObjectId, er]) => {
       errors.push(...validateER(er, dataObjectId));
-      errors.push(...validateERIdmXsd(er, dataObjectId)); // ISO 29481-3 Clause 10
+      errors.push(...validateERIdmXsd(er, dataObjectId));
     });
   } else {
     errors.push({
       category: 'er',
       field: 'erDataMap',
       path: 'er',
-      message: 'No Exchange Requirements defined. Add ERs by double-clicking Data Objects.',
+      message: 'No Exchange Requirements defined.',
       severity: 'warning'
     });
   }

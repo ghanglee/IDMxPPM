@@ -3,6 +3,8 @@
  * Parses ISO 29481-3 (idmXML) files into the application's data format
  */
 
+import { isBase64Encoding, buildDataUri } from './filePathUtils.js';
+
 /**
  * ISO 3166-1 alpha-3 to alpha-2 mapping for region code normalization.
  * When idmXML files store regions as 3-letter codes (e.g., "CHE"),
@@ -81,9 +83,9 @@ const parseFigures = (sectionElement) => {
   const figureElements = getDirectChildren(sectionElement, 'figure');
   const imageElements = getDirectChildren(sectionElement, 'image');
 
-  // Also check inside <description> children for nested <image> elements
-  const descriptionEl = getFirstChild(sectionElement, 'description');
-  const descImageElements = descriptionEl ? getDirectChildren(descriptionEl, 'image') : [];
+  // Also check inside ALL <description> children for nested <image> elements
+  const descriptionEls = getDirectChildren(sectionElement, 'description');
+  const descImageElements = descriptionEls.flatMap(desc => getDirectChildren(desc, 'image'));
 
   const allElements = [...figureElements, ...imageElements, ...descImageElements];
 
@@ -93,7 +95,7 @@ const parseFigures = (sectionElement) => {
     const encoding = fig.getAttribute('encoding');
     const filePath = fig.getAttribute('filePath');
 
-    if (encoding === 'base64') {
+    if (isBase64Encoding(encoding)) {
       const base64Data = fig.textContent?.trim() || '';
       if (base64Data) {
         figures.push({
@@ -101,7 +103,7 @@ const parseFigures = (sectionElement) => {
           name: caption,
           caption: caption,
           type: mimeType,
-          data: `data:${mimeType};base64,${base64Data}`
+          data: buildDataUri(mimeType, base64Data)
         });
       }
     } else if (filePath) {
@@ -496,9 +498,12 @@ export const parseIdmXml = (xmlContent) => {
             const directId = container.getAttribute('id');
             const directName = container.getAttribute('name');
             if (directId || directName) {
+              const subClassification = getFirstChild(container, 'classification');
+              const subRole = subClassification ? subClassification.getAttribute('name') : '';
               subActors.push({
                 id: directId || `subactor-${Date.now()}`,
                 name: directName || '',
+                role: subRole,
                 bpmnShapeName: ''
               });
             } else {
@@ -509,9 +514,12 @@ export const parseIdmXml = (xmlContent) => {
                 const subActorName = subActorEl.getAttribute('name') || '';
                 const subBpmnShapeEl = getFirstChild(subActorEl, 'bpmnShapeName');
                 const subBpmnShapeName = subBpmnShapeEl ? subBpmnShapeEl.textContent.trim() : '';
+                const subClassification = getFirstChild(subActorEl, 'classification');
+                const subRole = subClassification ? subClassification.getAttribute('name') : '';
                 subActors.push({
                   id: subActorId,
                   name: subActorName,
+                  role: subRole,
                   bpmnShapeName: subBpmnShapeName
                 });
               }
@@ -727,7 +735,8 @@ export const parseIdmXml = (xmlContent) => {
       const diagram = getFirstChild(pm, 'diagram');
       if (diagram) {
         result.headerData.pmId = diagram.getAttribute('id') || '';
-        const diagramFilePath = diagram.getAttribute('diagramFilePath');
+        // v2.0 uses 'diagramFilePath', v1.0 actual files use 'filePath'
+        const diagramFilePath = diagram.getAttribute('diagramFilePath') || diagram.getAttribute('filePath');
         if (diagramFilePath) {
           result.bpmnFilePath = diagramFilePath;
         }
@@ -955,26 +964,36 @@ const parseErElement = (erElement) => {
     er.name = er.shortTitle || trimStr(specId.getAttribute('fullTitle'));
   }
 
-  // Parse description - namespace-safe (with optional image children)
-  const description = getFirstChild(erElement, 'description');
-  if (description) {
-    er.description = trimStr(description.getAttribute('title') || description.textContent);
-    // Parse figures from description's image children
-    const descImages = getDirectChildren(description, 'image');
-    if (descImages.length > 0) {
-      er.descriptionFigures = [];
+  // Parse ALL description elements - namespace-safe (merge text, collect all images)
+  const descriptionEls = getDirectChildren(erElement, 'description');
+  if (descriptionEls.length > 0) {
+    const descTexts = [];
+    er.descriptionFigures = [];
+    descriptionEls.forEach(desc => {
+      const titleText = trimStr(desc.getAttribute('title'));
+      if (titleText) {
+        descTexts.push(titleText);
+      } else {
+        // Fallback: get text content excluding image children
+        const contentText = trimStr(desc.textContent);
+        // Only use textContent if it's not base64 image data
+        if (contentText && contentText.length < 10000) {
+          descTexts.push(contentText);
+        }
+      }
+      const descImages = getDirectChildren(desc, 'image');
       descImages.forEach((img, index) => {
-        const caption = img.getAttribute('caption') || `Figure ${index + 1}`;
+        const caption = img.getAttribute('caption') || `Figure ${er.descriptionFigures.length + 1}`;
         const mimeType = img.getAttribute('mimeType') || 'image/png';
         const encoding = img.getAttribute('encoding');
         const filePath = img.getAttribute('filePath');
-        if (encoding === 'base64') {
+        if (isBase64Encoding(encoding)) {
           const base64Data = img.textContent?.trim() || '';
           if (base64Data) {
             er.descriptionFigures.push({
               id: `fig-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
               name: caption, caption, type: mimeType,
-              data: `data:${mimeType};base64,${base64Data}`
+              data: buildDataUri(mimeType, base64Data)
             });
           }
         } else if (filePath) {
@@ -984,12 +1003,16 @@ const parseErElement = (erElement) => {
           });
         }
       });
-    }
+    });
+    er.description = descTexts.join('\n');
   }
 
   // Parse information units - namespace-safe
+  // Skip placeholder IUs that were auto-generated during export for schema compliance
   const infoUnits = getDirectChildren(erElement, 'informationUnit');
   infoUnits.forEach(iu => {
+    const iuId = iu.getAttribute('id') || '';
+    if (iuId === 'iu-placeholder') return; // Skip export placeholder
     er.informationUnits.push(parseInformationUnit(iu));
   });
 
@@ -1023,27 +1046,26 @@ const parseInformationUnit = (iuElement) => {
     subInformationUnits: []
   };
 
-  // Check for definition figures in <description> child elements (with image children)
-  const defDesc = getFirstChild(iuElement, 'description');
-  if (defDesc) {
-    // If there's a description child, its title overrides the attribute (or supplements it)
+  // Check ALL <description> children for definition text and figures
+  const defDescs = getDirectChildren(iuElement, 'description');
+  defDescs.forEach(defDesc => {
     const descTitle = trimStr(defDesc.getAttribute('title'));
     if (descTitle) {
       unit.definition = descTitle;
     }
     const defImages = getDirectChildren(defDesc, 'image');
-    defImages.forEach((img, index) => {
-      const caption = img.getAttribute('caption') || `Figure ${index + 1}`;
+    defImages.forEach((img) => {
+      const caption = img.getAttribute('caption') || `Figure ${unit.definitionFigures.length + 1}`;
       const mimeType = img.getAttribute('mimeType') || 'image/png';
       const encoding = img.getAttribute('encoding');
       const filePath = img.getAttribute('filePath');
-      if (encoding === 'base64') {
+      if (isBase64Encoding(encoding)) {
         const base64Data = img.textContent?.trim() || '';
         if (base64Data) {
           unit.definitionFigures.push({
             id: `fig-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
             name: caption, caption, type: mimeType,
-            data: `data:${mimeType};base64,${base64Data}`
+            data: buildDataUri(mimeType, base64Data)
           });
         }
       } else if (filePath) {
@@ -1053,26 +1075,39 @@ const parseInformationUnit = (iuElement) => {
         });
       }
     });
-  }
+  });
 
-  // Parse examples - namespace-safe
+  // Parse examples - namespace-safe, iterate ALL description children
   const examplesEl = getFirstChild(iuElement, 'examples');
-  const examplesDesc = examplesEl ? getFirstChild(examplesEl, 'description') : null;
-  if (examplesDesc) {
-    unit.examples = trimStr(examplesDesc.getAttribute('title') || examplesDesc.textContent);
+  if (examplesEl) {
+    const exDescs = getDirectChildren(examplesEl, 'description');
+    const exTexts = [];
+    exDescs.forEach(desc => {
+      const titleText = trimStr(desc.getAttribute('title'));
+      if (titleText) {
+        exTexts.push(titleText);
+      } else {
+        const contentText = trimStr(desc.textContent);
+        if (contentText && contentText.length < 10000) {
+          exTexts.push(contentText);
+        }
+      }
+    });
+    if (exTexts.length > 0) {
+      unit.examples = exTexts.join('\n');
+    }
   }
 
-  // Parse example images (both embedded base64 and file references)
+  // Parse example images from all sources: direct <image> children and images inside all <description> children
   const images = examplesEl ? getDirectChildren(examplesEl, 'image') : [];
-  // Also check for images inside description element
-  const descImages = examplesDesc ? getDirectChildren(examplesDesc, 'image') : [];
+  const descImages = examplesEl ? getDirectChildren(examplesEl, 'description').flatMap(d => getDirectChildren(d, 'image')) : [];
   [...images, ...descImages].forEach((img, index) => {
     const caption = img.getAttribute('caption') || `Image ${index + 1}`;
     const mimeType = img.getAttribute('mimeType') || 'image/png';
     const encoding = img.getAttribute('encoding');
     const filePath = img.getAttribute('filePath');
 
-    if (encoding === 'base64') {
+    if (isBase64Encoding(encoding)) {
       const base64Data = img.textContent?.trim() || '';
       if (base64Data) {
         unit.exampleImages.push({
@@ -1080,7 +1115,7 @@ const parseInformationUnit = (iuElement) => {
           name: caption,
           caption: caption,
           type: mimeType,
-          data: `data:${mimeType};base64,${base64Data}`
+          data: buildDataUri(mimeType, base64Data)
         });
       }
     } else if (filePath) {

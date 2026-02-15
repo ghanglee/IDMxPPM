@@ -5,6 +5,8 @@
  * Schema v2.0: https://standards.iso.org/iso/29481/-3/ed-2/en
  */
 
+import { isDataUri, parseDataUri } from './filePathUtils.js';
+
 // Generate UUID
 const generateUUID = () => {
   return crypto.randomUUID?.() ||
@@ -66,8 +68,9 @@ const generateImagesXml = (images, indent = '      ') => {
     const mimeType = img.type || 'image/png';
 
     // If base64 data is available (standalone export), embed it inline
-    if (img.data && img.data.startsWith('data:')) {
-      const base64Data = img.data.split(',')[1] || '';
+    if (img.data && isDataUri(img.data)) {
+      const parsed = parseDataUri(img.data);
+      const base64Data = parsed ? parsed.base64Data : '';
       lines.push(`${indent}<image caption="${escapeXml(caption)}" mimeType="${escapeXml(mimeType)}" encoding="base64">${base64Data}</image>`);
     } else {
       // filePath-only (ZIP bundle export where images are separate files)
@@ -271,7 +274,10 @@ const generateErXml = (er, authorName, indent = '  ', isRoot = true) => {
     lines.push(...generateDescriptionXml(er.description || '', er.descriptionFigures || [], indent + '  '));
   }
 
-  // Per ISO 29481-3 Clause 10: ER must have at least one informationUnit OR subEr
+  // ISO 29481-3 Clause 10 / idmXSD v2.0:
+  // An ER must have at least one informationUnit OR subEr.
+  // ERs with only sub-ERs are valid (IUs inherited transitively).
+  // Leaf ERs (no sub-ERs) must have at least one IU.
   const hasInfoUnits = er.informationUnits && er.informationUnits.length > 0;
   const hasSubERs = er.subERs && er.subERs.length > 0;
 
@@ -286,7 +292,6 @@ const generateErXml = (er, authorName, indent = '  ', isRoot = true) => {
   if (hasSubERs) {
     er.subERs.forEach(subER => {
       lines.push(`${indent}  <subEr>`);
-      // Recursively generate sub-ER (pass isRoot=false since it's already wrapped in <subEr>)
       lines.push(`${indent}    <er>`);
       lines.push(generateErXml(subER, authorName, indent + '    ', false));
       lines.push(`${indent}    </er>`);
@@ -294,15 +299,15 @@ const generateErXml = (er, authorName, indent = '  ', isRoot = true) => {
     });
   }
 
-  // If ER has neither informationUnits nor subERs, add a placeholder informationUnit
-  // per ISO 29481-3 Clause 10 requirement
+  // Leaf ER with no IUs: add placeholder to satisfy xs:choice minOccurs="1"
+  // (filtered out on re-import by the parser)
   if (!hasInfoUnits && !hasSubERs) {
     lines.push(`${indent}  <informationUnit`);
     lines.push(`${indent}    id="iu-placeholder"`);
     lines.push(`${indent}    name="Placeholder"`);
     lines.push(`${indent}    dataType="String"`);
     lines.push(`${indent}    isMandatory="false"`);
-    lines.push(`${indent}    definition="Placeholder information unit (ER requires at least one IU or subER per ISO 29481-3)"/>`);
+    lines.push(`${indent}    definition="Placeholder - leaf ER requires at least one Information Unit"/>`);
   }
 
   if (isRoot) {
@@ -715,7 +720,13 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, da
           actor.subActors.forEach((subActor, subIndex) => {
             const subActorId = subActor.id || `actor-${index + 1}-sub-${subIndex + 1}`;
             const subActorName = subActor.name || 'Unnamed Lane';
-            lines.push(`      <subActor id="${escapeXml(subActorId)}" name="${escapeXml(subActorName)}"/>`);
+            if (subActor.role) {
+              lines.push(`      <subActor id="${escapeXml(subActorId)}" name="${escapeXml(subActorName)}">`);
+              lines.push(`        <classification id="sub-role-${index + 1}-${subIndex + 1}" name="${escapeXml(subActor.role)}"/>`);
+              lines.push('      </subActor>');
+            } else {
+              lines.push(`      <subActor id="${escapeXml(subActorId)}" name="${escapeXml(subActorName)}"/>`);
+            }
           });
         }
 
@@ -858,7 +869,7 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, da
     let shapeAndActorIndex = 0;
     headerData.actorsList.forEach(actor => {
       const actorId = actor.id || '';
-      const bpmnShape = actor.bpmnShapeName || actor.bpmnId;
+      const bpmnShape = actor.bpmnShapeName || actor.bpmnId || actor.bpmnLaneId;
       if (bpmnShape && actorId) {
         shapeAndActorIndex++;
         lines.push(`      <shapeAndActor id="SA-${shapeAndActorIndex}">`);
@@ -944,7 +955,8 @@ export const generateErXmlStandalone = (er, authorName = 'IDMxPPM User') => {
     lines.push(`  <description title="${escapeXml(er.description)}"/>`);
   }
 
-  // Per ISO 29481-3 Clause 10: ER must have at least one informationUnit OR subEr
+  // ISO 29481-3 Clause 10 / idmXSD v2.0:
+  // ERs with only sub-ERs are valid. Leaf ERs must have at least one IU.
   const hasInfoUnits = er.informationUnits && er.informationUnits.length > 0;
   const hasSubERs = er.subERs && er.subERs.length > 0;
 
@@ -966,14 +978,14 @@ export const generateErXmlStandalone = (er, authorName = 'IDMxPPM User') => {
     });
   }
 
-  // If ER has neither informationUnits nor subERs, add a placeholder
+  // Leaf ER with no IUs: add placeholder to satisfy xs:choice minOccurs="1"
   if (!hasInfoUnits && !hasSubERs) {
     lines.push('  <informationUnit');
     lines.push('    id="iu-placeholder"');
     lines.push('    name="Placeholder"');
     lines.push('    dataType="String"');
     lines.push('    isMandatory="false"');
-    lines.push('    definition="Placeholder information unit (ER requires at least one IU or subER per ISO 29481-3)"/>');
+    lines.push('    definition="Placeholder - leaf ER requires at least one Information Unit"/>');
   }
 
   lines.push('</er>');
