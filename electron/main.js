@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -448,6 +448,11 @@ ipcMain.handle('fs:readRelativeFileBase64', async (event, { basePath, relativePa
   } catch (err) {
     return { success: false, error: err.message };
   }
+});
+
+// Open external URL in default browser
+ipcMain.handle('shell:openExternal', async (event, url) => {
+  await shell.openExternal(url);
 });
 
 // IPC 핸들러들

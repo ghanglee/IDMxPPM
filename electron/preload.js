@@ -36,6 +36,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   readRelativeFile: (basePath, relativePath) => ipcRenderer.invoke('fs:readRelativeFile', { basePath, relativePath }),
   readRelativeFileBase64: (basePath, relativePath) => ipcRenderer.invoke('fs:readRelativeFileBase64', { basePath, relativePath }),
 
+  // Open external URL in default browser
+  openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
+
   // 플랫폼 정보
   platform: process.platform
 });
