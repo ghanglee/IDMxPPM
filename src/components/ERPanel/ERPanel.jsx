@@ -54,11 +54,23 @@ const SCHEMA_OPTIONS = [
 const uuid = () => crypto.randomUUID?.() || `IU-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 /**
+ * Auto-resize a textarea to fit its content.
+ */
+const autoResizeTextarea = (textarea) => {
+  if (!textarea) return;
+  textarea.style.height = 'auto';
+  const minHeight = 40;
+  const maxHeight = 300;
+  textarea.style.height = `${Math.min(Math.max(textarea.scrollHeight, minHeight), maxHeight)}px`;
+};
+
+/**
  * Compact definition field with figure upload support.
  * Used for ER descriptions and IU definitions.
  */
-const DefinitionWithFigures = ({ value, figures = [], onChange, onFiguresChange, placeholder, rows = 4, label = 'Definition', className = 'er-textarea' }) => {
+const DefinitionWithFigures = ({ value, figures = [], onChange, onFiguresChange, onBlur, placeholder, rows = 4, label = 'Definition', className = 'er-textarea' }) => {
   const fileRef = React.useRef(null);
+  const textareaRef = React.useRef(null);
 
   const handleFileChange = (e) => {
     Array.from(e.target.files || []).forEach(file => {
@@ -88,11 +100,18 @@ const DefinitionWithFigures = ({ value, figures = [], onChange, onFiguresChange,
         <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleFileChange} style={{ display: 'none' }} />
       </div>
       <textarea
+        ref={textareaRef}
         value={value || ''}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          onChange(e.target.value);
+          autoResizeTextarea(e.target);
+        }}
+        onBlur={onBlur}
+        onFocus={(e) => autoResizeTextarea(e.target)}
         placeholder={placeholder}
         rows={rows}
         className={className}
+        style={{ overflow: 'hidden' }}
       />
       {figures.length > 0 && (
         <div className="er-def-figures">
@@ -211,7 +230,7 @@ const ERPanel = ({
   const mappingInputRefs = useRef({});
 
   // Detail panel resize state (proportion-based)
-  const [detailPanelRatio, setDetailPanelRatio] = useState(0.7);
+  const [detailPanelRatio, setDetailPanelRatio] = useState(0.5);
   const resizingRef = useRef(false);
   const resizeStartYRef = useRef(0);
   const resizeStartRatioRef = useRef(0);
@@ -388,6 +407,15 @@ const ERPanel = ({
     if (selectedErId === prevSelectedErIdRef.current) {
       return;
     }
+
+    // Auto-commit pending detail panel edits before switching to new ER
+    if (selectedItem && selectedItemSnapshotRef.current) {
+      const currentData = JSON.stringify(selectedItem.data);
+      if (currentData !== selectedItemSnapshotRef.current) {
+        commitCurrentEdit();
+      }
+    }
+
     prevSelectedErIdRef.current = selectedErId;
 
     // Find the ER data in hierarchy
@@ -2784,6 +2812,7 @@ const ERPanel = ({
                       onFiguresChange={(figs) => {
                         setSelectedItem(prev => ({ ...prev, data: { ...prev.data, definitionFigures: figs } }));
                       }}
+                      onBlur={() => { if (hasUnsavedDetailChanges()) commitCurrentEdit(); }}
                       placeholder="Describe this information unit..."
                       rows={6}
                     />
@@ -2799,6 +2828,7 @@ const ERPanel = ({
                       onFiguresChange={(figs) => {
                         setSelectedItem(prev => ({ ...prev, data: { ...prev.data, exampleImages: figs } }));
                       }}
+                      onBlur={() => { if (hasUnsavedDetailChanges()) commitCurrentEdit(); }}
                       placeholder="e.g., Wall-001, Level-1"
                       rows={3}
                     />
@@ -2947,6 +2977,9 @@ const ERPanel = ({
                       onChange={(e) => {
                         setSelectedItem(prev => ({ ...prev, data: { ...prev.data, name: e.target.value } }));
                       }}
+                      onBlur={() => {
+                        if (hasUnsavedDetailChanges()) commitCurrentEdit();
+                      }}
                       placeholder="e.g., Site Survey Data"
                       className="er-input"
                     />
@@ -2962,6 +2995,7 @@ const ERPanel = ({
                       onFiguresChange={(figs) => {
                         setSelectedItem(prev => ({ ...prev, data: { ...prev.data, descriptionFigures: figs } }));
                       }}
+                      onBlur={() => { if (hasUnsavedDetailChanges()) commitCurrentEdit(); }}
                       placeholder="Brief description of this Exchange Requirement..."
                       rows={4}
                     />
@@ -2977,6 +3011,7 @@ const ERPanel = ({
                       onFiguresChange={(figs) => {
                         setSelectedItem(prev => ({ ...prev, data: { ...prev.data, exampleImages: figs } }));
                       }}
+                      onBlur={() => { if (hasUnsavedDetailChanges()) commitCurrentEdit(); }}
                       placeholder="Examples for this Exchange Requirement..."
                       rows={3}
                     />

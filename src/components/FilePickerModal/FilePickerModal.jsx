@@ -46,10 +46,17 @@ const FilePickerModal = ({ isOpen, onClose, onFileSelected }) => {
       description: 'BPMN 2.0 XML process diagram'
     },
     {
+      id: 'html',
+      name: 'Reviewed HTML',
+      extension: '.html',
+      accept: '.html,.htm',
+      description: 'Import reviewed HTML with comments'
+    },
+    {
       id: 'all',
       name: 'All Supported Formats',
       extension: '.*',
-      accept: '.idm,.json,.xml,.zip,.idmx,.xppm,.bpmn',
+      accept: '.idm,.json,.xml,.zip,.idmx,.xppm,.bpmn,.html,.htm',
       description: 'Show all supported file types'
     }
   ];
@@ -123,6 +130,11 @@ const FilePickerModal = ({ isOpen, onClose, onFileSelected }) => {
                   {format.id === 'bpmn' && (
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M22 11V3h-7v3H9V3H2v8h7V8h2v10h4v3h7v-8h-7v3h-2V8h2v3h7zM7 9H4V5h3v4zm10 6h3v4h-3v-4zm0-10h3v4h-3V5z"/>
+                    </svg>
+                  )}
+                  {format.id === 'html' && (
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8h16v10zm-2-1h-6v-2h6v2zm-8-4l-4 4v-3H4v-2h2V8l4 4z"/>
                     </svg>
                   )}
                   {format.id === 'all' && (

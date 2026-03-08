@@ -16,6 +16,24 @@
 }
 
 /* ============================================================================
+   Data Object Highlight - Glow effect when linked ER is selected
+   ============================================================================ */
+
+.highlighted-data-object .djs-visual > rect,
+.highlighted-data-object .djs-visual > path,
+.highlighted-data-object .djs-visual > polygon {
+  stroke: var(--accent-primary, #3b82f6) !important;
+  stroke-width: 3px !important;
+}
+
+.highlighted-data-object .djs-outline {
+  visibility: visible !important;
+  stroke: var(--accent-primary, #3b82f6) !important;
+  stroke-width: 2px !important;
+  fill: rgba(59, 130, 246, 0.08) !important;
+}
+
+/* ============================================================================
    Workspace Container - Flexbox layout for palette and canvas separation
    ============================================================================ */
 

@@ -1,0 +1,134 @@
+.review-comments-panel {
+  padding: 12px;
+  overflow-y: auto;
+  height: 100%;
+}
+
+.review-comments-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-secondary, #999);
+}
+
+.review-comments-empty p {
+  margin: 8px 0;
+}
+
+.review-comments-hint {
+  font-size: 12px;
+  color: var(--text-tertiary, #777);
+}
+
+.review-comments-summary {
+  padding: 8px 12px;
+  background: var(--bg-secondary, #2a2a2a);
+  border-radius: 4px;
+  margin-bottom: 12px;
+  font-size: 12px;
+}
+
+.review-comments-count {
+  color: var(--warning-color, #f59e0b);
+  font-weight: 600;
+}
+
+.review-comments-total {
+  color: var(--text-secondary, #999);
+}
+
+.review-comment-group {
+  margin-bottom: 16px;
+}
+
+.review-comment-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  background: var(--bg-tertiary, #333);
+  border-radius: 4px;
+  margin-bottom: 6px;
+}
+
+.review-comment-group-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary, #eee);
+}
+
+.review-comment-group-count {
+  font-size: 11px;
+  background: var(--accent-primary, #3b82f6);
+  color: white;
+  padding: 1px 8px;
+  border-radius: 10px;
+}
+
+.review-comment-item {
+  padding: 10px 12px;
+  margin: 4px 0;
+  border: 1px solid var(--border-primary, #444);
+  border-radius: 4px;
+  background: var(--bg-primary, #1e1e1e);
+  font-size: 12px;
+}
+
+.review-comment-item.resolved {
+  opacity: 0.6;
+  border-color: var(--border-secondary, #555);
+}
+
+.review-comment-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 11px;
+}
+
+.review-comment-meta strong {
+  color: var(--text-primary, #eee);
+}
+
+.review-comment-time {
+  color: var(--text-tertiary, #777);
+  font-size: 10px;
+}
+
+.review-comment-resolved-badge {
+  background: #155724;
+  color: #d4edda;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+}
+
+.review-comment-text {
+  color: var(--text-secondary, #ccc);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.review-comment-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.review-action-btn {
+  background: none;
+  border: none;
+  color: var(--accent-primary, #3b82f6);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0;
+}
+
+.review-action-btn:hover {
+  text-decoration: underline;
+}
+
+.review-action-remove {
+  color: var(--error-color, #ef4444);
+}

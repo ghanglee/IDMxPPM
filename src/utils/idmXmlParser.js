@@ -948,6 +948,7 @@ const parseErElement = (erElement) => {
     shortTitle: '',     // Short title for name-based matching
     name: '',
     description: '',
+    descriptionFigures: [],
     informationUnits: [],
     subERs: []
   };

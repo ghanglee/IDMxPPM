@@ -1,5 +1,75 @@
 # IDMxPPM neo-Seoul — Release Notes
 
+## v1.3.0 (2026-03-08)
+
+### Highlights
+
+- **Task Detail Panel** — Extended BPMN element documentation to all element types (tasks, gateways, events, sequence flows) with a dedicated ElementDetailPanel
+- **Actor-BPMN Linking** — BPMN Pool/Lane names are automatically linked to UC actors; selecting an ER highlights its linked data object in the BPMN canvas
+- **xPPM Full Import** — Robust xPPM import with folder-based image/BPMN loading from adjacent `Image/` and `Diagram/` directories
+- **Review Mode HTML** — Self-contained HTML export with embedded commenting UI for reviewers; import reviewed HTML back to restore comments
+- **HTML Export Improvements** — Clickable BPMN elements, BPMN Activities section, and inline IU figures placed under their associated items
+
+---
+
+### New Features
+
+#### BPMN Element Documentation
+- Extended element detail panel to support all BPMN elements (tasks, gateways, events, sequence flows), not just tasks
+- Created ElementDetailPanel with TYPE_LABELS map for human-readable element type names
+- Added type-aware tooltips on BPMN elements showing documentation status
+- Documentation saved in BPMN XML `<documentation>` element
+
+#### Actor-BPMN Linking
+- Named BPMN swimlanes (Pools/Lanes) are automatically added as actors in the Use Case
+- `shapeAndActor` mappings exported in idmXML for actor-to-BPMN-shape associations
+- ER-to-BPMN highlighting: selecting an ER in the left panel highlights its linked data object via `canvas.addMarker()`
+
+#### Review Mode HTML Export
+- Self-contained HTML with embedded commenting UI (`reviewCommentingUI.js`)
+- Reviewers open HTML in a browser, add comments with reviewer name, and download the annotated file
+- Toolbar with reviewer name input, comment count, and download button
+- HTML import handler parses embedded `#idmxppm-project-data` and `#idmxppm-comments` JSON blocks
+- ReviewCommentsPanel in ContentPane shows imported comments with mark-addressed/remove actions
+
+#### HTML Export Enhancements
+- **Clickable Data Objects** — SVG data objects in HTML export have onclick handlers that scroll to linked ER sections
+- **BPMN Activities Section** — All named BPMN elements (tasks, gateways, events) in the SVG are clickable and jump to a new "BPMN Activities" section with back-links to the diagram
+- **Inline IU Figures** — Definition figures and example images now render in a full-width row directly under their associated Information Unit, instead of being collected at the bottom of the table
+
+---
+
+### Bug Fixes
+
+- **Fixed xPPM figure import** — Electron main process now scans `Image/` folder alongside the xPPM file and loads ALL images, instead of relying solely on regex extraction from XML content. Images stored under multiple key formats (forward-slash, backslash, basename) for robust path matching
+- **Fixed xPPM BPMN import** — Added `Diagram/` folder scanning fallback when XML-extracted BPMN path fails
+- **Fixed xPPM IU parsing** — Added `definitionFigures: []` initialization, correct image classification (definition vs example), and `<examples>` element parsing per v1.0 schema
+- **Fixed idmXML ER figure initialization** — `descriptionFigures: []` now always initialized in `parseErElement`
+- **Fixed undo button** — Added `internalChangeRef` flag to prevent commandStack.changed → importXML re-import loop that destroyed undo history
+- **Fixed ER linking failure** — DataObjectERSelectModal and ER-first architecture now correctly handle linking data objects to ERs
+- **Fixed duplicate ER names** — ER creation counts existing names and generates sequential unique names
+- **Fixed ER renaming** — Auto-commit on blur saves ER name changes immediately without restart
+- **Fixed repetitive ER popups** — Replaced blocking `alert()` with non-blocking toast notifications, each ER warned only once per session
+
+---
+
+### UI Improvements
+
+- **ER-to-BPMN highlighting** — Selecting an ER in the left panel highlights its linked data object in the BPMN canvas with blue outline
+- **Adjustable text fields** — Auto-resizing textareas in ER detail panel (40px min, 300px max)
+- **Clearer ER marking** — Descriptive text ("No Name" / "No Content") with tooltips instead of generic "Incomplete" badge
+- **Tab selection visibility** — Active tabs in DataObjectERSelectModal and RootERSelectionModal have distinct background color and font weight
+- **Root ER auto-creation** — On BPMN import with empty erHierarchy, a root ER is auto-created (named "er_" + ShortTitle)
+
+---
+
+### Compatibility
+
+- **Import** — idmXSD v1.0, v2.0, xPPM (.xppm), reviewed HTML (.html/.htm)
+- **Export** — idmXSD v2.0 only, HTML (with review mode), ZIP bundle, BPMN, erXML
+
+---
+
 ## v1.2.2 (2026-02-13)
 
 ### Highlights

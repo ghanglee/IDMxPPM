@@ -115,6 +115,8 @@
 .root-er-tab.active {
   color: var(--accent-color);
   border-bottom-color: var(--accent-color);
+  background: rgba(59, 130, 246, 0.15);
+  font-weight: 600;
 }
 
 /* Body */

@@ -133,6 +133,8 @@
 .do-er-tab.active {
   color: var(--accent-primary, #3b82f6);
   border-bottom-color: var(--accent-primary, #3b82f6);
+  background: rgba(59, 130, 246, 0.15);
+  font-weight: 600;
 }
 
 .do-er-tab svg {

@@ -5,6 +5,7 @@
 
 import { defaultIdmXslt } from './defaultIdmXslt';
 import { getRegionName } from './idmXmlParser';
+import { getReviewUIStyles, getReviewUIScript } from './reviewCommentingUI';
 
 /**
  * Generate self-contained HTML from IDM data
@@ -200,7 +201,11 @@ export const generateStandaloneHtml = ({
   erDataMap,
   erHierarchy,
   bpmnSvg,
-  customXsltContent
+  customXsltContent,
+  dataObjectErMap,
+  bpmnElements,
+  projectData,
+  enableReview
 }) => {
   const title = headerData?.title || headerData?.shortTitle || 'IDM Specification';
   const shortTitle = headerData?.shortTitle || title;
@@ -320,6 +325,20 @@ export const generateStandaloneHtml = ({
       height: auto;
     }
 
+    .bpmn-hint {
+      font-size: 9pt;
+      color: #888;
+      font-style: italic;
+      margin-bottom: 8px;
+    }
+
+    .bpmn-diagram [onclick]:hover .djs-visual > rect,
+    .bpmn-diagram [onclick]:hover .djs-visual > path,
+    .bpmn-diagram [onclick]:hover .djs-visual > polygon {
+      stroke: #0066cc;
+      stroke-width: 2px;
+    }
+
     table {
       width: 100%;
       border-collapse: collapse;
@@ -437,6 +456,99 @@ export const generateStandaloneHtml = ({
       color: #0066cc;
     }
 
+    .task-list-section {
+      margin: 35px 0;
+    }
+
+    .task-list-section h3 {
+      font-size: 11pt;
+      font-weight: 600;
+      color: #555;
+      margin: 18px 0 10px 0;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #eee;
+    }
+
+    .task-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+      font-size: 10pt;
+    }
+
+    .task-table th {
+      background: #0066cc;
+      color: white;
+      font-weight: 600;
+      padding: 8px 10px;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    .task-table td {
+      border: 1px solid #ddd;
+      padding: 8px 10px;
+      vertical-align: top;
+    }
+
+    .task-table tr:nth-child(even) {
+      background: #f9f9f9;
+    }
+
+    .task-table tr:hover {
+      background: #eef4ff;
+    }
+
+    .task-name-link {
+      color: #0066cc;
+      text-decoration: none;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .task-name-link:hover {
+      text-decoration: underline;
+    }
+
+    .task-type-badge {
+      display: inline-block;
+      background: #e8f0fe;
+      color: #1a73e8;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 8pt;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    .task-doc {
+      color: #555;
+      font-size: 9pt;
+      white-space: pre-wrap;
+      max-width: 260px;
+    }
+
+    .task-no-doc {
+      color: #bbb;
+      font-size: 9pt;
+      font-style: italic;
+    }
+
+    .task-er-link {
+      font-size: 9pt;
+      color: #0066cc;
+      text-decoration: none;
+    }
+
+    .task-er-link:hover {
+      text-decoration: underline;
+    }
+
+    .task-lane {
+      font-size: 9pt;
+      color: #666;
+    }
+
     .example-images {
       display: flex;
       flex-wrap: wrap;
@@ -490,6 +602,44 @@ export const generateStandaloneHtml = ({
       font-style: italic;
     }
 
+    .iu-figures-row td {
+      padding: 4px 12px 12px !important;
+      background: #f8f9fa;
+    }
+    .iu-figures {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .iu-figures-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .iu-figures-label {
+      font-size: 9pt;
+      font-weight: 600;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .iu-figures-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .iu-figure-item {
+      flex: 0 1 280px;
+      text-align: center;
+    }
+    .iu-figure-item img {
+      max-width: 100%;
+      max-height: 220px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
     .footer {
       margin-top: 50px;
       padding-top: 18px;
@@ -513,6 +663,7 @@ export const generateStandaloneHtml = ({
         page-break-before: always;
       }
     }
+    ${enableReview ? getReviewUIStyles() : ''}
   </style>
 </head>
 <body>
@@ -596,13 +747,17 @@ export const generateStandaloneHtml = ({
 
   <!-- BPMN Diagram -->
   ${bpmnSvg ? `
-  <div class="bpmn-section">
+  <div class="bpmn-section" id="bpmn-process-map">
     <h2>Process Map (BPMN)</h2>
+    <p class="bpmn-hint">Click on elements to jump to their descriptions. Data objects link to Exchange Requirements.</p>
     <div class="bpmn-diagram">
-      ${bpmnSvg}
+      ${addClickableActivities(addClickableDataObjects(bpmnSvg, dataObjectErMap), bpmnElements, dataObjectErMap)}
     </div>
   </div>
   ` : ''}
+
+  <!-- BPMN Activities -->
+  ${generateActivitiesSection(bpmnElements)}
 
   <!-- Exchange Requirements -->
   ${generateERsSection(erDataMap, erHierarchy)}
@@ -610,10 +765,200 @@ export const generateStandaloneHtml = ({
   <div class="footer">
     Generated from IDMxPPM neo-Seoul | ISO 29481-3 (idmXML) Compliant
   </div>
+  ${enableReview ? generateReviewBlocks(projectData) : ''}
 </body>
 </html>`;
 
   return html;
+};
+
+/**
+ * Add onclick handlers to data object SVG elements so they link to ER sections.
+ * bpmn-js SVG output uses data-element-id attributes on <g> groups.
+ */
+const addClickableDataObjects = (svgContent, dataObjectErMap) => {
+  if (!svgContent || !dataObjectErMap || Object.keys(dataObjectErMap).length === 0) {
+    return svgContent || '';
+  }
+
+  let result = svgContent;
+  for (const [doId, erId] of Object.entries(dataObjectErMap)) {
+    const sectionId = `er-${erId}`;
+    // Match the data-element-id attribute and add click behavior + cursor styling
+    const pattern = new RegExp(`data-element-id="${doId}"`, 'g');
+    result = result.replace(pattern,
+      `data-element-id="${doId}" style="cursor:pointer" onclick="document.getElementById('${sectionId}')?.scrollIntoView({behavior:'smooth',block:'start'})"`
+    );
+  }
+  return result;
+};
+
+/**
+ * Add onclick handlers to BPMN activity SVG elements so they link to activity descriptions.
+ * Skips data objects (already handled by addClickableDataObjects).
+ */
+const addClickableActivities = (svgContent, bpmnElements, dataObjectErMap) => {
+  if (!svgContent || !bpmnElements || bpmnElements.length === 0) {
+    return svgContent || '';
+  }
+
+  const dataObjectIds = new Set(Object.keys(dataObjectErMap || {}));
+  let result = svgContent;
+
+  for (const el of bpmnElements) {
+    // Skip elements without names or that are data objects (already linked to ERs)
+    if (!el.name || dataObjectIds.has(el.id)) continue;
+    // Skip if already has onclick (from addClickableDataObjects)
+    const checkPattern = new RegExp(`data-element-id="${el.id}"[^>]*onclick`);
+    if (checkPattern.test(result)) continue;
+
+    const sectionId = `activity-${el.id}`;
+    const pattern = new RegExp(`data-element-id="${el.id}"`, 'g');
+    result = result.replace(pattern,
+      `data-element-id="${el.id}" style="cursor:pointer" onclick="document.getElementById('${sectionId}')?.scrollIntoView({behavior:'smooth',block:'start'})"`
+    );
+  }
+  return result;
+};
+
+/**
+ * Human-readable type labels for BPMN elements.
+ */
+const ACTIVITY_TYPE_LABELS = {
+  'bpmn:Task': 'Task',
+  'bpmn:UserTask': 'User Task',
+  'bpmn:ServiceTask': 'Service Task',
+  'bpmn:SendTask': 'Send Task',
+  'bpmn:ReceiveTask': 'Receive Task',
+  'bpmn:ManualTask': 'Manual Task',
+  'bpmn:BusinessRuleTask': 'Business Rule Task',
+  'bpmn:ScriptTask': 'Script Task',
+  'bpmn:CallActivity': 'Call Activity',
+  'bpmn:SubProcess': 'Sub-Process',
+  'bpmn:ExclusiveGateway': 'Exclusive Gateway (XOR)',
+  'bpmn:ParallelGateway': 'Parallel Gateway (AND)',
+  'bpmn:InclusiveGateway': 'Inclusive Gateway (OR)',
+  'bpmn:EventBasedGateway': 'Event-Based Gateway',
+  'bpmn:ComplexGateway': 'Complex Gateway',
+  'bpmn:StartEvent': 'Start Event',
+  'bpmn:EndEvent': 'End Event',
+  'bpmn:IntermediateCatchEvent': 'Intermediate Catch Event',
+  'bpmn:IntermediateThrowEvent': 'Intermediate Throw Event',
+  'bpmn:BoundaryEvent': 'Boundary Event',
+  'bpmn:SequenceFlow': 'Sequence Flow'
+};
+
+/**
+ * Group BPMN element types into categories.
+ */
+const getTypeCategory = (type) => {
+  if (type.includes('Task') || type.includes('Activity') || type.includes('SubProcess') || type === 'bpmn:Task') return 'Tasks';
+  if (type.includes('Gateway')) return 'Gateways';
+  if (type.includes('Event')) return 'Events';
+  if (type.includes('Flow')) return 'Flows';
+  return 'Other';
+};
+
+/**
+ * Generate a table for a category of BPMN elements.
+ * Each row links back to the BPMN diagram and optionally to linked ERs.
+ */
+const generateCategoryTable = (elements, showLane) => {
+  let html = `
+  <table class="task-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Name</th>
+        <th>Type</th>
+        ${showLane ? '<th>Lane / Pool</th>' : ''}
+        <th>Documentation</th>
+        <th>Linked ER</th>
+      </tr>
+    </thead>
+    <tbody>`;
+
+  elements.forEach((el, idx) => {
+    const typeLabel = ACTIVITY_TYPE_LABELS[el.type] || el.type.replace('bpmn:', '');
+    const rowId = `activity-${el.id}`;
+
+    // Lane / Pool column
+    const lanePool = [el.lane, el.pool].filter(Boolean).join(' / ');
+
+    // Linked ERs column
+    const linkedERs = el.linkedERs || [];
+    const erLinks = linkedERs.map(er =>
+      `<a class="task-er-link" href="#er-${er.erId}">${escapeHtml(er.name)}</a>`
+    ).join(', ');
+
+    html += `
+      <tr id="${rowId}">
+        <td>${idx + 1}</td>
+        <td><a class="task-name-link" href="#" onclick="document.querySelector('[data-element-id=\\'${el.id}\\']')?.scrollIntoView({behavior:'smooth',block:'center'}); return false;">${escapeHtml(el.name)}</a></td>
+        <td><span class="task-type-badge">${escapeHtml(typeLabel)}</span></td>
+        ${showLane ? `<td><span class="task-lane">${escapeHtml(lanePool || '-')}</span></td>` : ''}
+        <td>${el.documentation
+          ? `<span class="task-doc">${escapeHtml(el.documentation)}</span>`
+          : `<span class="task-no-doc">-</span>`
+        }</td>
+        <td>${erLinks || '-'}</td>
+      </tr>`;
+  });
+
+  html += '</tbody></table>';
+  return html;
+};
+
+/**
+ * Generate the BPMN Activities section HTML as tables grouped by category.
+ */
+const generateActivitiesSection = (bpmnElements) => {
+  if (!bpmnElements || bpmnElements.length === 0) return '';
+
+  // Only include elements with names
+  const named = bpmnElements.filter(el => el.name);
+  if (named.length === 0) return '';
+
+  // Check if any element has lane/pool info
+  const showLane = named.some(el => el.lane || el.pool);
+
+  // Group by category
+  const groups = {};
+  const categoryOrder = ['Tasks', 'Gateways', 'Events', 'Flows', 'Other'];
+  for (const el of named) {
+    const cat = getTypeCategory(el.type);
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(el);
+  }
+
+  let html = '<div class="task-list-section"><h2>BPMN Activities</h2>';
+  html += '<p style="font-size:9pt;color:#888;font-style:italic;margin-bottom:12px;">Click a name to highlight the element in the diagram above. Click an element in the diagram to jump to its row below.</p>';
+
+  for (const cat of categoryOrder) {
+    const items = groups[cat];
+    if (!items || items.length === 0) continue;
+
+    html += `<h3>${escapeHtml(cat)}</h3>`;
+    html += generateCategoryTable(items, showLane);
+  }
+
+  html += '</div>';
+  return html;
+};
+
+/**
+ * Generate embedded project data and review UI script blocks for review mode.
+ */
+const generateReviewBlocks = (projectData) => {
+  const safeJson = (obj) => JSON.stringify(obj).replace(/<\//g, '<\\/');
+  const projectJson = projectData ? safeJson(projectData) : '{}';
+  const commentsJson = safeJson({ comments: [], metadata: { exportedAt: new Date().toISOString(), commentCount: 0 } });
+
+  return `
+  <script type="application/json" id="idmxppm-project-data">${projectJson}</script>
+  <script type="application/json" id="idmxppm-comments">${commentsJson}</script>
+  ${getReviewUIScript()}
+  `;
 };
 
 /**
@@ -782,8 +1127,9 @@ const generateActorsSection = (actors) => {
  */
 const generateErHtml = (er, level = 3) => {
   const headingTag = `h${Math.min(level, 6)}`;
+  const sectionId = `er-${er.id || er.guid || ''}`;
   let html = `
-  <div class="er-section">
+  <div class="er-section" id="${sectionId}">
     <${headingTag} class="er-title">${escapeHtml(er.name || 'Unnamed ER')}</${headingTag}>
 
     ${er.description ? `<div class="description">${escapeHtml(er.description)}</div>` : ''}
@@ -804,7 +1150,6 @@ const generateErHtml = (er, level = 3) => {
           ${er.informationUnits.map(iu => generateInfoUnitRow(iu)).join('')}
         </tbody>
       </table>
-      ${generateInfoUnitImages(er.informationUnits)}
     ` : ''}
 
     ${er.subERs && er.subERs.length > 0 ? er.subERs.map(subEr => generateErHtml(subEr, level + 1)).join('') : ''}
@@ -838,6 +1183,9 @@ const generateERsSection = (erDataMap, erHierarchy) => {
 
 const generateInfoUnitRow = (unit, level = 0) => {
   const indent = level > 0 ? '&nbsp;'.repeat(level * 4) + '└ ' : '';
+  const defFigures = (unit.definitionFigures || []).filter(f => f.data);
+  const exFigures = (unit.exampleImages || []).filter(f => f.data);
+  const hasFigures = defFigures.length > 0 || exFigures.length > 0;
 
   let rows = `
     <tr>
@@ -853,21 +1201,35 @@ const generateInfoUnitRow = (unit, level = 0) => {
       </td>
       <td>${escapeHtml(unit.dataType || 'String')}</td>
       <td><span class="${unit.isMandatory ? 'mandatory' : 'optional'}">${unit.isMandatory ? 'Yes' : 'No'}</span></td>
-      <td>
-        ${escapeHtml(unit.definition || '')}
-        ${unit.definitionFigures && unit.definitionFigures.length > 0 ? `
-          <div class="section-figures" style="margin-top:4px;">
-            ${unit.definitionFigures.filter(f => f.data).map(f => `
-              <div class="section-figure" style="display:inline-block;max-width:120px;margin:2px;">
-                <img src="${f.data}" alt="${escapeHtml(f.caption || f.name || '')}" style="max-width:100%;"/>
-                ${f.caption ? `<div class="figure-caption" style="font-size:0.75em;">${escapeHtml(f.caption)}</div>` : ''}
-              </div>
-            `).join('')}
-          </div>
-        ` : ''}
-      </td>
+      <td>${escapeHtml(unit.definition || '')}</td>
     </tr>
   `;
+
+  // Render figures in a full-width row directly under this IU
+  if (hasFigures) {
+    rows += `<tr class="iu-figures-row"><td colspan="4"><div class="iu-figures">`;
+    if (defFigures.length > 0) {
+      rows += `<div class="iu-figures-group"><span class="iu-figures-label">Definition Figures</span><div class="iu-figures-list">`;
+      rows += defFigures.map(f => `
+        <div class="iu-figure-item">
+          <img src="${f.data}" alt="${escapeHtml(f.caption || f.name || '')}"/>
+          ${f.caption ? `<div class="figure-caption">${escapeHtml(f.caption)}</div>` : ''}
+        </div>
+      `).join('');
+      rows += `</div></div>`;
+    }
+    if (exFigures.length > 0) {
+      rows += `<div class="iu-figures-group"><span class="iu-figures-label">Examples</span><div class="iu-figures-list">`;
+      rows += exFigures.map(f => `
+        <div class="iu-figure-item">
+          <img src="${f.data}" alt="${escapeHtml(f.caption || f.name || '')}"/>
+          ${f.caption ? `<div class="figure-caption">${escapeHtml(f.caption)}</div>` : ''}
+        </div>
+      `).join('');
+      rows += `</div></div>`;
+    }
+    rows += `</div></td></tr>`;
+  }
 
   // Add sub-units recursively
   if (unit.subInformationUnits && unit.subInformationUnits.length > 0) {
@@ -879,38 +1241,6 @@ const generateInfoUnitRow = (unit, level = 0) => {
   return rows;
 };
 
-const generateInfoUnitImages = (units) => {
-  const images = [];
-  collectAllImages(units, images);
-
-  if (images.length === 0) return '';
-
-  return `
-    <div class="example-images">
-      ${images.map(img => `
-        <div class="example-image">
-          <img src="${img.data || ''}" alt="${escapeHtml(img.caption || img.name || 'Example image')}"/>
-          <div class="caption">${escapeHtml(img.caption || img.name || '')}</div>
-        </div>
-      `).join('')}
-    </div>
-  `;
-};
-
-const collectAllImages = (units, images) => {
-  units.forEach(unit => {
-    if (unit.exampleImages && unit.exampleImages.length > 0) {
-      unit.exampleImages.forEach(img => {
-        if (img.data) {
-          images.push(img);
-        }
-      });
-    }
-    if (unit.subInformationUnits) {
-      collectAllImages(unit.subInformationUnits, images);
-    }
-  });
-};
 
 /**
  * Export HTML document to file

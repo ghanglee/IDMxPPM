@@ -16,6 +16,7 @@ import {
   SaveExportIcon
 } from '../icons';
 import { normalizeRegionCode } from '../../utils/idmXmlParser';
+import ReviewCommentsPanel from '../ReviewCommentsPanel/ReviewCommentsPanel';
 import './ContentPane.css';
 
 // ============================================================================
@@ -83,7 +84,18 @@ const ERHierarchyItem = memo(({
               <span className="er-sub-count">{er.subERs.length} sub-ERs</span>
             )}
             {!isComplete && !isRoot && (
-              <span className="er-incomplete-badge">Incomplete</span>
+              <span
+                className="er-incomplete-badge"
+                title={
+                  !hasName && !(hasUnits || hasSubERs)
+                    ? 'Missing: ER name, and information units or sub-ERs'
+                    : !hasName
+                    ? 'Missing: ER name'
+                    : 'Missing: information units or sub-ERs'
+                }
+              >
+                {!hasName ? 'No Name' : 'No Content'}
+              </span>
             )}
           </div>
         </div>
@@ -1591,6 +1603,9 @@ const ContentPane = ({
   onExportER,
   selectedErId = null,           // Currently selected ER for operations
   bpmnActorsList = [],           // BPMN Pools/Lanes for actor linking
+  reviewComments = [],           // Review comments from imported HTML
+  onMarkCommentAddressed,        // Callback to mark a comment as addressed
+  onRemoveComment,               // Callback to remove a comment
   onClose
 }) => {
   // Determine if using ER-first mode
@@ -3153,6 +3168,13 @@ const ContentPane = ({
       {type === 'specification' && renderIdmHeader()}
       {type === 'useCase' && renderUseCase()}
       {type === 'exchangeReq' && renderExchangeReq()}
+      {type === 'reviewComments' && (
+        <ReviewCommentsPanel
+          comments={reviewComments}
+          onMarkAddressed={onMarkCommentAddressed}
+          onRemove={onRemoveComment}
+        />
+      )}
     </div>
   );
 };

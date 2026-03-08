@@ -476,14 +476,10 @@ const parseExchangeRequirements = (doc) => {
     });
     erData.description = descriptionTexts.join('\n');
     erData.descriptionFigures = descriptionImages;
-    if (descriptionImages.length > 0) {
-      console.log(`ER "${erData.name}" has ${descriptionImages.length} description images`);
-    }
 
     // Parse information units
     const infoUnits = erElement.querySelectorAll(':scope > informationUnit');
     erData.informationUnits = Array.from(infoUnits).map(iu => parseInformationUnit(iu));
-    console.log(`ER "${erData.name}" has ${erData.informationUnits.length} information units`);
 
     // Parse correspondingMvd
     const mvd = erElement.querySelector(':scope > correspondingMvd');
@@ -534,7 +530,6 @@ const parseExchangeRequirements = (doc) => {
 
   // Start parsing from the root ER element
   const rootEr = parseErElement(erRoot);
-  console.log('Root ER parsed:', rootEr?.name);
 
   return { erDataMap, erLibrary, rootEr };
 };
@@ -549,13 +544,14 @@ const parseInformationUnit = (iuElement) => {
     dataType: mapDataType(iuElement.getAttribute('dataType')),
     isMandatory: iuElement.getAttribute('isMandatory') === 'true',
     definition: iuElement.getAttribute('definition') || '',
+    definitionFigures: [],
     examples: '',
     exampleImages: [],
     correspondingExternalElements: [],
     subInformationUnits: []
   };
 
-  // Parse ALL <description> children — merge text and extract images
+  // Parse direct <description> children of IU — definition figures (v2.0 style)
   const iuDescElements = iuElement.querySelectorAll(':scope > description');
   const iuDescTexts = [];
   iuDescElements.forEach((descEl) => {
@@ -564,14 +560,14 @@ const parseInformationUnit = (iuElement) => {
       const text = contentEl.textContent?.trim();
       if (text) iuDescTexts.push(text);
     }
-    // Collect <image> elements from each <description>
+    // Collect <image> elements from each <description> as definition figures
     const imgElements = descEl.querySelectorAll(':scope > image');
     imgElements.forEach((img, idx) => {
       const filePath = img.getAttribute('filePath') || '';
       const caption = img.getAttribute('caption') || '';
       const fileName = getBasename(filePath) || `iu_image_${idx + 1}`;
-      iu.exampleImages.push({
-        id: `fig-iu-${iu.id}-${Date.now()}-${iu.exampleImages.length}`,
+      iu.definitionFigures.push({
+        id: `fig-iu-${iu.id}-${Date.now()}-${iu.definitionFigures.length}`,
         name: fileName,
         caption: caption,
         filePath: filePath,
@@ -582,7 +578,40 @@ const parseInformationUnit = (iuElement) => {
     });
   });
   if (iuDescTexts.length > 0) {
-    iu.examples = iuDescTexts.join('\n');
+    iu.definition = iuDescTexts.join('\n');
+  }
+
+  // Parse <examples> element (v1.0/xPPM: examples > description > content/image)
+  const examplesEl = iuElement.querySelector(':scope > examples');
+  if (examplesEl) {
+    const exTexts = [];
+    const exDescs = examplesEl.querySelectorAll(':scope > description');
+    exDescs.forEach((descEl) => {
+      const contentEl = descEl.querySelector('content');
+      if (contentEl) {
+        const text = contentEl.textContent?.trim();
+        if (text) exTexts.push(text);
+      }
+      // Collect <image> elements from examples as example images
+      const imgElements = descEl.querySelectorAll(':scope > image');
+      imgElements.forEach((img, idx) => {
+        const filePath = img.getAttribute('filePath') || '';
+        const caption = img.getAttribute('caption') || '';
+        const fileName = getBasename(filePath) || `ex_image_${idx + 1}`;
+        iu.exampleImages.push({
+          id: `fig-ex-${iu.id}-${Date.now()}-${iu.exampleImages.length}`,
+          name: fileName,
+          caption: caption,
+          filePath: filePath,
+          data: null,
+          type: getMimeType(fileName),
+          needsLoading: true
+        });
+      });
+    });
+    if (exTexts.length > 0) {
+      iu.examples = exTexts.join('\n');
+    }
   }
 
   // Parse corresponding external elements (IFC, bSDD, etc.) - skip empty mappings

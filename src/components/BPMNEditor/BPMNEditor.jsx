@@ -18,12 +18,34 @@ import {
 } from '../icons';
 import './BPMNEditor.css';
 
-const TASK_TYPES = new Set([
+// All BPMN element types that support documentation editing
+// Excludes DataObject/DataStoreReference (ER handling) and Participant/Lane (actor linking)
+const DOCUMENTABLE_TYPES = new Set([
+  // Tasks
   'bpmn:Task', 'bpmn:UserTask', 'bpmn:ServiceTask',
   'bpmn:SendTask', 'bpmn:ReceiveTask', 'bpmn:ManualTask',
   'bpmn:BusinessRuleTask', 'bpmn:ScriptTask',
-  'bpmn:CallActivity', 'bpmn:SubProcess'
+  'bpmn:CallActivity', 'bpmn:SubProcess',
+  // Gateways
+  'bpmn:ExclusiveGateway', 'bpmn:ParallelGateway',
+  'bpmn:InclusiveGateway', 'bpmn:EventBasedGateway',
+  'bpmn:ComplexGateway',
+  // Events
+  'bpmn:StartEvent', 'bpmn:EndEvent',
+  'bpmn:IntermediateCatchEvent', 'bpmn:IntermediateThrowEvent',
+  'bpmn:BoundaryEvent',
+  // Flows
+  'bpmn:SequenceFlow'
 ]);
+
+// Human-readable tooltip for each element category
+const getElementTooltip = (type) => {
+  const short = type.replace('bpmn:', '');
+  if (short.includes('Gateway')) return 'Double-click to edit gateway details';
+  if (short.includes('Event')) return 'Double-click to edit event details';
+  if (short === 'SequenceFlow') return 'Double-click to edit flow details';
+  return 'Double-click to edit element details';
+};
 
 const BPMNEditor = ({
   xml,
@@ -34,12 +56,14 @@ const BPMNEditor = ({
   onReady,
   onImportBpmn,
   onToggleCollapse,
-  canCollapse = false
+  canCollapse = false,
+  highlightDataObjectId
 }) => {
   const containerRef = useRef(null);
   const paletteContainerRef = useRef(null);
   const modelerRef = useRef(null);
   const isImportingRef = useRef(false); // Track when importing to prevent modal during import
+  const internalChangeRef = useRef(false); // Track internal commandStack changes to prevent re-import loop
   const [isReady, setIsReady] = useState(false);
   const [selectedElement, setSelectedElement] = useState(null);
   const [error, setError] = useState(null);
@@ -168,7 +192,7 @@ const BPMNEditor = ({
           });
         }
         if (onTaskSelect) onTaskSelect(null);
-      } else if (selected && TASK_TYPES.has(selected.type)) {
+      } else if (selected && DOCUMENTABLE_TYPES.has(selected.type)) {
         if (onTaskSelect) {
           const businessObject = selected.businessObject;
           const docText = businessObject?.documentation?.[0]?.text || '';
@@ -202,7 +226,7 @@ const BPMNEditor = ({
           });
         }
         setTooltip({ visible: false, x: 0, y: 0, text: '' });
-      } else if (TASK_TYPES.has(element.type)) {
+      } else if (DOCUMENTABLE_TYPES.has(element.type)) {
         if (onTaskSelect) {
           const businessObject = element.businessObject;
           const docText = businessObject?.documentation?.[0]?.text || '';
@@ -242,19 +266,28 @@ const BPMNEditor = ({
             text: 'Double-click to specify this Exchange Requirement'
           });
         }
-      } else if (TASK_TYPES.has(element.type)) {
+      } else if (DOCUMENTABLE_TYPES.has(element.type)) {
         const canvas = modeler.get('canvas');
         const viewbox = canvas.viewbox();
         const containerRect = containerRef.current?.getBoundingClientRect();
         if (containerRect) {
           const scale = viewbox.scale || 1;
-          const x = (element.x - viewbox.x) * scale + containerRect.left + (element.width * scale) / 2;
-          const y = (element.y - viewbox.y) * scale + containerRect.top - 10;
+          let x, y;
+          if (element.waypoints) {
+            // Connection elements (SequenceFlow) — use midpoint of waypoints
+            const mid = element.waypoints[Math.floor(element.waypoints.length / 2)];
+            x = (mid.x - viewbox.x) * scale + containerRect.left;
+            y = (mid.y - viewbox.y) * scale + containerRect.top - 10;
+          } else {
+            // Shape elements (tasks, gateways, events)
+            x = (element.x - viewbox.x) * scale + containerRect.left + (element.width * scale) / 2;
+            y = (element.y - viewbox.y) * scale + containerRect.top - 10;
+          }
           setTooltip({
             visible: true,
             x,
             y,
-            text: 'Double-click to edit task details'
+            text: getElementTooltip(element.type)
           });
         }
       }
@@ -265,7 +298,7 @@ const BPMNEditor = ({
       if (element.type === 'bpmn:DataObjectReference' ||
           element.type === 'bpmn:DataObject' ||
           element.type === 'bpmn:DataStoreReference' ||
-          TASK_TYPES.has(element.type)) {
+          DOCUMENTABLE_TYPES.has(element.type)) {
         setTooltip({ visible: false, x: 0, y: 0, text: '' });
       }
     });
@@ -298,6 +331,7 @@ const BPMNEditor = ({
     eventBus.on('commandStack.changed', async () => {
       if (onChange) {
         try {
+          internalChangeRef.current = true; // Flag to prevent re-import loop
           const { xml: newXml } = await modeler.saveXML({ format: true });
           onChange(newXml);
         } catch (err) {
@@ -315,6 +349,13 @@ const BPMNEditor = ({
   // Respond to xml prop changes (including close project)
   useEffect(() => {
     if (!modelerRef.current || !isReady) return;
+
+    // Skip re-import if the xml change came from internal commandStack (edit/undo/redo)
+    // This preserves the commandStack history for undo/redo to work
+    if (internalChangeRef.current) {
+      internalChangeRef.current = false;
+      return;
+    }
 
     const loadNewDiagram = async () => {
       try {
@@ -357,6 +398,31 @@ const BPMNEditor = ({
 
     loadNewDiagram();
   }, [xml, isReady]);
+
+  // Highlight the data object linked to the selected ER
+  useEffect(() => {
+    if (!modelerRef.current || !isReady) return;
+
+    const canvas = modelerRef.current.get('canvas');
+    const elementRegistry = modelerRef.current.get('elementRegistry');
+
+    // Remove previous highlights from all data objects
+    elementRegistry.forEach(element => {
+      if (element.type === 'bpmn:DataObjectReference' ||
+          element.type === 'bpmn:DataObject' ||
+          element.type === 'bpmn:DataStoreReference') {
+        try { canvas.removeMarker(element.id, 'highlighted-data-object'); } catch (e) { /* ignore */ }
+      }
+    });
+
+    // Add highlight to the target data object
+    if (highlightDataObjectId) {
+      const element = elementRegistry.get(highlightDataObjectId);
+      if (element) {
+        canvas.addMarker(highlightDataObjectId, 'highlighted-data-object');
+      }
+    }
+  }, [highlightDataObjectId, isReady]);
 
   // Expose modeler methods via ref callback
   useEffect(() => {

@@ -274,7 +274,9 @@
 
 .er-textarea {
   resize: vertical;
-  min-height: 60px;
+  min-height: 40px;
+  max-height: 300px;
+  overflow: hidden;
 }
 
 .er-checkbox {

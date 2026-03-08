@@ -198,7 +198,8 @@ async function handleOpenProject() {
       { name: 'ZIP Bundle (.zip)', extensions: ['zip', 'idmx'] },
       { name: 'xPPM Legacy (.xppm)', extensions: ['xppm'] },
       { name: 'BPMN Diagram (.bpmn)', extensions: ['bpmn'] },
-      { name: 'All Supported Formats', extensions: ['idm', 'json', 'xml', 'zip', 'idmx', 'xppm', 'bpmn'] },
+      { name: 'Reviewed HTML (.html)', extensions: ['html', 'htm'] },
+      { name: 'All Supported Formats', extensions: ['idm', 'json', 'xml', 'zip', 'idmx', 'xppm', 'bpmn', 'html', 'htm'] },
       { name: 'All Files', extensions: ['*'] }
     ],
     properties: ['openFile']
@@ -221,56 +222,108 @@ async function handleOpenProject() {
     } else if (ext === '.xppm') {
       type = 'xppm';
     } else if (ext === '.xml') {
-      // Check if it's an idmXML file or BPMN
-      const isIdmXml = content.includes('idmXML') ||
-                       content.includes('standards.buildingsmart.org/IDM') ||
-                       (content.includes('<idm') && (content.includes('<uc>') || content.includes('<er>')));
-      type = isIdmXml ? 'idmxml' : 'bpmn';
+      // Check if it's a proper idmXML (with namespace), legacy xPPM v0.2 (no namespace), or BPMN
+      const hasIdmXmlNamespace = content.includes('idmXML') || content.includes('standards.buildingsmart.org/IDM');
+      const hasIdmStructure = content.includes('<idm') && (content.includes('<uc>') || content.includes('<er>'));
+      if (hasIdmXmlNamespace) {
+        type = 'idmxml';
+      } else if (hasIdmStructure) {
+        // v0.2 xPPM format: has IDM structure but no idmXML namespace
+        type = 'xppm';
+      } else {
+        type = 'bpmn';
+      }
     }
     // .json and .idm are treated as 'project' type
 
-    // For xPPM and idmXML files, also read external BPMN diagram and images from adjacent folders
+    // For xPPM and idmXML files, load external BPMN diagram and images from adjacent folders
+    // xPPM convention: Diagram/ and Image/ folders sit alongside the .xppm file
     let bpmnContent = null;
     let imageMap = {};
     if (type === 'xppm' || type === 'idmxml') {
       const baseDir = path.dirname(filePath);
+      const mimeMap = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.svg': 'image/svg+xml', '.bmp': 'image/bmp', '.webp': 'image/webp' };
+      const imageExts = new Set(Object.keys(mimeMap));
 
-      // Extract BPMN file path from xPPM XML content
-      const bpmnMatch = content.match(/filePath="([^"]*\.bpmn)"/i);
+      // 1. Load BPMN: first try path from XML, then scan Diagram/ folder
+      const bpmnMatch = content.match(/(?:filePath|diagramFilePath)="([^"]*\.bpmn)"/i);
       if (bpmnMatch) {
         const bpmnRelPath = bpmnMatch[1].replace(/\\/g, '/');
         const bpmnFullPath = path.resolve(baseDir, bpmnRelPath);
-        console.log('[file-import] BPMN file path extracted:', bpmnRelPath, '-> resolved:', bpmnFullPath);
         if (fs.existsSync(bpmnFullPath)) {
           try {
             bpmnContent = fs.readFileSync(bpmnFullPath, 'utf-8');
-            // Strip UTF-8 BOM
-            if (bpmnContent.charCodeAt(0) === 0xFEFF) {
-              bpmnContent = bpmnContent.slice(1);
-            }
-            console.log('[file-import] BPMN loaded successfully, length:', bpmnContent.length);
+            if (bpmnContent.charCodeAt(0) === 0xFEFF) bpmnContent = bpmnContent.slice(1);
+            console.log('[file-import] BPMN loaded from XML path:', bpmnRelPath);
           } catch (err) {
-            console.error('[file-import] Failed to read BPMN file:', err.message);
+            console.error('[file-import] Failed to read BPMN:', err.message);
           }
-        } else {
-          console.warn('[file-import] BPMN file not found:', bpmnFullPath);
+        }
+      }
+      // Fallback: scan Diagram/ folder for first .bpmn file
+      if (!bpmnContent) {
+        const diagramDir = path.join(baseDir, 'Diagram');
+        if (fs.existsSync(diagramDir)) {
+          try {
+            const diagramFiles = fs.readdirSync(diagramDir);
+            const bpmnFile = diagramFiles.find(f => f.toLowerCase().endsWith('.bpmn'));
+            if (bpmnFile) {
+              const bpmnFullPath = path.join(diagramDir, bpmnFile);
+              bpmnContent = fs.readFileSync(bpmnFullPath, 'utf-8');
+              if (bpmnContent.charCodeAt(0) === 0xFEFF) bpmnContent = bpmnContent.slice(1);
+              console.log('[file-import] BPMN loaded from Diagram/ folder:', bpmnFile);
+            }
+          } catch (err) {
+            console.error('[file-import] Failed to scan Diagram/ folder:', err.message);
+          }
         }
       }
 
-      // Extract and read image files from xPPM content
+      // 2. Load images: scan Image/ folder and load ALL image files
+      const imageDir = path.join(baseDir, 'Image');
+      if (fs.existsSync(imageDir)) {
+        try {
+          const imageFiles = fs.readdirSync(imageDir);
+          for (const imgFile of imageFiles) {
+            const imgExt = path.extname(imgFile).toLowerCase();
+            if (!imageExts.has(imgExt)) continue;
+            const imgFullPath = path.join(imageDir, imgFile);
+            try {
+              const buffer = fs.readFileSync(imgFullPath);
+              const base64 = buffer.toString('base64');
+              const mimeType = mimeMap[imgExt] || 'image/png';
+              const dataUri = `data:${mimeType};base64,${base64}`;
+              // Store under multiple keys so renderer lookup always matches
+              imageMap[`Image/${imgFile}`] = dataUri;           // forward-slash relative path
+              imageMap[`Image\\${imgFile}`] = dataUri;          // backslash (raw from XML)
+              imageMap[imgFile] = dataUri;                       // basename only
+            } catch (err) {
+              console.error('[file-import] Failed to read image:', imgFile, err.message);
+            }
+          }
+          console.log(`[file-import] Loaded ${Object.keys(imageMap).length / 3} images from Image/ folder`);
+        } catch (err) {
+          console.error('[file-import] Failed to scan Image/ folder:', err.message);
+        }
+      }
+
+      // 3. Also extract any image paths from XML that may point outside Image/ folder
       const imageMatches = content.matchAll(/filePath="([^"]*\.(png|jpg|jpeg|gif|svg|bmp|webp))"/gi);
       for (const match of imageMatches) {
         const imgRelPath = match[1].replace(/\\/g, '/');
+        if (imageMap[imgRelPath]) continue; // Already loaded from folder scan
         const imgFullPath = path.resolve(baseDir, imgRelPath);
         if (fs.existsSync(imgFullPath)) {
           try {
             const buffer = fs.readFileSync(imgFullPath);
             const base64 = buffer.toString('base64');
             const imgExt = path.extname(imgFullPath).toLowerCase();
-            const mimeMap = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.svg': 'image/svg+xml', '.bmp': 'image/bmp', '.webp': 'image/webp' };
             const mimeType = mimeMap[imgExt] || 'image/png';
             imageMap[imgRelPath] = `data:${mimeType};base64,${base64}`;
-            console.log('[file-import] Image loaded:', imgRelPath);
+            // Also store by basename
+            const imgBasename = path.basename(imgFullPath);
+            if (!imageMap[imgBasename]) imageMap[imgBasename] = imageMap[imgRelPath];
+            console.log('[file-import] Image loaded from XML path:', imgRelPath);
           } catch (err) {
             console.error('[file-import] Failed to read image:', imgRelPath, err.message);
           }
@@ -278,6 +331,7 @@ async function handleOpenProject() {
       }
     }
 
+    console.log(`[file-import] Sending to renderer: type=${type}, bpmnContent=${!!bpmnContent}, imageMap entries=${Object.keys(imageMap).length}`);
     mainWindow.webContents.send('file-opened', { filePath, content, type, bpmnContent, imageMap });
   }
 }

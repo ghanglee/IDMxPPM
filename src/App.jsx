@@ -12,7 +12,7 @@ import RootERSelectionModal from './components/RootERSelectionModal/RootERSelect
 import RootSwitchModal from './components/RootSwitchModal/RootSwitchModal';
 import ServerConnectionModal from './components/ServerConnectionModal/ServerConnectionModal';
 import ServerBrowser from './components/ServerBrowser/ServerBrowser';
-import TaskDetailPanel from './components/TaskDetailPanel/TaskDetailPanel';
+import ElementDetailPanel from './components/TaskDetailPanel/ElementDetailPanel';
 import { ThemeProvider } from './hooks/useTheme';
 import { useServerConnection } from './hooks/useServerConnection';
 import { api } from './utils/apiClient';
@@ -51,6 +51,7 @@ const App = () => {
   const [erPanelMode, setErPanelMode] = useState('list');
   const [erDataMap, setErDataMap] = useState({});
   const [erLibrary, setErLibrary] = useState([]);
+  const [reviewComments, setReviewComments] = useState([]);
 
   // ER-first architecture state (new)
   const [erHierarchy, setErHierarchy] = useState([]);  // Ordered hierarchical array of ERs (source of truth)
@@ -65,6 +66,11 @@ const App = () => {
   const [isDirty, setIsDirty] = useState(false);
   const [bpmnDataObjects, setBpmnDataObjects] = useState([]); // Track all data objects from BPMN
   const [bpmnActorsList, setBpmnActorsList] = useState([]); // Track BPMN Pools/Lanes for actor linking
+
+  // Toast notification state
+  const [toastMessage, setToastMessage] = useState(null);
+  const toastTimerRef = useRef(null);
+  const warnedErIdsRef = useRef(new Set()); // Track ERs already warned about to avoid repeated alerts
 
   // Task Detail Panel state
   const [selectedTask, setSelectedTask] = useState(null);
@@ -159,7 +165,8 @@ const App = () => {
   const [exportSavePath, setExportSavePath] = useState(''); // Full path from browse dialog
   const [exportOptions, setExportOptions] = useState({
     includeBpmn: true,
-    includeImages: true
+    includeImages: true,
+    enableReview: false
   });
   const [customXslt, setCustomXslt] = useState(null); // Custom XSLT file for PDF export
 
@@ -235,20 +242,45 @@ const App = () => {
     }];
   }, []);
 
+  // Deduplicate ERs within a subERs array (and recursively in nested subERs)
+  // Keeps only the first occurrence of each ER by id
+  const deduplicateErHierarchy = useCallback((hierarchy) => {
+    if (!hierarchy || hierarchy.length === 0) return hierarchy;
+
+    const deduplicateLevel = (ers) => {
+      const seen = new Set();
+      const result = [];
+      for (const er of ers) {
+        if (seen.has(er.id)) continue;
+        seen.add(er.id);
+        result.push({
+          ...er,
+          subERs: er.subERs?.length > 0 ? deduplicateLevel(er.subERs) : (er.subERs || [])
+        });
+      }
+      return result;
+    };
+
+    return deduplicateLevel(hierarchy);
+  }, []);
+
   // Auto-consolidate ER hierarchy: if only one top-level ER, return as-is
   // If multiple, make the first one the root and others become sub-ERs
   // This is a fallback for cases where the modal wasn't shown
   const autoConsolidateErHierarchy = useCallback((hierarchy) => {
     if (!hierarchy || hierarchy.length === 0) return [];
-    if (hierarchy.length === 1) return hierarchy;
+    if (hierarchy.length === 1) return deduplicateErHierarchy(hierarchy);
 
     // Multiple top-level ERs: make first one the root
     const [root, ...rest] = hierarchy;
-    return [{
+    // Filter out any ERs from rest that already exist in root.subERs
+    const existingSubErIds = new Set((root.subERs || []).map(er => er.id));
+    const newSubERs = rest.filter(er => !existingSubErIds.has(er.id));
+    return deduplicateErHierarchy([{
       ...root,
-      subERs: [...(root.subERs || []), ...rest]
-    }];
-  }, []);
+      subERs: [...(root.subERs || []), ...newSubERs]
+    }]);
+  }, [deduplicateErHierarchy]);
 
   // Helper to handle import with potential multi-root ER situation
   // Returns true if modal was shown (async), false if import can proceed directly
@@ -371,6 +403,105 @@ const App = () => {
     }
 
     return idmData;
+  }, []);
+
+  // Browser-mode helper: prompt user to select external files (images, BPMN) for xPPM/v0.2 import
+  // In browser mode, we cannot access the filesystem, so we ask the user to select companion files.
+  const loadXppmCompanionFiles = useCallback(async (xppmResult) => {
+    // Collect all unresolved image figures
+    const unresolvedFigures = [];
+    const collectFigures = (figures) => {
+      if (!figures?.length) return;
+      for (const fig of figures) {
+        if (fig.filePath && !fig.data) unresolvedFigures.push(fig);
+      }
+    };
+    const collectErFigures = (ers) => {
+      if (!ers) return;
+      const erList = Array.isArray(ers) ? ers : Object.values(ers);
+      for (const er of erList) {
+        collectFigures(er.descriptionFigures);
+        if (er.informationUnits) {
+          for (const iu of er.informationUnits) {
+            collectFigures(iu.definitionFigures);
+            collectFigures(iu.exampleImages);
+          }
+        }
+        if (er.subERs?.length) collectErFigures(er.subERs);
+      }
+    };
+    const hd = xppmResult.headerData || {};
+    collectFigures(hd.summaryFigures);
+    collectFigures(hd.aimAndScopeFigures);
+    collectFigures(hd.benefitsFigures);
+    collectFigures(hd.limitationsFigures);
+    if (xppmResult.erHierarchy) collectErFigures(xppmResult.erHierarchy);
+
+    const needsBpmn = !xppmResult.bpmnXml && xppmResult.bpmnFilePath;
+    if (unresolvedFigures.length === 0 && !needsBpmn) return;
+
+    // Build message for user
+    const parts = [];
+    if (unresolvedFigures.length > 0) parts.push(`${unresolvedFigures.length} image(s)`);
+    if (needsBpmn) parts.push('1 BPMN diagram');
+    const confirmed = window.confirm(
+      `This file references ${parts.join(' and ')} stored as external files.\n\n` +
+      `Would you like to select the companion files (Image folder, BPMN file) to load them?\n\n` +
+      `Tip: Select all files from the project's Image/ and Diagram/ folders.`
+    );
+    if (!confirmed) return;
+
+    // Open file picker for companion files
+    return new Promise((resolve) => {
+      let resolved = false;
+      const done = () => { if (!resolved) { resolved = true; resolve(); } };
+
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.multiple = true;
+      input.accept = 'image/*,.bpmn,.xml';
+      input.onchange = async (e) => {
+        const files = Array.from(e.target.files || []);
+        if (files.length === 0) { done(); return; }
+
+        let imageCount = 0;
+        for (const file of files) {
+          // Check for BPMN file
+          if (needsBpmn && (file.name.endsWith('.bpmn') || file.name.endsWith('.xml'))) {
+            const text = await file.text();
+            if (text.includes('bpmn2:definitions') || text.includes('bpmn:definitions') || text.includes('<definitions')) {
+              xppmResult.bpmnXml = text;
+              console.log('[browser xPPM] Loaded BPMN from selected file:', file.name);
+              continue;
+            }
+          }
+
+          // Match image files by basename
+          if (file.type.startsWith('image/')) {
+            const matchingFigs = unresolvedFigures.filter(fig => {
+              const figName = fpBasename(fig.filePath);
+              return figName === file.name;
+            });
+            if (matchingFigs.length > 0) {
+              const dataUri = await new Promise((res) => {
+                const reader = new FileReader();
+                reader.onload = () => res(reader.result);
+                reader.readAsDataURL(file);
+              });
+              for (const fig of matchingFigs) {
+                fig.data = dataUri;
+                fig.needsLoading = false;
+              }
+              imageCount += matchingFigs.length;
+            }
+          }
+        }
+        console.log(`[browser xPPM] Loaded ${imageCount} image(s) and BPMN=${!!xppmResult.bpmnXml} from selected files`);
+        done();
+      };
+      input.oncancel = () => done();
+      input.click();
+    });
   }, []);
 
   // Helper function to extract data objects after project load
@@ -748,6 +879,22 @@ const App = () => {
     }, 200);
   }, []);
 
+  // Show a non-blocking toast notification
+  // Compute highlighted data object ID for BPMN canvas (reverse lookup from selected ER)
+  const highlightedDataObjectId = useMemo(() => {
+    if (!selectedErId) return null;
+    for (const [doId, erId] of Object.entries(dataObjectErMap)) {
+      if (erId === selectedErId) return doId;
+    }
+    return null;
+  }, [selectedErId, dataObjectErMap]);
+
+  const showToast = useCallback((message, duration = 4000) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToastMessage(message);
+    toastTimerRef.current = setTimeout(() => setToastMessage(null), duration);
+  }, []);
+
   // Helper: Find ER by ID in hierarchy (recursive) - defined early for use in handleDataObjectSelect
   const findErById = useCallback((hierarchy, targetId) => {
     for (const er of hierarchy) {
@@ -786,12 +933,11 @@ const App = () => {
       const legacyEr = erDataMap[dataObject.id];
       const erId = legacyEr.id || legacyEr.guid || `er-${Date.now()}`;
 
-      // Check if this ER is already in erHierarchy
-      const erInHierarchy = findErById(erHierarchy, erId);
-      if (!erInHierarchy) {
-        // Add to erHierarchy
-        setErHierarchy(prev => [...prev, { ...legacyEr, id: erId }]);
-      }
+      // Add to erHierarchy if not already present (check inside functional update to avoid stale closure)
+      setErHierarchy(prev => {
+        if (findErById(prev, erId)) return prev; // Already exists
+        return [...prev, { ...legacyEr, id: erId }];
+      });
       // Create the mapping
       setDataObjectErMap(prev => ({
         ...prev,
@@ -2360,7 +2506,7 @@ const App = () => {
   // Handle ER selection from list or content pane
   const handleSelectER = useCallback((erId) => {
     // Validate current ER before switching (warn if missing description or IUs)
-    if (selectedErId && selectedErId !== erId) {
+    if (selectedErId && selectedErId !== erId && !warnedErIdsRef.current.has(selectedErId)) {
       const currentEr = findErById(erHierarchy, selectedErId);
       if (currentEr) {
         const missingParts = [];
@@ -2373,7 +2519,8 @@ const App = () => {
           missingParts.push('at least one Information Unit');
         }
         if (missingParts.length > 0) {
-          alert(`The ER "${currentEr.name || 'Unnamed ER'}" is missing ${missingParts.join(' and ')}. Please complete it later.`);
+          warnedErIdsRef.current.add(selectedErId);
+          showToast(`"${currentEr.name || 'Unnamed ER'}" is missing ${missingParts.join(' and ')}. Please complete it later.`);
         }
       }
     }
@@ -2385,7 +2532,7 @@ const App = () => {
     setErPanelMode('detail');
     setShowERPanel(true);
     // Keep the ER list open on the left when selecting an individual ER
-  }, [selectedErId, erHierarchy, findErById]);
+  }, [selectedErId, erHierarchy, findErById, showToast]);
 
   // Add new ER to the hierarchy
   // If an ER is selected, add as sub-ER of the selected ER
@@ -2393,16 +2540,32 @@ const App = () => {
   // If no ERs exist, create as top-level ER
   // Users can then move ERs around using move up/down and indent/outdent
   const handleAddNewER = useCallback(() => {
-    const newER = {
-      id: `er-${Date.now()}`,
-      guid: crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      name: 'New ER',
-      description: '',
-      informationUnits: [],
-      subERs: []
-    };
+    // newER will be created inside setErHierarchy to read current state for unique naming
+    let createdER = null;
 
     setErHierarchy(prev => {
+      // Count existing "New ER" / "New ER (N)" names to generate a unique name
+      const countNewERNames = (ers) => {
+        let count = 0;
+        for (const er of ers) {
+          if (er.name === 'New ER' || /^New ER \(\d+\)$/.test(er.name)) count++;
+          if (er.subERs?.length > 0) count += countNewERNames(er.subERs);
+        }
+        return count;
+      };
+      const existing = countNewERNames(prev);
+      const newName = existing === 0 ? 'New ER' : `New ER (${existing + 1})`;
+
+      const newER = {
+        id: `er-${Date.now()}`,
+        guid: crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        name: newName,
+        description: '',
+        informationUnits: [],
+        subERs: []
+      };
+      createdER = newER;
+
       if (prev.length === 0) {
         // No ERs exist - create as top-level
         return [newER];
@@ -2456,14 +2619,16 @@ const App = () => {
     // The new ER will appear as a sub-ER in the tree view
 
     // If this is the first ER in an empty project, auto-select it to open Individual ER pane
-    if (erHierarchy.length === 0) {
-      setSelectedErId(newER.id);
-      setSelectedDataObject({ id: newER.id, name: newER.id });
+    if (erHierarchy.length === 0 && createdER) {
+      setSelectedErId(createdER.id);
+      setSelectedDataObject({ id: createdER.id, name: createdER.id });
       setErPanelMode('detail');
     }
 
     // Set newly added ER ID to trigger scroll in ERPanel
-    setNewlyAddedErId(newER.id);
+    if (createdER) {
+      setNewlyAddedErId(createdER.id);
+    }
     setShowERPanel(true);
     setIsDirty(true);
   }, [selectedErId, erHierarchy.length]);
@@ -2609,7 +2774,7 @@ const App = () => {
         let erDataMapToImport = null;
 
         if (projectData.erHierarchy && projectData.erHierarchy.length > 0) {
-          erHierarchyToImport = projectData.erHierarchy;
+          erHierarchyToImport = deduplicateErHierarchy(projectData.erHierarchy);
           dataObjectErMapToImport = projectData.dataObjectErMap || {};
           erDataMapToImport = projectData.erDataMap || null;
         } else if (projectData.erDataMap) {
@@ -2641,6 +2806,7 @@ const App = () => {
         setDataObjectErMap(dataObjectErMapToImport);
         if (erDataMapToImport) setErDataMap(erDataMapToImport);
         if (projectData.erLibrary) setErLibrary(projectData.erLibrary);
+        if (projectData.reviewComments) setReviewComments(projectData.reviewComments);
         setCurrentFilePath(file.name);
         setIsDirty(false);
         setValidationResults(null);
@@ -2650,8 +2816,71 @@ const App = () => {
         extractDataObjectsAfterLoad();
         linkActorsToSwimlanesByName();
       } else if (fileName.endsWith('.xml')) {
-        // Check if it's an idmXML file
-        if (isIdmXml(content)) {
+        // Distinguish proper idmXML (with namespace) from legacy xPPM v0.2 (no namespace)
+        const hasIdmXmlNamespace = content.includes('idmXML') || content.includes('standards.buildingsmart.org/IDM');
+        const hasIdmStructure = content.includes('<idm') && (content.includes('<uc>') || content.includes('<er>'));
+
+        if (!hasIdmXmlNamespace && hasIdmStructure) {
+          // v0.2 xPPM format: has IDM structure but no idmXML namespace — use xPPM importer
+          try {
+            isLoadingProjectRef.current = true;
+            const xppmResult = importXppm(content, null);
+
+            const erHierarchyToImport = xppmResult.erHierarchy || [];
+            const dataObjectErMapToImport = xppmResult.dataObjectErMap || {};
+
+            if (handleErHierarchyImport(erHierarchyToImport, {
+              bpmnXml: xppmResult.bpmnXml || 'EMPTY',
+              headerData: xppmResult.headerData,
+              dataObjectErMap: dataObjectErMapToImport,
+              erDataMap: xppmResult.erDataMap,
+              erLibrary: xppmResult.erLibrary,
+              filePath: file.name,
+              isDirtyAfterImport: !xppmResult.bpmnXml,
+              source: 'xppm'
+            })) {
+              if (!xppmResult.bpmnXml) {
+                alert('xPPM imported. Note: No BPMN diagram found. The process map canvas will be blank.');
+              }
+              return;
+            }
+
+            if (xppmResult.headerData) setHeaderData(xppmResult.headerData);
+            setErHierarchy(erHierarchyToImport);
+            setDataObjectErMap(dataObjectErMapToImport);
+            if (xppmResult.erDataMap) setErDataMap(xppmResult.erDataMap);
+            if (xppmResult.erLibrary) setErLibrary(xppmResult.erLibrary);
+            setBpmnXml(xppmResult.bpmnXml || 'EMPTY');
+            if (!xppmResult.bpmnXml) {
+              alert('xPPM imported successfully. Note: No BPMN diagram found. The process map canvas is blank and needs to be created manually.');
+            }
+            setCurrentFilePath(file.name);
+            setIsDirty(!xppmResult.bpmnXml);
+            setValidationResults(null);
+            setHasActiveProject(true);
+            setActivePane('specification');
+            setTimeout(() => { isLoadingProjectRef.current = false; }, 2000);
+            extractDataObjectsAfterLoad();
+            linkActorsToSwimlanesByName();
+
+            // In browser mode, prompt user to select companion files (images, BPMN) after import
+            if (!window.electronAPI) {
+              setTimeout(async () => {
+                try {
+                  await loadXppmCompanionFiles(xppmResult);
+                  if (xppmResult.erHierarchy) setErHierarchy([...xppmResult.erHierarchy]);
+                  if (xppmResult.bpmnXml && xppmResult.bpmnXml !== 'EMPTY') setBpmnXml(xppmResult.bpmnXml);
+                } catch (e) {
+                  console.warn('[browser xPPM] Failed to load companion files:', e);
+                }
+              }, 500);
+            }
+          } catch (xppmErr) {
+            console.error('Failed to parse xPPM v0.2 XML:', xppmErr);
+            alert('Failed to parse xPPM file: ' + xppmErr.message);
+            isLoadingProjectRef.current = false;
+          }
+        } else if (isIdmXml(content)) {
           try {
             isLoadingProjectRef.current = true;
 
@@ -2740,6 +2969,86 @@ const App = () => {
         setHasActiveProject(true);
         extractDataObjectsAfterLoad(); // Extract data objects from loaded BPMN
         linkActorsToSwimlanesByName(); // Sync actors with BPMN Pools
+      } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
+        // Parse as reviewed HTML export (with embedded project data + comments)
+        try {
+          isLoadingProjectRef.current = true;
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(content, 'text/html');
+
+          const projectDataEl = doc.getElementById('idmxppm-project-data');
+          if (!projectDataEl) {
+            alert('This HTML file has no embedded IDMxPPM project data. Only HTML files exported from IDMxPPM with Review Mode enabled can be imported.');
+            isLoadingProjectRef.current = false;
+            return;
+          }
+
+          const projectData = JSON.parse(projectDataEl.textContent);
+
+          // Extract review comments if present
+          let importedComments = [];
+          const commentsEl = doc.getElementById('idmxppm-comments');
+          if (commentsEl) {
+            try {
+              const commentsData = JSON.parse(commentsEl.textContent);
+              importedComments = commentsData.comments || [];
+            } catch (e) {
+              console.warn('Failed to parse review comments:', e);
+            }
+          }
+
+          // Restore project state from embedded data
+          let erHierarchyToImport = projectData.erHierarchy || [];
+          let dataObjectErMapToImport = projectData.dataObjectErMap || {};
+
+          // Check if we need to show root selection modal
+          if (handleErHierarchyImport(erHierarchyToImport, {
+            bpmnXml: projectData.bpmnXml || 'EMPTY',
+            headerData: projectData.headerData,
+            dataObjectErMap: dataObjectErMapToImport,
+            erDataMap: projectData.erDataMap,
+            erLibrary: projectData.erLibrary,
+            filePath: file.name,
+            isDirtyAfterImport: false,
+            source: 'project'
+          })) {
+            // Modal shown, import will be completed by modal handler
+            if (importedComments.length > 0) {
+              setReviewComments(importedComments);
+              showToast(`Imported ${importedComments.length} review comment(s)`);
+            }
+            return;
+          }
+
+          // No modal needed - proceed with direct import
+          if (projectData.bpmnXml) setBpmnXml(projectData.bpmnXml);
+          if (projectData.headerData) setHeaderData(projectData.headerData);
+          setErHierarchy(erHierarchyToImport);
+          setDataObjectErMap(dataObjectErMapToImport);
+          if (projectData.erDataMap) setErDataMap(projectData.erDataMap);
+          if (projectData.erLibrary) setErLibrary(projectData.erLibrary);
+          if (importedComments.length > 0) {
+            setReviewComments(importedComments);
+          }
+          setCurrentFilePath(file.name);
+          setIsDirty(false);
+          setValidationResults(null);
+          setHasActiveProject(true);
+          setActivePane('specification');
+          setTimeout(() => { isLoadingProjectRef.current = false; }, 2000);
+          extractDataObjectsAfterLoad();
+          linkActorsToSwimlanesByName();
+
+          if (importedComments.length > 0) {
+            showToast(`Project restored with ${importedComments.length} review comment(s)`);
+          } else {
+            showToast('Project restored from reviewed HTML file');
+          }
+        } catch (htmlErr) {
+          console.error('Failed to import reviewed HTML:', htmlErr);
+          alert('Failed to import HTML file: ' + htmlErr.message);
+          isLoadingProjectRef.current = false;
+        }
       } else if (fileName.endsWith('.xppm')) {
         // Parse as xPPM legacy file
         try {
@@ -2785,6 +3094,21 @@ const App = () => {
           setTimeout(() => { isLoadingProjectRef.current = false; }, 2000);
           extractDataObjectsAfterLoad();
           linkActorsToSwimlanesByName();
+
+          // In browser mode, prompt user to select companion files (images, BPMN) after import
+          if (!window.electronAPI) {
+            // Use setTimeout to let the UI render first, then prompt for images
+            setTimeout(async () => {
+              try {
+                await loadXppmCompanionFiles(xppmResult);
+                // Re-set erHierarchy if images were loaded (triggers re-render)
+                if (xppmResult.erHierarchy) setErHierarchy([...xppmResult.erHierarchy]);
+                if (xppmResult.bpmnXml && xppmResult.bpmnXml !== 'EMPTY') setBpmnXml(xppmResult.bpmnXml);
+              } catch (e) {
+                console.warn('[browser xPPM] Failed to load companion files:', e);
+              }
+            }, 500);
+          }
         } catch (xppmErr) {
           console.error('Failed to parse xPPM file:', xppmErr);
           alert('Failed to parse xPPM file: ' + xppmErr.message);
@@ -2795,7 +3119,7 @@ const App = () => {
       console.error('Failed to parse file:', err);
       alert('Failed to open file. Please ensure it is a valid project, idmXML, BPMN, or xPPM file.');
     }
-  }, [extractDataObjectsAfterLoad, linkActorsToSwimlanesByName, migrateErDataMap]);
+  }, [extractDataObjectsAfterLoad, linkActorsToSwimlanesByName, migrateErDataMap, loadXppmCompanionFiles]);
 
   // Open project
   const handleOpenProject = useCallback(async () => {
@@ -2972,7 +3296,9 @@ const App = () => {
     setIsDirty(false);
     setValidationResults(null);
     setErLibrary([]);
+    setReviewComments([]);
     setHasActiveProject(false); // Mark project as closed
+    warnedErIdsRef.current.clear(); // Reset validation warnings for next project
   }, []);
 
   // Close project - Show confirmation if dirty
@@ -2991,7 +3317,7 @@ const App = () => {
     // Open the user manual in a new browser tab/window
     // In Electron, this will use the shell.openExternal
     // In browser, this will open the markdown file or a hosted version
-    const manualUrl = 'https://htmlpreview.github.io/?https://github.com/ghanglee/IDMxPPM/blob/main/user_manuals/V1.2.2/IDMxPPM-Tutorials.html';
+    const manualUrl = 'https://htmlpreview.github.io/?https://github.com/ghanglee/IDMxPPM/blob/main/user_manuals/V1.3.0/IDMxPPM-Tutorials.html';
 
     if (window.electronAPI && window.electronAPI.openExternal) {
       window.electronAPI.openExternal(manualUrl);
@@ -3286,6 +3612,7 @@ const App = () => {
             dataObjectErMap,      // ER-first: maps data object IDs to ER IDs
             erDataMap,            // Legacy: kept for backward compatibility
             erLibrary,
+            reviewComments: reviewComments.length > 0 ? reviewComments : undefined,
             exportedAt: new Date().toISOString()
           };
           const jsonContent = JSON.stringify(projectData);
@@ -3370,15 +3697,106 @@ const App = () => {
         case 'html': {
           // HTML export with embedded images and BPMN diagram
 
-          // Get BPMN as SVG if modeler is available
+          // Get BPMN as SVG and extract element data if modeler is available
           let bpmnSvg = null;
+          let bpmnElements = [];
           if (modelerRef.current) {
             try {
               const { svg } = await modelerRef.current.saveSVG();
               bpmnSvg = svg;
             } catch (err) {
               console.error('Failed to export BPMN as SVG:', err);
-              // Continue without BPMN diagram
+            }
+
+            // Extract documentable BPMN elements for the activities/task list section
+            try {
+              const activityTypes = new Set([
+                'bpmn:Task', 'bpmn:UserTask', 'bpmn:ServiceTask',
+                'bpmn:SendTask', 'bpmn:ReceiveTask', 'bpmn:ManualTask',
+                'bpmn:BusinessRuleTask', 'bpmn:ScriptTask',
+                'bpmn:CallActivity', 'bpmn:SubProcess',
+                'bpmn:ExclusiveGateway', 'bpmn:ParallelGateway',
+                'bpmn:InclusiveGateway', 'bpmn:EventBasedGateway',
+                'bpmn:ComplexGateway',
+                'bpmn:StartEvent', 'bpmn:EndEvent',
+                'bpmn:IntermediateCatchEvent', 'bpmn:IntermediateThrowEvent',
+                'bpmn:BoundaryEvent',
+                'bpmn:SequenceFlow'
+              ]);
+
+              // Helper: find parent lane/pool names
+              const findLaneName = (el) => {
+                let p = el.parent;
+                while (p) {
+                  if (p.type === 'bpmn:Lane') return p.businessObject?.name || '';
+                  p = p.parent;
+                }
+                return '';
+              };
+              const findPoolName = (el) => {
+                let p = el.parent;
+                while (p) {
+                  if (p.type === 'bpmn:Participant') return p.businessObject?.name || '';
+                  p = p.parent;
+                }
+                return '';
+              };
+
+              // Helper: find data objects connected via DataInputAssociation / DataOutputAssociation
+              const findAssociatedDataObjects = (bo) => {
+                const dataObjectIds = [];
+                const associations = [
+                  ...(bo?.dataInputAssociations || []),
+                  ...(bo?.dataOutputAssociations || [])
+                ];
+                for (const assoc of associations) {
+                  // sourceRef/targetRef can be arrays or single refs
+                  const refs = [assoc.targetRef, ...(assoc.sourceRef || [])].filter(Boolean);
+                  for (const ref of refs) {
+                    if (ref.$type === 'bpmn:DataObjectReference' || ref.$type === 'bpmn:DataObject') {
+                      dataObjectIds.push(ref.id);
+                    }
+                  }
+                }
+                return dataObjectIds;
+              };
+
+              const elementRegistry = modelerRef.current.get('elementRegistry');
+              elementRegistry.forEach(element => {
+                if (activityTypes.has(element.type)) {
+                  const bo = element.businessObject;
+                  const associatedDataObjectIds = findAssociatedDataObjects(bo);
+                  // Map data object IDs to ER names via dataObjectErMap
+                  const linkedERs = associatedDataObjectIds
+                    .map(doId => {
+                      const erId = dataObjectErMap[doId];
+                      if (!erId) return null;
+                      // Find ER name from erHierarchy
+                      const findErName = (ers) => {
+                        for (const er of (ers || [])) {
+                          if (er.id === erId) return er.name;
+                          const sub = findErName(er.subERs);
+                          if (sub) return sub;
+                        }
+                        return null;
+                      };
+                      return { erId, name: findErName(erHierarchy) || erId };
+                    })
+                    .filter(Boolean);
+
+                  bpmnElements.push({
+                    id: element.id,
+                    type: element.type,
+                    name: bo?.name || '',
+                    documentation: bo?.documentation?.[0]?.text || '',
+                    lane: findLaneName(element),
+                    pool: findPoolName(element),
+                    linkedERs
+                  });
+                }
+              });
+            } catch (err) {
+              console.error('Failed to extract BPMN elements:', err);
             }
           }
 
@@ -3413,13 +3831,27 @@ const App = () => {
             if (!htmlErDataMap[dataObjectId]) htmlErDataMap[dataObjectId] = er;
           });
 
+          // Build project data for review mode (allows re-import)
+          const reviewProjectData = exportOptions.enableReview ? {
+            bpmnXml,
+            headerData,
+            erHierarchy,
+            dataObjectErMap,
+            erDataMap: htmlErDataMap,
+            erLibrary
+          } : null;
+
           // Generate standalone HTML
           const htmlContent = generateStandaloneHtml({
             headerData,
             erDataMap: htmlErDataMap,
             erHierarchy,
             bpmnSvg,
-            customXsltContent
+            customXsltContent,
+            dataObjectErMap,
+            bpmnElements,
+            projectData: reviewProjectData,
+            enableReview: exportOptions.enableReview
           });
 
           await saveFile(htmlContent, `${fileName}.html`, 'text/html');
@@ -3467,6 +3899,7 @@ const App = () => {
       dataObjectErMap,      // ER-first: maps data object IDs to ER IDs
       erDataMap,            // Legacy: kept for backward compatibility
       erLibrary,
+      reviewComments: reviewComments.length > 0 ? reviewComments : undefined,
       savedAt: new Date().toISOString()
     };
 
@@ -3574,7 +4007,7 @@ const App = () => {
           let erDataMapToImport = null;
 
           if (projectData.erHierarchy && projectData.erHierarchy.length > 0) {
-            erHierarchyToImport = projectData.erHierarchy;
+            erHierarchyToImport = deduplicateErHierarchy(projectData.erHierarchy);
             dataObjectErMapToImport = projectData.dataObjectErMap || {};
             erDataMapToImport = projectData.erDataMap || null;
           } else if (projectData.erDataMap) {
@@ -3606,6 +4039,7 @@ const App = () => {
           setDataObjectErMap(dataObjectErMapToImport);
           if (erDataMapToImport) setErDataMap(erDataMapToImport);
           if (projectData.erLibrary) setErLibrary(projectData.erLibrary);
+          if (projectData.reviewComments) setReviewComments(projectData.reviewComments);
           setCurrentFilePath(data.filePath);
           setIsDirty(false);
           setValidationResults(null);
@@ -3645,7 +4079,54 @@ const App = () => {
             console.log('[idmXML import] BPMN loaded from main process, length:', data.bpmnContent.length);
           }
 
-          // Resolve external references (BPMN if still missing, plus all image filePaths)
+          // Apply pre-loaded images from the main process (for idmXML files with external image references)
+          if (data.imageMap && Object.keys(data.imageMap).length > 0) {
+            console.log('[idmXML import] Applying', Object.keys(data.imageMap).length, 'pre-loaded images');
+            const applyImages = (figures) => {
+              if (!figures?.length) return;
+              for (const fig of figures) {
+                if (fig.filePath && !fig.data) {
+                  const normalized = normalizePath(fig.filePath);
+                  const baseName = fpBasename(fig.filePath);
+                  const match = data.imageMap[normalized] || data.imageMap[fig.filePath] || data.imageMap[baseName];
+                  if (match) {
+                    fig.data = match;
+                    fig.needsLoading = false;
+                  }
+                }
+              }
+            };
+            // Apply to header figures
+            const hd = idmData.headerData || {};
+            applyImages(hd.summaryFigures);
+            applyImages(hd.aimAndScopeFigures);
+            applyImages(hd.benefitsFigures);
+            applyImages(hd.limitationsFigures);
+            // Apply to ER figures recursively
+            const applyErImages = (ers) => {
+              if (!ers) return;
+              const erList = Array.isArray(ers) ? ers : Object.values(ers);
+              for (const er of erList) {
+                applyImages(er.descriptionFigures);
+                if (er.informationUnits) {
+                  const applyIuImages = (units) => {
+                    for (const iu of units) {
+                      applyImages(iu.definitionFigures);
+                      applyImages(iu.exampleImages);
+                      if (iu.subInformationUnits) applyIuImages(iu.subInformationUnits);
+                    }
+                  };
+                  applyIuImages(er.informationUnits);
+                }
+                if (er.subErs?.length) applyErImages(er.subErs);
+                if (er.subERs?.length) applyErImages(er.subERs);
+              }
+            };
+            if (idmData.erDataMap) applyErImages(idmData.erDataMap);
+            if (idmData.erHierarchy) applyErImages(idmData.erHierarchy);
+          }
+
+          // Resolve external references (BPMN if still missing, plus remaining image filePaths)
           await resolveExternalReferences(idmData, data.filePath);
 
           // Build dataObjectErMap from dataObjectErLinks
@@ -3726,19 +4207,22 @@ const App = () => {
           isLoadingProjectRef.current = true;
           // Pass bpmnContent from main process (pre-loaded alongside the xPPM file)
           const xppmResult = importXppm(data.content, data.bpmnContent || null);
-          console.log('[xPPM import] bpmnXml present:', !!xppmResult.bpmnXml, '| bpmnContent from main:', !!data.bpmnContent);
 
           // Apply pre-loaded images from the main process to ER figures
           if (data.imageMap && Object.keys(data.imageMap).length > 0) {
-            console.log('[xPPM import] Applying', Object.keys(data.imageMap).length, 'pre-loaded images');
+            let appliedCount = 0;
             const applyImages = (figures) => {
               if (!figures?.length) return;
               for (const fig of figures) {
                 if (fig.filePath && !fig.data) {
                   const normalized = normalizePath(fig.filePath);
-                  if (data.imageMap[normalized]) {
-                    fig.data = data.imageMap[normalized];
+                  const baseName = fpBasename(fig.filePath);
+                  // Try: normalized path, raw path, basename-only
+                  const match = data.imageMap[normalized] || data.imageMap[fig.filePath] || data.imageMap[baseName];
+                  if (match) {
+                    fig.data = match;
                     fig.needsLoading = false;
+                    appliedCount++;
                   }
                 }
               }
@@ -3920,6 +4404,7 @@ const App = () => {
             onAbout={() => setShowAboutDialog(true)}
             onServerConnect={() => setShowServerModal(true)}
             isServerConnected={serverConnection.isConnected && serverConnection.isAuthenticated}
+            hasReviewComments={reviewComments.length > 0}
           />
 
           {/* Content Area */}
@@ -3958,6 +4443,17 @@ const App = () => {
                     onImportER={handleImportErXml}
                     onExportER={handleExportErXml}
                     bpmnActorsList={bpmnActorsList}
+                    reviewComments={reviewComments}
+                    onMarkCommentAddressed={(commentId) => {
+                      setReviewComments(prev => prev.map(c =>
+                        c.id === commentId ? { ...c, resolved: true, resolvedAt: new Date().toISOString() } : c
+                      ));
+                      setIsDirty(true);
+                    }}
+                    onRemoveComment={(commentId) => {
+                      setReviewComments(prev => prev.filter(c => c.id !== commentId));
+                      setIsDirty(true);
+                    }}
                     onClose={() => {
                       setActivePane(null);
                       if (activePane === 'exchangeReq') {
@@ -3978,6 +4474,7 @@ const App = () => {
                       onTaskSelect={handleTaskSelect}
                       onChange={handleBpmnChange}
                       onReady={handleModelerReady}
+                      highlightDataObjectId={highlightedDataObjectId}
                       onImportBpmn={(newBpmnXml) => {
                         setBpmnXml(newBpmnXml);
                         // Clear data object-to-ER mappings since old BPMN data object IDs are no longer valid
@@ -3985,6 +4482,25 @@ const App = () => {
                         // A BPMN diagram may not show all ERs in the IDM specification
                         setDataObjectErMap({});
                         setIsDirty(true);
+
+                        // If no ER hierarchy exists yet, auto-create a root ER as the starting point
+                        if (erHierarchy.length === 0) {
+                          const rootName = headerData?.shortTitle
+                            ? `er_${headerData.shortTitle}`
+                            : 'Root ER';
+                          const rootER = {
+                            id: `er-${Date.now()}`,
+                            guid: crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                            name: rootName,
+                            description: '',
+                            informationUnits: [],
+                            subERs: []
+                          };
+                          setErHierarchy([rootER]);
+                          setSelectedErId(rootER.id);
+                          showToast(`Root ER "${rootName}" created. Data objects will be linked as sub-ERs.`);
+                        }
+
                         // Extract data objects after import - this will trigger the unassociated data objects dialog
                         // Users can then map new data objects to existing ERs or create new ERs
                         setTimeout(() => {
@@ -4044,9 +4560,9 @@ const App = () => {
                   />
                 )}
 
-                {/* Task Detail Panel (Right side) - Shows when a BPMN task is double-clicked */}
+                {/* Element Detail Panel (Right side) - Shows when a BPMN element is selected/double-clicked */}
                 {showTaskDetailPanel && selectedTask && (
-                  <TaskDetailPanel
+                  <ElementDetailPanel
                     task={selectedTask}
                     onSave={handleTaskSave}
                     onClose={handleCloseTaskDetailPanel}
@@ -4354,6 +4870,20 @@ const App = () => {
                     >
                       Download default XSLT template
                     </button>
+
+                    <div className="export-review-option" style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid var(--border-primary, #333)' }}>
+                      <label className="export-xslt-option" style={{ cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={exportOptions.enableReview}
+                          onChange={(e) => setExportOptions(prev => ({ ...prev, enableReview: e.target.checked }))}
+                        />
+                        <span>Enable Review Mode</span>
+                      </label>
+                      <p style={{ fontSize: '11px', color: 'var(--text-tertiary, #888)', margin: '4px 0 0 22px' }}>
+                        Adds commenting UI for reviewers. They can add comments and download the annotated file, which you can import back into IDMxPPM.
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
@@ -4923,6 +5453,9 @@ const App = () => {
             transform: translate(-50%, -50%);
             width: 500px;
             max-width: 90vw;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
             background: var(--bg-primary);
             border: 1px solid var(--border-primary);
             border-radius: 8px;
@@ -4934,6 +5467,7 @@ const App = () => {
           .export-dialog-header {
             padding: 20px 24px 16px;
             border-bottom: 1px solid var(--border-primary);
+            flex-shrink: 0;
           }
 
           .export-dialog-header h3 {
@@ -4945,6 +5479,9 @@ const App = () => {
 
           .export-dialog-body {
             padding: 20px 24px;
+            overflow-y: auto;
+            flex: 1;
+            min-height: 0;
           }
 
           .export-dialog-subtitle {
@@ -5211,6 +5748,7 @@ const App = () => {
             gap: 10px;
             padding: 16px 24px;
             border-top: 1px solid var(--border-primary);
+            flex-shrink: 0;
           }
 
           /* App Version Button */
@@ -5421,6 +5959,49 @@ const App = () => {
           }
         `}</style>
       </div>
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="toast-notification" onClick={() => setToastMessage(null)}>
+          <span className="toast-icon">&#9432;</span>
+          <span className="toast-text">{toastMessage}</span>
+          <button className="toast-close" onClick={(e) => { e.stopPropagation(); setToastMessage(null); }}>&times;</button>
+          <style>{`
+            .toast-notification {
+              position: fixed;
+              bottom: 40px;
+              left: 50%;
+              transform: translateX(-50%);
+              background: var(--bg-secondary, #1e293b);
+              color: var(--text-primary, #f1f5f9);
+              border: 1px solid var(--border-primary, #334155);
+              border-left: 4px solid var(--accent-primary, #3b82f6);
+              padding: 12px 16px;
+              border-radius: 6px;
+              display: flex;
+              align-items: center;
+              gap: 10px;
+              max-width: 600px;
+              font-size: 13px;
+              box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+              z-index: 10000;
+              animation: toast-slide-in 0.3s ease-out;
+              cursor: pointer;
+            }
+            .toast-icon { font-size: 16px; color: var(--accent-primary, #3b82f6); flex-shrink: 0; }
+            .toast-text { flex: 1; }
+            .toast-close {
+              background: none; border: none; color: var(--text-muted, #94a3b8);
+              font-size: 18px; cursor: pointer; padding: 0 4px; line-height: 1;
+            }
+            .toast-close:hover { color: var(--text-primary, #f1f5f9); }
+            @keyframes toast-slide-in {
+              from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+              to { opacity: 1; transform: translateX(-50%) translateY(0); }
+            }
+          `}</style>
+        </div>
+      )}
     </ThemeProvider>
   );
 };

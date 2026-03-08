@@ -9,7 +9,8 @@ import {
   SaveExportIcon,
   CloseIcon,
   HelpIcon,
-  ServerIcon
+  ServerIcon,
+  ReviewCommentsIcon
 } from '../icons';
 import './VerticalMenuBar.css';
 
@@ -29,7 +30,8 @@ const VerticalMenuBar = ({
   onHelp,
   onAbout,
   onServerConnect,
-  isServerConnected = false
+  isServerConnected = false,
+  hasReviewComments = false
 }) => {
   const menuItems = [
     {
@@ -69,6 +71,13 @@ const VerticalMenuBar = ({
       onClick: () => onMenuItemClick?.('exchangeReq'),
       showWhenOpen: true
     },
+    ...(hasReviewComments ? [{
+      id: 'reviewComments',
+      label: 'Review Comments',
+      icon: ReviewCommentsIcon,
+      onClick: () => onMenuItemClick?.('reviewComments'),
+      showWhenOpen: true
+    }] : []),
     {
       id: 'validate',
       label: 'Validate',
