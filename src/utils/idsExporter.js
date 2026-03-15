@@ -109,49 +109,9 @@ function analyzeER(er) {
           // Direct IFC entity reference
           entityCandidates.add(toIdsEntityName(element));
         }
-      } else if (schema === 'bSDD') {
-        facets.push({
-          type: 'property',
-          propertySet: mapping.dictionary || 'bSDD',
-          baseName: element,
-          dataType: DATA_TYPE_MAP[iu.dataType] || 'IFCLABEL',
-          cardinality: iu.isMandatory ? 'required' : 'optional',
-          instructions: iu.definition || '',
-          uri: mapping.uri || mapping.referenceCode || '',
-        });
-      } else if (['UniFormat', 'OmniClass', 'MasterFormat'].includes(schema)) {
-        facets.push({
-          type: 'classification',
-          system: schema,
-          value: mapping.code || element,
-          cardinality: iu.isMandatory ? 'required' : 'optional',
-          instructions: iu.definition || '',
-        });
-      } else if (schema === 'CityGML') {
-        // CityGML can't be expressed in IDS — skip but note
-      } else if (schema === 'Other' && element) {
-        // Custom schema — add as classification
-        facets.push({
-          type: 'classification',
-          system: mapping.standardName || schema,
-          value: element,
-          cardinality: iu.isMandatory ? 'required' : 'optional',
-          instructions: iu.definition || '',
-        });
       }
-    }
-
-    // If no external mappings but IU has a name, add as a generic property facet
-    if (mappings.length === 0 && iu.name) {
-      facets.push({
-        type: 'property',
-        propertySet: 'IDM_Requirements',
-        baseName: iu.name,
-        dataType: DATA_TYPE_MAP[iu.dataType] || 'IFCLABEL',
-        cardinality: iu.isMandatory ? 'required' : 'optional',
-        instructions: iu.definition || '',
-        uri: '',
-      });
+      // Non-IFC schemas (bSDD without IFC context, CityGML, UniFormat, OmniClass, MasterFormat, Other)
+      // are skipped — IDS is strictly IFC-bound and cannot represent non-IFC requirements.
     }
 
     // Process sub-IUs recursively

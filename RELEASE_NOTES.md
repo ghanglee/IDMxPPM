@@ -1,5 +1,91 @@
 # IDMxPPM neo-Seoul — Release Notes
 
+## v1.3.1 (2026-03-15)
+
+### Highlights
+
+- **IDS Export & Import** — Export Exchange Requirements as buildingSMART IDS files for IFC model validation; import IDS files to create skeleton IDM specifications with pre-populated IFC mappings
+- **LOIN Export & Import** — Bi-directional support for Level of Information Need (EN 17412 / ISO 7817-1) with round-trip fidelity; supports CEN 17412, EN 17412-3, and ISO 7817-3 schema variants
+- **Collapsible Export Dialog** — Export format list collapses to show sub-options inline; selected format auto-scrolls to center
+- **XML Auto-Detection** — Automatic identification of XML file types (`<idm:`, `<loin:`, `<ids:`, `<bpmn:`) during import
+
+---
+
+### New Features
+
+#### IDS Export
+
+- Export IFC-mapped Exchange Requirements as buildingSMART IDS v1.0 XML
+- Each ER with IFC external element mappings becomes an IDS `<specification>`
+- Property set references (e.g., `Pset_WallCommon.FireRating`) exported as `<property>` facets
+- Configurable IFC version (IFC2X3, IFC4, IFC4X3_ADD2)
+- Non-IFC mappings (CityGML, UniFormat, etc.) are correctly excluded — IDS is strictly IFC-bound
+
+#### IDS Import
+
+- Import `.ids` files to create skeleton IDM specifications
+- Each IDS `<specification>` becomes a Sub-ER with the specification name
+- Property requirements → IUs with name, data type (mapped from IFC types), and external mappings
+- Attribute, classification, material, and partOf requirements also converted to IUs
+- Value constraints (patterns, enumerations, ranges) preserved in IU constraints field
+- IFC version mapped to external element basis
+
+#### LOIN Export
+
+- Export IDM as LOIN XML (CEN 17412 format / `<LOINSpecification>`)
+- Groups Information Units by external element mappings into `specificationPerObjectType` entries
+- Schema-agnostic: supports IFC, CityGML, UniFormat, OmniClass, and any classification system
+- Maps actors to sending/receiving context, project phases to milestones
+- IUs without external mappings are excluded with a count reported
+
+#### LOIN Import
+
+- Import LOIN XML files to create skeleton IDM specifications
+- Auto-detects three schema variants: CEN 17412, EN 17412-3, ISO 7817-3
+- ISO 7817-3 `nodeID` cross-references are automatically resolved
+- Each object type becomes a Sub-ER; properties become IUs with external element mappings
+- Geometric information and documentation requirements stored in Sub-ER descriptions
+- Round-trip support: external mappings enable re-exporting to LOIN
+
+#### Collapsible Export Dialog
+
+- Export format options show title only when unselected; expand inline with description and sub-options when selected
+- Selected format auto-scrolls to center of the dialog for visibility
+
+#### XML Auto-Detection
+
+- XML files are automatically identified by root element prefix during import
+- `<idm:` → idmXML (v2.0 if namespace matches, otherwise xPPM v1.0)
+- `<loin:` or `<LOINSpecification>` → LOIN
+- `<ids:` → IDS
+- `<bpmn:` → BPMN
+- Unknown XML prompts user to select format
+
+---
+
+### UI Improvements
+
+- **Help icon** changed from `?` to `i` (info) for consistency with standard UI conventions
+- **Collapsible export formats** reduce visual clutter in the Save & Export dialog
+
+---
+
+### Documentation
+
+- Added [LOIN–IDM Mapping Reference](docs/LOIN-IDM-Mapping.md) with detailed bi-directional mapping tables
+- Added [IDS–IDM Mapping Reference](docs/IDS-IDM-Mapping.md) with import/export mapping tables
+- Updated user manual (V1.3.1) with IDS/LOIN import/export sections
+- Added tutorials 18–21: IDS Export, LOIN Export, IDS Import, LOIN Import
+
+---
+
+### Compatibility
+
+- **Import** — idmXSD v1.0, v2.0, xPPM (.xppm), LOIN (.xml), IDS (.ids), reviewed HTML (.html/.htm), BPMN (.bpmn)
+- **Export** — idmXSD v2.0, IDS v1.0, LOIN (CEN 17412), HTML (with review mode), ZIP bundle, BPMN, erXML
+
+---
+
 ## v1.3.0 (2026-03-08)
 
 ### Highlights

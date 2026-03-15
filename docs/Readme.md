@@ -1,4 +1,4 @@
-IDMxPPM (neo-Seoul Edition)
+# IDMxPPM neo-Seoul (v1.3.1)
 
 IDMxPPM is an Information Delivery Manual (IDM) authoring and management tool compliant with ISO 29481. It provides an integrated environment for modeling use cases, defining exchange requirements (ERs), and generating machine-readable IDM specifications.
 
@@ -15,12 +15,20 @@ Use BPMN process maps as the primary workspace and link Data Objects directly to
 Hierarchical ER and Information Unit modeling with mandatory/optional indicators, examples, and constraints.
 	•	External Schema Mapping
 Map information units to external schemas such as IFC, bSDD, CityGML, and classification systems (UniFormat, OmniClass, MasterFormat).
+	•	IDS Export & Import
+Export Exchange Requirements as buildingSMART Information Delivery Specification (IDS) files for IFC model validation. Import IDS files to create skeleton IDM specifications.
+	•	LOIN Export & Import
+Bi-directional support for Level of Information Need (EN 17412 / ISO 7817-1). Export groups IUs by object type; import creates ER hierarchy from LOIN specifications. Supports CEN 17412, EN 17412-3, and ISO 7817-3 schema variants.
+	•	Review Mode HTML Export
+Self-contained HTML with embedded commenting UI. Reviewers add comments in the browser; import reviewed HTML back to restore comments.
 	•	Validation Engine
 Validate IDM specifications against ISO 29481 requirements and report completeness issues.
 	•	idmXML Export and Import
-Generate ISO 29481-3 compliant idmXML files with embedded BPMN models.
+Generate ISO 29481-3 compliant idmXML files with embedded BPMN models. Supports both idmXSD v1.0 and v2.0 with automatic version detection on import.
 	•	Cross-Platform Desktop Application
-Built with Electron, React, and Vite for macOS and Windows.
+Built with Electron, React, and Vite for macOS, Windows, and Linux.
+	•	Optional Server Backend
+Self-hosted Express/MongoDB server for centralized IDM specification storage and multi-user collaboration.
 
 ⸻
 
@@ -70,8 +78,11 @@ npm run build:all     # All platforms
 Format	Extension	Description
 IDMxPPM Project	.idm	Full project including BPMN, ERs, and ER library
 idmXML Specification	.xml	ISO 29481-3 compliant with embedded BPMN and images
-HTML Document	.html	Self-contained HTML with embedded SVG BPMN (printable)
+IDS	.ids	buildingSMART Information Delivery Specification (import & export)
+LOIN XML	.xml	Level of Information Need, EN 17412 / ISO 7817-1 (import & export)
+HTML Document	.html	Self-contained HTML with embedded SVG BPMN and optional review mode
 ZIP Bundle	.zip	Archive with idmXML, BPMN, images, and project data
+Legacy xPPM	.xppm	Import from previous xPPM tool with BPMN and image loading
 BPMN Diagram	.bpmn	BPMN 2.0 XML process map
 Exchange Requirement	.erxml	Individual ER export/import
 
@@ -80,11 +91,13 @@ Exchange Requirement	.erxml	Individual ER export/import
 
 📚 Standards and References
 	•	ISO 29481-1: IDM Methodology and Format
-	•	ISO 29481-3: IDM Data Schema (idmXML)
-	•	ISO 19510: BPMN 2.0 Representation
+	•	ISO 29481-3: IDM Data Schema (idmXML / idmXSD 2.0)
+	•	ISO/IEC 19510: BPMN 2.0 Representation
+	•	EN 17412 / ISO 7817-1: Level of Information Need (LOIN)
+	•	buildingSMART IDS: Information Delivery Specification
+	•	ISO 16739-1: Industry Foundation Classes (IFC)
 	•	ISO 19650 Series: Information Management
 	•	ISO 12006-3: Taxonomy and Data Dictionaries
-	•	ISO 16739-1: Industry Foundation Classes (IFC)
 
 ⸻
 
