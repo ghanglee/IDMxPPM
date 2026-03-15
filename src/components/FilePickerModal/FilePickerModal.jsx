@@ -39,6 +39,20 @@ const FilePickerModal = ({ isOpen, onClose, onFileSelected }) => {
       description: 'Legacy xPPM format import'
     },
     {
+      id: 'loin',
+      name: 'LOIN XML',
+      extension: '.xml',
+      accept: '.xml',
+      description: 'Level of Information Need (EN 17412 / ISO 7817-1)'
+    },
+    {
+      id: 'ids',
+      name: 'IDS',
+      extension: '.ids',
+      accept: '.ids,.xml',
+      description: 'Information Delivery Specification (buildingSMART)'
+    },
+    {
       id: 'bpmn',
       name: 'BPMN Diagram',
       extension: '.bpmn',
@@ -56,7 +70,7 @@ const FilePickerModal = ({ isOpen, onClose, onFileSelected }) => {
       id: 'all',
       name: 'All Supported Formats',
       extension: '.*',
-      accept: '.idm,.json,.xml,.zip,.idmx,.xppm,.bpmn,.html,.htm',
+      accept: '.idm,.json,.xml,.ids,.zip,.idmx,.xppm,.bpmn,.html,.htm',
       description: 'Show all supported file types'
     }
   ];

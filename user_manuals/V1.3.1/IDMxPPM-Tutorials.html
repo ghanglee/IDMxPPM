@@ -427,7 +427,7 @@
   </p>
   <div class="meta">
     <span>v1.3.1</span>
-    <span>18 Tutorials</span>
+    <span>19 Tutorials</span>
     <span>Building Informatics Group, Yonsei University</span>
   </div>
 </div>
@@ -454,6 +454,7 @@
     <a href="#t16" class="new-badge"><span class="num">16</span> HTML Export Enhancements</a>
     <a href="#t17" class="new-badge"><span class="num">17</span> xPPM Figure Import</a>
     <a href="#t18" class="new-badge"><span class="num">18</span> IDS Export</a>
+    <a href="#t19" class="new-badge"><span class="num">19</span> LOIN Export</a>
   </div>
 </nav>
 
@@ -1679,6 +1680,65 @@
     <div class="tip">
       <span class="icon">&#9889;</span>
       <span>To get the most out of IDS export, add <strong>External Element Mappings</strong> (Tutorial 7) to your Information Units, specifying the IFC property set and property name in the format <code>Pset_WallCommon.FireRating</code>.</span>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- TUTORIAL 19 -->
+  <section class="tutorial" id="t19">
+    <div class="tutorial-header">
+      <div class="tutorial-num">19</div>
+      <h2>LOIN Export</h2>
+      <span class="new-tag">NEW in v1.3.1</span>
+    </div>
+    <p>
+      Export your IDM specification to <strong>LOIN (Level of Information Need)</strong> format per
+      <strong>EN 17412 / ISO 7817-1</strong>. LOIN defines the granularity of information exchange
+      in BIM projects, and this export maps your Exchange Requirements into structured
+      <code>specificationPerObjectType</code> entries grouped by IFC entity.
+    </p>
+    <div class="placeholder-gif">
+      <span class="icon">&#128203;</span>
+      LOIN Export — generating a LOIN XML file from IDM specification
+    </div>
+
+    <div class="steps">
+      <h3>How It Works</h3>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text">Ensure your <strong>Information Units</strong> have IFC external element mappings (e.g., <code>IfcDoor</code>, <code>Pset_WallCommon.FireRating</code>).</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text">Define <strong>actors</strong> in the Use Case panel — the first actor maps to <strong>sending actor</strong>, the second to <strong>receiving actor</strong>.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text">Select <strong>target project phases</strong> in the Use Case panel.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-text">Click <strong>Save &amp; Export</strong> in the left sidebar and select <strong>LOIN (.xml)</strong> from the format list.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-text">The exporter groups Information Units by IFC entity into <code>specificationPerObjectType</code> entries.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">6</div>
+        <div class="step-text">Information Units without IFC mappings are <strong>excluded</strong> from the export with a console warning.</div>
+      </div>
+    </div>
+
+    <div class="tip">
+      <span class="icon">&#9889;</span>
+      <span>LOIN export works best when Information Units have detailed external element mappings. Use the <strong>bSDD search</strong> or <strong>IFC schema search</strong> to add Pset property mappings like <code>Pset_DoorCommon.FireRating</code> for the most accurate LOIN output.</span>
+    </div>
+
+    <div class="note">
+      <span class="icon">&#128221;</span>
+      <span>IDM actors map to LOIN context (<code>sendingActor</code>/<code>receivingActor</code>), project phases map to <code>informationDeliveryMileStone</code>, and IFC-mapped IUs become properties grouped by entity type.</span>
     </div>
   </section>
 

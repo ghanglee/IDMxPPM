@@ -25,6 +25,9 @@ import { readFileAsText } from './utils/pdfExporter';
 import { defaultIdmXslt } from './utils/defaultIdmXslt';
 import { generateStandaloneHtml } from './utils/htmlExporter';
 import { generateIdsXml } from './utils/idsExporter';
+import { generateLoinXml } from './utils/loinExporter';
+import { isLoinXml, parseLoinXml } from './utils/loinImporter';
+import { isIdsXml, parseIdsXml } from './utils/idsImporter';
 import { importXppm } from './utils/xppmImporter';
 import { normalizePath, basename as fpBasename, bpmnCandidates, imageCandidates } from './utils/filePathUtils.js';
 import {
@@ -2819,12 +2822,92 @@ const App = () => {
         extractDataObjectsAfterLoad();
         linkActorsToSwimlanesByName();
       } else if (fileName.endsWith('.xml')) {
-        // Distinguish proper idmXML (with namespace) from legacy xPPM v0.2 (no namespace)
-        const hasIdmXmlNamespace = content.includes('idmXML') || content.includes('standards.buildingsmart.org/IDM');
-        const hasIdmStructure = content.includes('<idm') && (content.includes('<uc>') || content.includes('<er>'));
+        // Detect XML type by root element prefix
+        const isLoinContent = content.includes('<loin:') || content.includes('<LOINSpecification');
+        const isIdsContent = content.includes('<ids:');
+        const isIdmTag = content.includes('<idm:') || content.includes('<idm>') || content.includes('<idm ');
+        const isV2 = content.includes('idmXML/2.0') || content.includes('29481/-3/ed-2');
+        const isIdmXmlContent = isIdmTag && isV2;
+        const isXppmContent = isIdmTag && !isV2;
 
-        if (!hasIdmXmlNamespace && hasIdmStructure) {
-          // v0.2 xPPM format: has IDM structure but no idmXML namespace — use xPPM importer
+        if (isLoinContent) {
+          // LOIN XML detected — route to LOIN importer
+          try {
+            isLoadingProjectRef.current = true;
+            const loinData = parseLoinXml(content);
+
+            if (loinData.erHierarchy && handleErHierarchyImport(loinData.erHierarchy, {
+              bpmnXml: 'EMPTY',
+              headerData: loinData.headerData,
+              dataObjectErMap: {},
+              erDataMap: {},
+              erLibrary: null,
+              filePath: file.name,
+              isDirtyAfterImport: true,
+              source: 'loin'
+            })) {
+              alert(`LOIN imported: ${loinData.totalObjectTypes} object type(s), ${loinData.totalIUs} property/properties converted to Information Units.`);
+              return;
+            }
+
+            if (loinData.headerData) setHeaderData(loinData.headerData);
+            if (loinData.erHierarchy) setErHierarchy(loinData.erHierarchy);
+            setDataObjectErMap({});
+            setErDataMap({});
+            setBpmnXml('EMPTY');
+            setCurrentFilePath(file.name);
+            setIsDirty(true);
+            setValidationResults(null);
+            setHasActiveProject(true);
+            setActivePane('specification');
+            setTimeout(() => { isLoadingProjectRef.current = false; }, 2000);
+
+            alert(`LOIN imported: ${loinData.totalObjectTypes} object type(s), ${loinData.totalIUs} property/properties converted to Information Units.`);
+          } catch (loinErr) {
+            console.error('Failed to parse LOIN XML:', loinErr);
+            alert('Failed to parse LOIN XML file: ' + loinErr.message);
+            isLoadingProjectRef.current = false;
+          }
+        } else if (isIdsContent) {
+          // IDS XML detected — route to IDS importer
+          try {
+            isLoadingProjectRef.current = true;
+            const idsData = parseIdsXml(content);
+
+            if (idsData.erHierarchy && handleErHierarchyImport(idsData.erHierarchy, {
+              bpmnXml: 'EMPTY',
+              headerData: idsData.headerData,
+              dataObjectErMap: {},
+              erDataMap: {},
+              erLibrary: null,
+              filePath: file.name,
+              isDirtyAfterImport: true,
+              source: 'ids'
+            })) {
+              alert(`IDS imported: ${idsData.totalSpecifications} specification(s), ${idsData.totalIUs} requirement(s) converted to Information Units.`);
+              return;
+            }
+
+            if (idsData.headerData) setHeaderData(idsData.headerData);
+            if (idsData.erHierarchy) setErHierarchy(idsData.erHierarchy);
+            setDataObjectErMap({});
+            setErDataMap({});
+            setBpmnXml('EMPTY');
+            setCurrentFilePath(file.name);
+            setIsDirty(true);
+            setValidationResults(null);
+            setHasActiveProject(true);
+            setActivePane('specification');
+            setTimeout(() => { isLoadingProjectRef.current = false; }, 2000);
+
+            alert(`IDS imported: ${idsData.totalSpecifications} specification(s), ${idsData.totalIUs} requirement(s) converted to Information Units.`);
+          } catch (idsErr) {
+            console.error('Failed to parse IDS XML:', idsErr);
+            alert('Failed to parse IDS file: ' + idsErr.message);
+            isLoadingProjectRef.current = false;
+          }
+        } else if (isXppmContent) {
+          // v0.2 xPPM format: <idm> without namespace prefix — use xPPM importer
           try {
             isLoadingProjectRef.current = true;
             const xppmResult = importXppm(content, null);
@@ -2883,7 +2966,7 @@ const App = () => {
             alert('Failed to parse xPPM file: ' + xppmErr.message);
             isLoadingProjectRef.current = false;
           }
-        } else if (isIdmXml(content)) {
+        } else if (isIdmXmlContent) {
           try {
             isLoadingProjectRef.current = true;
 
@@ -2951,6 +3034,44 @@ const App = () => {
             alert('Failed to parse idmXML file: ' + idmErr.message);
             isLoadingProjectRef.current = false;
           }
+        } else if (isLoinXml(content)) {
+          // LOIN XML (EN 17412 / ISO 7817-1)
+          try {
+            isLoadingProjectRef.current = true;
+            const loinData = parseLoinXml(content);
+
+            if (loinData.erHierarchy && handleErHierarchyImport(loinData.erHierarchy, {
+              bpmnXml: 'EMPTY',
+              headerData: loinData.headerData,
+              dataObjectErMap: {},
+              erDataMap: {},
+              erLibrary: null,
+              filePath: file.name,
+              isDirtyAfterImport: true,
+              source: 'loin'
+            })) {
+              alert(`LOIN imported: ${loinData.totalObjectTypes} object type(s), ${loinData.totalIUs} property/properties converted to Information Units.`);
+              return;
+            }
+
+            if (loinData.headerData) setHeaderData(loinData.headerData);
+            if (loinData.erHierarchy) setErHierarchy(loinData.erHierarchy);
+            setDataObjectErMap({});
+            setErDataMap({});
+            setBpmnXml('EMPTY');
+            setCurrentFilePath(file.name);
+            setIsDirty(true);
+            setValidationResults(null);
+            setHasActiveProject(true);
+            setActivePane('specification');
+            setTimeout(() => { isLoadingProjectRef.current = false; }, 2000);
+
+            alert(`LOIN imported: ${loinData.totalObjectTypes} object type(s), ${loinData.totalIUs} property/properties converted to Information Units.`);
+          } catch (loinErr) {
+            console.error('Failed to parse LOIN XML:', loinErr);
+            alert('Failed to parse LOIN XML file: ' + loinErr.message);
+            isLoadingProjectRef.current = false;
+          }
         } else {
           // Treat as BPMN XML
           setBpmnXml(content);
@@ -2960,6 +3081,44 @@ const App = () => {
           setCurrentFilePath(null);
           setIsDirty(true);
           setHasActiveProject(true);
+        }
+      } else if (fileName.endsWith('.ids')) {
+        // Parse as IDS file
+        try {
+          isLoadingProjectRef.current = true;
+          const idsData = parseIdsXml(content);
+
+          if (idsData.erHierarchy && handleErHierarchyImport(idsData.erHierarchy, {
+            bpmnXml: 'EMPTY',
+            headerData: idsData.headerData,
+            dataObjectErMap: {},
+            erDataMap: {},
+            erLibrary: null,
+            filePath: file.name,
+            isDirtyAfterImport: true,
+            source: 'ids'
+          })) {
+            alert(`IDS imported: ${idsData.totalSpecifications} specification(s), ${idsData.totalIUs} requirement(s) converted to Information Units.`);
+            return;
+          }
+
+          if (idsData.headerData) setHeaderData(idsData.headerData);
+          if (idsData.erHierarchy) setErHierarchy(idsData.erHierarchy);
+          setDataObjectErMap({});
+          setErDataMap({});
+          setBpmnXml('EMPTY');
+          setCurrentFilePath(file.name);
+          setIsDirty(true);
+          setValidationResults(null);
+          setHasActiveProject(true);
+          setActivePane('specification');
+          setTimeout(() => { isLoadingProjectRef.current = false; }, 2000);
+
+          alert(`IDS imported: ${idsData.totalSpecifications} specification(s), ${idsData.totalIUs} requirement(s) converted to Information Units.`);
+        } catch (idsErr) {
+          console.error('Failed to parse IDS:', idsErr);
+          alert('Failed to parse IDS file: ' + idsErr.message);
+          isLoadingProjectRef.current = false;
         }
       } else if (fileName.endsWith('.bpmn')) {
         // Parse as BPMN file
@@ -3428,7 +3587,9 @@ const App = () => {
       'idmxml-v2': '.xml',
       'html': '.html',
       'zip': '.zip',
-      'bpmn': '.bpmn'
+      'bpmn': '.bpmn',
+      'ids': '.ids',
+      'loin': '.xml'
     };
 
     const defaultName = (exportFilename || 'idm-specification') + (extensions[exportFormat] || '');
@@ -3896,6 +4057,33 @@ const App = () => {
           break;
         }
 
+        case 'loin': {
+          // LOIN (Level of Information Need) - EN 17412 / ISO 7817-1
+          const loinResult = generateLoinXml({
+            headerData,
+            useCaseData: {
+              actors: headerData.actorsList || [],
+              aimScope: headerData.aimScope || '',
+              use: headerData.use || '',
+              summary: headerData.summary || '',
+              targetPhases: headerData.targetPhases || {},
+            },
+            erHierarchy
+          });
+
+          if (loinResult.specCount === 0) {
+            alert(`None of the ${loinResult.totalIUs} Information Unit(s) in this project have external element mappings.\n\nLOIN export requires at least one Information Unit with an external element mapping (e.g., IFC, CityGML, bSDD, UniFormat, or other schemas).\n\nAdd external element mappings via the External Element section in the ER detail panel.`);
+            return;
+          }
+
+          if (loinResult.skippedCount > 0) {
+            alert(`LOIN exported successfully.\n\n${loinResult.mappedIUs} of ${loinResult.totalIUs} Information Unit(s) were exported.\n${loinResult.skippedCount} Information Unit(s) were excluded because they have no external element mappings.`);
+          }
+
+          await saveFile(loinResult.xml, `${fileName}.xml`, 'application/xml');
+          break;
+        }
+
         case 'server': {
           await handleSaveToServer();
           break;
@@ -4235,6 +4423,82 @@ const App = () => {
         setHasActiveProject(true);
         extractDataObjectsAfterLoad(); // Extract data objects from loaded BPMN
         linkActorsToSwimlanesByName(); // Sync actors with BPMN Pools
+      } else if (data.type === 'loin') {
+        // Handle LOIN XML import
+        try {
+          isLoadingProjectRef.current = true;
+          const loinData = parseLoinXml(data.content);
+
+          if (loinData.erHierarchy && handleErHierarchyImport(loinData.erHierarchy, {
+            bpmnXml: 'EMPTY',
+            headerData: loinData.headerData,
+            dataObjectErMap: {},
+            erDataMap: {},
+            erLibrary: null,
+            filePath: data.filePath || 'loin-import.xml',
+            isDirtyAfterImport: true,
+            source: 'loin'
+          })) {
+            alert(`LOIN imported: ${loinData.totalObjectTypes} object type(s), ${loinData.totalIUs} property/properties converted to Information Units.`);
+            return;
+          }
+
+          if (loinData.headerData) setHeaderData(loinData.headerData);
+          if (loinData.erHierarchy) setErHierarchy(loinData.erHierarchy);
+          setDataObjectErMap({});
+          setErDataMap({});
+          setBpmnXml('EMPTY');
+          setCurrentFilePath(data.filePath || null);
+          setIsDirty(true);
+          setValidationResults(null);
+          setHasActiveProject(true);
+          setActivePane('specification');
+          setTimeout(() => { isLoadingProjectRef.current = false; }, 2000);
+
+          alert(`LOIN imported: ${loinData.totalObjectTypes} object type(s), ${loinData.totalIUs} property/properties converted to Information Units.`);
+        } catch (loinErr) {
+          console.error('Failed to parse LOIN XML:', loinErr);
+          alert('Failed to parse LOIN XML file: ' + loinErr.message);
+          isLoadingProjectRef.current = false;
+        }
+      } else if (data.type === 'ids') {
+        // Handle IDS import
+        try {
+          isLoadingProjectRef.current = true;
+          const idsData = parseIdsXml(data.content);
+
+          if (idsData.erHierarchy && handleErHierarchyImport(idsData.erHierarchy, {
+            bpmnXml: 'EMPTY',
+            headerData: idsData.headerData,
+            dataObjectErMap: {},
+            erDataMap: {},
+            erLibrary: null,
+            filePath: data.filePath || 'ids-import.ids',
+            isDirtyAfterImport: true,
+            source: 'ids'
+          })) {
+            alert(`IDS imported: ${idsData.totalSpecifications} specification(s), ${idsData.totalIUs} requirement(s) converted to Information Units.`);
+            return;
+          }
+
+          if (idsData.headerData) setHeaderData(idsData.headerData);
+          if (idsData.erHierarchy) setErHierarchy(idsData.erHierarchy);
+          setDataObjectErMap({});
+          setErDataMap({});
+          setBpmnXml('EMPTY');
+          setCurrentFilePath(data.filePath || null);
+          setIsDirty(true);
+          setValidationResults(null);
+          setHasActiveProject(true);
+          setActivePane('specification');
+          setTimeout(() => { isLoadingProjectRef.current = false; }, 2000);
+
+          alert(`IDS imported: ${idsData.totalSpecifications} specification(s), ${idsData.totalIUs} requirement(s) converted to Information Units.`);
+        } catch (idsErr) {
+          console.error('Failed to parse IDS:', idsErr);
+          alert('Failed to parse IDS file: ' + idsErr.message);
+          isLoadingProjectRef.current = false;
+        }
       } else if (data.type === 'zip') {
         // Handle ZIP bundle - note: Electron sends file content as string, need binary handling
         alert('ZIP import via Electron menu is not yet supported. Please use the browser file picker via Open Project button.');
@@ -4750,7 +5014,8 @@ const App = () => {
                          exportFormat === 'html' ? '.html' :
                          exportFormat === 'zip' ? '.zip' :
                          exportFormat === 'bpmn' ? '.bpmn' :
-                         exportFormat === 'ids' ? '.ids' : ''}
+                         exportFormat === 'ids' ? '.ids' :
+                         exportFormat === 'loin' ? '.xml' : ''}
                       </span>
                     </div>
                     {window.electronAPI?.showSaveLocation && (
@@ -4885,6 +5150,24 @@ const App = () => {
                             </select>
                             <p style={{ fontSize: '11px', color: 'var(--text-tertiary, #888)', margin: '4px 0 0 0' }}>
                               IDS exports only IFC-mappable requirements. Information Units need external element mappings (e.g., Pset_WallCommon.FireRating) to be included.
+                            </p>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* LOIN */}
+                  <div className={`export-format-option ${exportFormat === 'loin' ? 'selected' : ''}`} data-format="loin" onClick={() => setExportFormat('loin')}>
+                    <input type="radio" name="exportFormat" value="loin" checked={exportFormat === 'loin'} onChange={(e) => setExportFormat(e.target.value)} />
+                    <div className="export-format-content">
+                      <span className="export-format-title">LOIN (.xml)</span>
+                      {exportFormat === 'loin' && (
+                        <>
+                          <span className="export-format-desc">Level of Information Need (EN 17412 / ISO 7817-1)</span>
+                          <div className="export-suboptions" onClick={(e) => e.stopPropagation()}>
+                            <p style={{ fontSize: '11px', color: 'var(--text-tertiary, #888)', margin: '4px 0 0 0' }}>
+                              Maps IDM actors, project phases, and Information Units to LOIN object type specifications. IUs are grouped by their external element mappings (IFC, CityGML, bSDD, UniFormat, etc.). IUs without any external element mappings will be excluded.
                             </p>
                           </div>
                         </>

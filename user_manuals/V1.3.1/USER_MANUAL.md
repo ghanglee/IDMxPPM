@@ -1,6 +1,6 @@
 # IDMxPPM neo-Seoul User Manual
 
-**Version 1.3.0**
+**Version 1.3.1**
 
 An Information Delivery Manual (IDM) Authoring Tool compliant with ISO 29481-1 and ISO 29481-3
 
@@ -44,18 +44,19 @@ IDMxPPM (eXtended Process to Product Modeling) neo-Seoul is a desktop applicatio
 - Export self-contained HTML documents with review/commenting support
 - Collaborate via an optional self-hosted server with multi-user access
 
-### What's New in v1.3.0
+### What's New in v1.3.1
 
 | Feature | Description |
 |---------|-------------|
+| **IDS Export & Import** | Export Exchange Requirements as buildingSMART IDS files for IFC validation; import IDS files to create skeleton IDM specifications |
+| **LOIN Export & Import** | Bi-directional support for Level of Information Need (EN 17412 / ISO 7817-1) with round-trip fidelity |
+| **Collapsible Export Dialog** | Export format list collapses to show sub-options inline; selected format auto-scrolls to center |
 | **Element Detail Panel** | Click any BPMN element (tasks, gateways, events, flows) to edit its name and documentation |
 | **Actor-BPMN Linking** | BPMN Pool/Lane names automatically linked to UC actors; ER selection highlights linked data objects |
 | **xPPM Full Import** | Robust folder-based image/BPMN loading from adjacent `Image/` and `Diagram/` directories |
 | **Review Mode HTML** | Self-contained HTML with embedded commenting UI for reviewers; import reviewed HTML to restore comments |
 | **Clickable BPMN in HTML** | Data objects and named elements in HTML export are clickable, jumping to their ER or activity descriptions |
-| **BPMN Activities Section** | HTML export includes a new "BPMN Activities" section listing all named elements with back-links to the diagram |
 | **Inline IU Figures** | Definition figures and example images render directly under their associated Information Unit in HTML export |
-| **ER-to-BPMN Highlighting** | Selecting an ER in the left panel highlights its linked data object in the BPMN canvas |
 
 ### Standards Compliance
 
@@ -64,6 +65,8 @@ IDMxPPM (eXtended Process to Product Modeling) neo-Seoul is a desktop applicatio
 | ISO 29481-1 | IDM Methodology and format |
 | ISO 29481-3 | Data schema (idmXML / idmXSD 2.0) |
 | ISO/IEC 19510 | Business Process Model and Notation (BPMN) |
+| EN 17412 / ISO 7817-1 | Level of Information Need (LOIN) |
+| buildingSMART IDS | Information Delivery Specification |
 
 ### Supported Platforms
 
@@ -98,6 +101,8 @@ When you launch IDMxPPM, you'll see the **Startup Screen** with the following op
 | HTML Document | `.html` | Self-contained HTML with embedded images, BPMN (SVG), and optional review comments |
 | ZIP Bundle | `.zip` | Archive containing idmXML, BPMN, images, and project data |
 | Legacy xPPM | `.xppm` | Import from previous xPPM tool (header, ERs, use case, BPMN, images) |
+| LOIN XML | `.xml` | Level of Information Need (EN 17412 / ISO 7817-1) — import and export |
+| IDS | `.ids`, `.xml` | Information Delivery Specification (buildingSMART) — import and export |
 | BPMN Diagram | `.bpmn` | BPMN 2.0 XML format (diagram only) |
 | Exchange Requirement | `.erxml` | Individual ER for import/export |
 | Server | (cloud) | Save/load specs to/from connected MongoDB server |
@@ -666,6 +671,8 @@ Click the **Save & Export** icon in the vertical menu:
 | **HTML Document (.html)** | Self-contained HTML with embedded images, SVG BPMN, and optional review mode |
 | **ZIP Bundle (.zip)** | Archive with idmXML, BPMN, images, and project data |
 | **BPMN Only (.bpmn)** | Process diagram only |
+| **IDS (.ids)** | buildingSMART Information Delivery Specification for IFC validation |
+| **LOIN (.xml)** | Level of Information Need (EN 17412 / ISO 7817-1) |
 | **Save to Server** | Save/update spec on the connected server (requires authentication) |
 | **XSLT Template** | Download default stylesheet for customization |
 
@@ -706,6 +713,65 @@ Complete archive containing:
 - `project.json` - Full project data
 - `manifest.json` - Bundle metadata
 - `images/` folder - All referenced images
+
+### IDS Export
+
+The IDS (Information Delivery Specification) format is a buildingSMART standard for specifying IFC model validation requirements. IDMxPPM can export Exchange Requirements as IDS files that can be used with IFC validation tools.
+
+- Select the target IFC version: IFC 2X3 or IFC 4X3 ADD2 (recommended)
+- Only Information Units with IFC external element mappings are included
+- Pset/property mappings (e.g., `Pset_WallCommon.FireRating`) are exported as property requirements
+- IFC entity mappings are exported as entity requirements
+
+### LOIN Export
+
+The LOIN (Level of Information Need) format follows EN 17412 / ISO 7817-1 for specifying what information is needed for specific object types at specific project milestones. IDMxPPM maps IDM data to LOIN by extracting context from the Use Case and grouping Information Units by their IFC entity mappings.
+
+#### IDM-to-LOIN Mapping
+
+| IDM Element | LOIN Element | Description |
+|-------------|-------------|-------------|
+| IDM GUID | `LOINSpecification.globalId` | Unique identifier for the specification |
+| Short Title | `LOINSpecification.name` | Specification name |
+| Full Title | `description` | Specification description |
+| UC Actor 1 (sender) | `context.sendingActor` | The actor sending the information |
+| UC Actor 2 (receiver) | `context.receivingActor` | The actor receiving the information |
+| UC Aim & Scope | `context.purpose` | Purpose of the information exchange |
+| Target Project Phase (ISO 22263) | `context.informationDeliveryMileStone` | Project phase(s) when information is needed |
+| IU with IFC entity mapping | `specificationPerObjectType.objectType` | Object type requiring information (e.g., IfcDoor) |
+| IU name | `property.name` | Property name within the object type |
+| IU dataType | `property.dataType` | Data type (String, Real, Boolean, DateTime, Integer) |
+| IU external element (Pset) | `propertySet.name` | IFC Property Set grouping (e.g., Pset_DoorCommon) |
+| IU external element (bSDD ref) | `property.refToClassification` | Reference to bSDD classification |
+
+#### Grouping Logic
+
+Information Units are grouped into LOIN `specificationPerObjectType` entries based on their IFC external element mappings:
+
+1. **IUs mapped to Pset properties** (e.g., `Pset_WallCommon.FireRating`) are grouped under the corresponding IFC entity's `propertySet`
+2. **IUs mapped to IFC entities** (e.g., `IfcDoor`) are placed as standalone properties under that entity
+3. **IUs without IFC/bSDD mappings** are excluded from the LOIN export (a count is shown in the console)
+
+#### Data Type Mapping
+
+| IDM Data Type | LOIN Data Type |
+|---------------|----------------|
+| String / Text | String |
+| Numeric | Real |
+| Boolean | Boolean |
+| Date / Time | DateTime |
+| Image, Audio, Video, Document | String |
+| Structured, Other | String |
+
+#### Prerequisites
+
+For meaningful LOIN export, your Information Units should have:
+
+- **External Element Mappings** to IFC entities or Pset properties (see [Section 11: External Element Mapping](#11-external-element-mapping))
+- **Actors** defined in the Use Case (mapped to sending/receiving actors in LOIN context)
+- **Target Project Phases** selected (mapped to the information delivery milestone)
+
+> **Note**: LOIN is schema-agnostic and supports any classification system (IFC, CityGML, UniFormat, etc.). However, Information Units without any external element mappings cannot be grouped into object types and will be skipped during export.
 
 ### Save to Server
 
@@ -958,6 +1024,8 @@ You can save incomplete work even with validation errors. This allows you to:
 |--------|-----------------|
 | `.idm` | Full project (BPMN + all data + ER library) |
 | `.xml` (idmXML) | Header, Use Case, ERs, embedded BPMN, images |
+| `.xml` (LOIN) | LOIN specification → ER hierarchy with IUs and external mappings |
+| `.ids` / `.xml` (IDS) | IDS specifications → ER hierarchy with property/attribute requirements |
 | `.html` / `.htm` (Reviewed HTML) | Project data and review comments |
 | `.zip` (ZIP Bundle) | Complete project with all assets |
 | `.xppm` (Legacy xPPM) | Header, Use Case, ERs, BPMN diagram, images |
@@ -1005,6 +1073,54 @@ When importing a ZIP bundle:
 - BPMN diagram loaded from multiple sources (project.json, .bpmn file, or embedded in idmXML)
 - All images are restored from the `images/` folder
 - ER library is preserved
+
+### LOIN Import
+
+LOIN (Level of Information Need) files following EN 17412 / ISO 7817-1 can be imported to create a skeleton IDM specification. The importer supports all three known LOIN schema variants:
+
+| Variant | Root Element | Usage |
+| ------- | ----------- | ----- |
+| CEN 17412 (early draft) | `<LOINSpecification>` | Early implementations and tooling |
+| EN 17412-3 (European standard) | `<LevelOfInformationNeed>` | European standard with inline definitions |
+| ISO 7817-3 (international standard) | `<LevelOfInformationNeed>` | International standard with cross-referenced definitions via nodeID |
+
+When importing LOIN:
+
+- **Context** (purpose, milestone, actors) is mapped to Use Case fields
+- Each **object type** (`specificationPerObjectType`) becomes a Sub-ER
+- **Properties** become Information Units with external element mappings pre-populated
+- **Property sets** are preserved in the IU external mapping name (e.g., `Pset_DoorCommon.Width`)
+- **Geometric information** (detail level, dimensionality, appearance) is stored in the Sub-ER description
+- **Documentation requirements** are stored in the Sub-ER description
+- All IUs default to mandatory (LOIN assumes all listed properties are required)
+- The BPMN canvas starts blank — add your process map manually
+
+The external element mappings created during import enable bi-directional round-trip: re-exporting to LOIN will correctly group IUs back under their original object types.
+
+For detailed mapping tables, see [LOIN–IDM Mapping Reference](../../docs/LOIN-IDM-Mapping.md).
+
+### IDS Import
+
+IDS (Information Delivery Specification) files from buildingSMART can be imported to create a skeleton IDM specification. IDS defines model validation requirements per IFC entity, which map naturally to IDM Exchange Requirements.
+
+When importing IDS:
+
+- **Info section** (title, description, copyright, date, milestone) is mapped to the IDM header
+- Each **specification** becomes a Sub-ER, named after the specification
+- **Property requirements** become Information Units with:
+  - Name from `baseName`
+  - Data type mapped from IFC types (e.g., IFCTEXT → String, IFCREAL → Numeric)
+  - External element mapping from `propertySet.baseName` (e.g., `Pset_WallCommon.FireRating`)
+  - Value constraints (patterns, enumerations, ranges) stored in the IU constraints field
+- **Attribute requirements** become IUs referencing IFC attributes
+- **Classification requirements** become IUs with the classification system name
+- **Material requirements** become IUs describing material constraints
+- **PartOf requirements** become IUs describing spatial containment or aggregation relationships
+- **Applicability conditions** (entity type, predefined type, material/classification filters) are captured in the Sub-ER description
+- IFC version is mapped to the external element basis (IFC2X3 → "IFC 2x3", IFC4X3_ADD2 → "IFC 4x3 ADD2")
+- The BPMN canvas starts blank — add your process map manually
+
+For detailed mapping tables, see [IDS–IDM Mapping Reference](../../docs/IDS-IDM-Mapping.md).
 
 ---
 

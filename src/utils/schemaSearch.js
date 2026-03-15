@@ -3,7 +3,7 @@
  * Provides exact and semantic search for external schemas
  */
 
-import SCHEMA_INFO from '../../references/idsSchema';
+import SCHEMA_INFO from '../../references/external schemas/idsSchema';
 
 /**
  * Calculate similarity score between two strings (for semantic matching)

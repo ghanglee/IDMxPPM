@@ -195,11 +195,13 @@ async function handleOpenProject() {
     filters: [
       { name: 'IDMxPPM Project (.idm)', extensions: ['idm', 'json'] },
       { name: 'idmXML (.xml)', extensions: ['xml'] },
+      { name: 'LOIN XML (.xml)', extensions: ['xml'] },
+      { name: 'IDS (.ids)', extensions: ['ids'] },
       { name: 'ZIP Bundle (.zip)', extensions: ['zip', 'idmx'] },
       { name: 'xPPM Legacy (.xppm)', extensions: ['xppm'] },
       { name: 'BPMN Diagram (.bpmn)', extensions: ['bpmn'] },
       { name: 'Reviewed HTML (.html)', extensions: ['html', 'htm'] },
-      { name: 'All Supported Formats', extensions: ['idm', 'json', 'xml', 'zip', 'idmx', 'xppm', 'bpmn', 'html', 'htm'] },
+      { name: 'All Supported Formats', extensions: ['idm', 'json', 'xml', 'ids', 'zip', 'idmx', 'xppm', 'bpmn', 'html', 'htm'] },
       { name: 'All Files', extensions: ['*'] }
     ],
     properties: ['openFile']
@@ -221,17 +223,35 @@ async function handleOpenProject() {
       type = 'zip';
     } else if (ext === '.xppm') {
       type = 'xppm';
+    } else if (ext === '.ids') {
+      type = 'ids';
     } else if (ext === '.xml') {
-      // Check if it's a proper idmXML (with namespace), legacy xPPM v0.2 (no namespace), or BPMN
-      const hasIdmXmlNamespace = content.includes('idmXML') || content.includes('standards.buildingsmart.org/IDM');
-      const hasIdmStructure = content.includes('<idm') && (content.includes('<uc>') || content.includes('<er>'));
-      if (hasIdmXmlNamespace) {
-        type = 'idmxml';
-      } else if (hasIdmStructure) {
-        // v0.2 xPPM format: has IDM structure but no idmXML namespace
-        type = 'xppm';
-      } else {
+      // Detect XML type by root element prefix
+      if (content.includes('<loin:') || content.includes('<LOINSpecification')) {
+        type = 'loin';
+      } else if (content.includes('<ids:')) {
+        type = 'ids';
+      } else if (content.includes('<idm:') || content.includes('<idm>') || content.includes('<idm ')) {
+        // Distinguish idmXML v2.0 from v1.0/xPPM by namespace version
+        const isV2 = content.includes('idmXML/2.0') || content.includes('29481/-3/ed-2');
+        type = isV2 ? 'idmxml' : 'xppm';
+      } else if (content.includes('<bpmn:') || content.includes('<bpmn2:')) {
         type = 'bpmn';
+      } else {
+        // Unknown XML — ask user
+        const { dialog: electronDialog } = require('electron');
+        const choice = electronDialog.showMessageBoxSync(mainWindow, {
+          type: 'question',
+          title: 'Unknown XML Format',
+          message: `The file "${path.basename(filePath)}" could not be identified as idmXML, LOIN, IDS, or BPMN.\n\nHow would you like to open it?`,
+          buttons: ['As idmXML', 'As LOIN', 'As BPMN', 'Cancel'],
+          defaultId: 0,
+          cancelId: 3,
+        });
+        if (choice === 0) type = 'idmxml';
+        else if (choice === 1) type = 'loin';
+        else if (choice === 2) type = 'bpmn';
+        else return; // Cancel
       }
     }
     // .json and .idm are treated as 'project' type
