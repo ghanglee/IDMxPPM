@@ -427,7 +427,7 @@
   </p>
   <div class="meta">
     <span>v1.3.1</span>
-    <span>19 Tutorials</span>
+    <span>21 Tutorials</span>
     <span>Building Informatics Group, Yonsei University</span>
   </div>
 </div>
@@ -455,6 +455,8 @@
     <a href="#t17" class="new-badge"><span class="num">17</span> xPPM Figure Import</a>
     <a href="#t18" class="new-badge"><span class="num">18</span> IDS Export</a>
     <a href="#t19" class="new-badge"><span class="num">19</span> LOIN Export</a>
+    <a href="#t20" class="new-badge"><span class="num">20</span> IDS Import</a>
+    <a href="#t21" class="new-badge"><span class="num">21</span> LOIN Import</a>
   </div>
 </nav>
 
@@ -1739,6 +1741,150 @@
     <div class="note">
       <span class="icon">&#128221;</span>
       <span>IDM actors map to LOIN context (<code>sendingActor</code>/<code>receivingActor</code>), project phases map to <code>informationDeliveryMileStone</code>, and IFC-mapped IUs become properties grouped by entity type.</span>
+    </div>
+  </section>
+
+  <!-- TUTORIAL 20 -->
+  <section class="tutorial" id="t20">
+    <div class="tutorial-header">
+      <div class="tutorial-num">20</div>
+      <h2>IDS Import</h2>
+      <span class="new-tag">NEW in v1.3.1</span>
+    </div>
+    <p>
+      Import buildingSMART <strong>Information Delivery Specification (IDS)</strong> files to create a skeleton IDM specification.
+      IDS defines model validation requirements per IFC entity — each specification maps to a Sub-ER, and each required property becomes an Information Unit with external element mappings pre-populated.
+    </p>
+
+    <div class="placeholder-gif">
+      <span class="icon">&#128230;</span>
+      <br>IDS Import — Opening an .ids file and viewing the generated ER hierarchy
+    </div>
+
+    <div class="steps">
+      <h3>How to Import an IDS File</h3>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text">Click <strong>Open Project</strong> on the Startup Screen (or from the vertical menu when no project is open).</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text">Select <strong>IDS</strong> from the format list, or choose <strong>All Supported Formats</strong>.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text">Browse to your <code>.ids</code> file (or an <code>.xml</code> file containing IDS content) and open it.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-text">The app auto-detects IDS files by the <code>&lt;ids:</code> root element prefix. Each IDS <strong>specification</strong> becomes a <strong>Sub-ER</strong> named after the specification.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-text"><strong>Property requirements</strong> become Information Units with name, data type (mapped from IFC types like IFCTEXT → String), and external element mappings (e.g., <code>Pset_WallCommon.FireRating</code>).</div>
+      </div>
+      <div class="step">
+        <div class="step-num">6</div>
+        <div class="step-text"><strong>Value constraints</strong> (patterns, enumerations, ranges) are preserved in the IU constraints field. For example, <code>RAL.*</code> or <code>&gt; 0.5 and &lt; 2.1</code>.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">7</div>
+        <div class="step-text">Other requirement types — <strong>attributes</strong>, <strong>classifications</strong>, <strong>materials</strong>, and <strong>partOf</strong> relationships — are also converted to Information Units.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">8</div>
+        <div class="step-text">The BPMN canvas starts blank. Add your process map manually to complete the IDM specification.</div>
+      </div>
+    </div>
+
+    <div class="tip">
+      <span class="icon">&#9889;</span>
+      <span>IDS import creates a ready-to-use skeleton with IFC mappings already in place. Focus on adding the process perspective (BPMN diagram, ER descriptions, and use case details) to turn it into a complete IDM.</span>
+    </div>
+
+    <div class="note">
+      <span class="icon">&#128221;</span>
+      <span>IDS is strictly IFC-bound — every specification targets a specific IFC entity and version. The <code>ifcVersion</code> attribute (e.g., IFC2X3, IFC4X3_ADD2) is mapped to the appropriate external element basis in IDMxPPM.</span>
+    </div>
+  </section>
+
+  <!-- TUTORIAL 21 -->
+  <section class="tutorial" id="t21">
+    <div class="tutorial-header">
+      <div class="tutorial-num">21</div>
+      <h2>LOIN Import</h2>
+      <span class="new-tag">NEW in v1.3.1</span>
+    </div>
+    <p>
+      Import <strong>LOIN (Level of Information Need)</strong> files following EN 17412 / ISO 7817-1 to create a skeleton IDM specification.
+      LOIN defines what information is needed for specific object types at specific project milestones — each object type becomes a Sub-ER with properties converted to Information Units.
+    </p>
+
+    <div class="placeholder-gif">
+      <span class="icon">&#128230;</span>
+      <br>LOIN Import — Opening a LOIN XML file and viewing the generated ER hierarchy
+    </div>
+
+    <div class="steps">
+      <h3>How to Import a LOIN File</h3>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text">Click <strong>Open Project</strong> on the Startup Screen (or from the vertical menu).</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text">Select <strong>LOIN XML</strong> from the format list, or choose <strong>All Supported Formats</strong>.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text">Browse to your LOIN <code>.xml</code> file and open it. The importer auto-detects the schema variant by the root element (<code>&lt;LOINSpecification&gt;</code> or <code>&lt;LevelOfInformationNeed&gt;</code>).</div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-text"><strong>Context</strong> information (purpose, milestone, sending/receiving actors) is mapped to Use Case fields.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-text">Each <strong>object type</strong> (<code>specificationPerObjectType</code>) becomes a <strong>Sub-ER</strong> named after the object (e.g., "Door", "Wing Wall").</div>
+      </div>
+      <div class="step">
+        <div class="step-num">6</div>
+        <div class="step-text"><strong>Properties</strong> become Information Units with external element mappings pre-populated. Property set names are preserved (e.g., <code>Pset_DoorCommon.Width</code>).</div>
+      </div>
+      <div class="step">
+        <div class="step-num">7</div>
+        <div class="step-text"><strong>Geometric information</strong> (detail level, dimensionality, appearance) and <strong>documentation requirements</strong> are stored in the Sub-ER description.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">8</div>
+        <div class="step-text">The BPMN canvas starts blank. Add your process map manually to complete the IDM specification.</div>
+      </div>
+    </div>
+
+    <div class="steps">
+      <h3>Supported LOIN Schema Variants</h3>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text"><strong>CEN 17412 (early draft)</strong> — Uses <code>&lt;LOINSpecification&gt;</code> root element with inline <code>&lt;propertySet&gt;</code> and <code>&lt;property&gt;</code> elements. Used in early implementations.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text"><strong>EN 17412-3 (European standard)</strong> — Uses <code>&lt;LevelOfInformationNeed&gt;</code> with <code>&lt;Specification&gt;</code>, <code>&lt;SpecificationPerObjectType&gt;</code>, and <code>dt:</code> namespace for typed names and definitions.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text"><strong>ISO 7817-3 (international standard)</strong> — Same root as EN 17412-3 but with external <code>&lt;ObjectTypes&gt;</code> and <code>&lt;AlphanumericalInformation&gt;</code> sections. Definitions are cross-referenced via <code>nodeID</code> attributes, enabling reuse across specifications.</div>
+      </div>
+    </div>
+
+    <div class="tip">
+      <span class="icon">&#9889;</span>
+      <span>LOIN import supports <strong>bi-directional round-trip</strong>: external element mappings created during import enable re-exporting to LOIN, correctly grouping IUs back under their original object types and property sets.</span>
+    </div>
+
+    <div class="note">
+      <span class="icon">&#128221;</span>
+      <span>Unlike IDS, LOIN is <strong>schema-agnostic</strong> — object types can reference IFC entities, CityGML elements, UniFormat codes, or any other classification system. All are supported during import.</span>
     </div>
   </section>
 
