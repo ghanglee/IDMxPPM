@@ -24,6 +24,7 @@ import { parseIdmXml, isIdmXml, detectIdmXmlVersion, getFirstChild, getDirectChi
 import { readFileAsText } from './utils/pdfExporter';
 import { defaultIdmXslt } from './utils/defaultIdmXslt';
 import { generateStandaloneHtml } from './utils/htmlExporter';
+import { generateIdsXml } from './utils/idsExporter';
 import { importXppm } from './utils/xppmImporter';
 import { normalizePath, basename as fpBasename, bpmnCandidates, imageCandidates } from './utils/filePathUtils.js';
 import {
@@ -166,7 +167,8 @@ const App = () => {
   const [exportOptions, setExportOptions] = useState({
     includeBpmn: true,
     includeImages: true,
-    enableReview: false
+    enableReview: false,
+    idsIfcVersion: 'IFC4X3_ADD2'
   });
   const [customXslt, setCustomXslt] = useState(null); // Custom XSLT file for PDF export
 
@@ -200,6 +202,7 @@ const App = () => {
   const isProgrammaticDataObjectRef = useRef(false); // Track when creating data object programmatically (to skip modal)
   const headerDataRef = useRef(headerData); // Shadow headerData for actor→BPMN sync comparison
   const pendingCloseRef = useRef(false); // Track if project should close after Save & Export completes
+  const exportFormatListRef = useRef(null); // Ref for export format list scroll container
 
   // Keep headerDataRef in sync with headerData state
   useEffect(() => {
@@ -3317,7 +3320,7 @@ const App = () => {
     // Open the user manual in a new browser tab/window
     // In Electron, this will use the shell.openExternal
     // In browser, this will open the markdown file or a hosted version
-    const manualUrl = 'https://htmlpreview.github.io/?https://github.com/ghanglee/IDMxPPM/blob/main/user_manuals/V1.3.0/IDMxPPM-Tutorials.html';
+    const manualUrl = 'https://htmlpreview.github.io/?https://github.com/ghanglee/IDMxPPM/blob/main/user_manuals/V1.3.1/IDMxPPM-Tutorials.html';
 
     if (window.electronAPI && window.electronAPI.openExternal) {
       window.electronAPI.openExternal(manualUrl);
@@ -3383,6 +3386,19 @@ const App = () => {
     // Users may want to save incomplete work to continue later
     setShowExportDialog(true);
   }, [headerData, bpmnXml, erDataMap]);
+
+  // Auto-scroll selected export format to center of the list
+  useEffect(() => {
+    if (!showExportDialog || !exportFormatListRef.current) return;
+    // Small delay to let the DOM render the expanded sub-options
+    const timer = setTimeout(() => {
+      const container = exportFormatListRef.current;
+      const selected = container?.querySelector(`[data-format="${exportFormat}"]`);
+      if (!selected) return;
+      selected.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [exportFormat, showExportDialog]);
 
   // Handle close confirmation dialog response
   const handleCloseConfirmResponse = useCallback((response) => {
@@ -3858,6 +3874,28 @@ const App = () => {
           break;
         }
 
+        case 'ids': {
+          // IDS v1.0 (buildingSMART Information Delivery Specification)
+          const idsResult = generateIdsXml({
+            headerData,
+            erHierarchy,
+            ifcVersion: exportOptions.idsIfcVersion
+          });
+
+          if (idsResult.specCount === 0) {
+            alert('No IFC-mappable Exchange Requirements found.\n\nIDS export requires Information Units with IFC external element mappings (e.g., Pset_WallCommon.FireRating).\n\n' +
+              (idsResult.skippedCount > 0 ? `${idsResult.skippedCount} ER(s) were skipped because they have no IFC mappings.` : 'Add external element mappings to your Information Units first.'));
+            return;
+          }
+
+          if (idsResult.skippedCount > 0) {
+            console.info(`IDS export: ${idsResult.specCount} specification(s) generated, ${idsResult.skippedCount} ER(s) skipped (no IFC mappings)`);
+          }
+
+          await saveFile(idsResult.xml, `${fileName}.ids`, 'application/xml');
+          break;
+        }
+
         case 'server': {
           await handleSaveToServer();
           break;
@@ -3874,7 +3912,7 @@ const App = () => {
       console.error('Export failed:', err);
       alert('Export failed: ' + err.message);
     }
-  }, [bpmnXml, headerData, erDataMap, erLibrary, exportFormat, exportFilename, exportSavePath, exportOptions, customXslt, handleSaveToServer, resetProjectState]);
+  }, [bpmnXml, headerData, erDataMap, erHierarchy, dataObjectErMap, erLibrary, exportFormat, exportFilename, exportSavePath, exportOptions, customXslt, handleSaveToServer, resetProjectState]);
 
   // Save project
   const saveProject = async (saveAs = false) => {
@@ -4711,7 +4749,8 @@ const App = () => {
                          exportFormat === 'idmxml-v2' ? '.xml' :
                          exportFormat === 'html' ? '.html' :
                          exportFormat === 'zip' ? '.zip' :
-                         exportFormat === 'bpmn' ? '.bpmn' : ''}
+                         exportFormat === 'bpmn' ? '.bpmn' :
+                         exportFormat === 'ids' ? '.ids' : ''}
                       </span>
                     </div>
                     {window.electronAPI?.showSaveLocation && (
@@ -4736,156 +4775,134 @@ const App = () => {
                 </div>
 
                 <p className="export-dialog-subtitle">Choose an export format:</p>
-                <div className="export-format-options">
-                  <label className={`export-format-option ${exportFormat === 'idm' ? 'selected' : ''}`}>
-                    <input
-                      type="radio"
-                      name="exportFormat"
-                      value="idm"
-                      checked={exportFormat === 'idm'}
-                      onChange={(e) => setExportFormat(e.target.value)}
-                    />
+                <div className="export-format-options" ref={exportFormatListRef}>
+                  {/* IDM Project */}
+                  <div className={`export-format-option ${exportFormat === 'idm' ? 'selected' : ''}`} data-format="idm" onClick={() => setExportFormat('idm')}>
+                    <input type="radio" name="exportFormat" value="idm" checked={exportFormat === 'idm'} onChange={(e) => setExportFormat(e.target.value)} />
                     <div className="export-format-content">
                       <span className="export-format-title">IDM Project (.idm)</span>
-                      <span className="export-format-desc">Full project file with all data and library</span>
-                    </div>
-                  </label>
-                  <label className={`export-format-option ${exportFormat === 'idmxml-v2' ? 'selected' : ''}`}>
-                    <input
-                      type="radio"
-                      name="exportFormat"
-                      value="idmxml-v2"
-                      checked={exportFormat === 'idmxml-v2'}
-                      onChange={(e) => setExportFormat(e.target.value)}
-                    />
-                    <div className="export-format-content">
-                      <span className="export-format-title">idmXML (.xml)</span>
-                      <span className="export-format-desc">ISO 29481-3 compliant XML (idmXSD 2.0)</span>
-                    </div>
-                  </label>
-                  <label className={`export-format-option ${exportFormat === 'html' ? 'selected' : ''}`}>
-                    <input
-                      type="radio"
-                      name="exportFormat"
-                      value="html"
-                      checked={exportFormat === 'html'}
-                      onChange={(e) => setExportFormat(e.target.value)}
-                    />
-                    <div className="export-format-content">
-                      <span className="export-format-title">HTML Document (.html)</span>
-                      <span className="export-format-desc">Self-contained HTML with embedded images and BPMN diagram</span>
-                    </div>
-                  </label>
-                  <label className={`export-format-option ${exportFormat === 'zip' ? 'selected' : ''}`}>
-                    <input
-                      type="radio"
-                      name="exportFormat"
-                      value="zip"
-                      checked={exportFormat === 'zip'}
-                      onChange={(e) => setExportFormat(e.target.value)}
-                    />
-                    <div className="export-format-content">
-                      <span className="export-format-title">ZIP Bundle (.zip)</span>
-                      <span className="export-format-desc">idmXML + BPMN + images + project data in one archive</span>
-                    </div>
-                  </label>
-                  <label className={`export-format-option ${exportFormat === 'bpmn' ? 'selected' : ''}`}>
-                    <input
-                      type="radio"
-                      name="exportFormat"
-                      value="bpmn"
-                      checked={exportFormat === 'bpmn'}
-                      onChange={(e) => setExportFormat(e.target.value)}
-                    />
-                    <div className="export-format-content">
-                      <span className="export-format-title">BPMN Only (.bpmn)</span>
-                      <span className="export-format-desc">Process map diagram only</span>
-                    </div>
-                  </label>
-                  {serverConnection.isConnected && serverConnection.isAuthenticated && (
-                    <label className={`export-format-option export-format-server ${exportFormat === 'server' ? 'selected' : ''}`}>
-                      <input
-                        type="radio"
-                        name="exportFormat"
-                        value="server"
-                        checked={exportFormat === 'server'}
-                        onChange={(e) => setExportFormat(e.target.value)}
-                      />
-                      <div className="export-format-content">
-                        <span className="export-format-title">Save to Server</span>
-                        <span className="export-format-desc">{serverSpecId ? 'Update existing specification on server' : 'Create new specification on server'}</span>
-                      </div>
-                    </label>
-                  )}
-                </div>
-
-                {exportFormat === 'html' && (
-                  <div className="export-html-options">
-                    <p className="export-option-label">Stylesheet:</p>
-                    <div className="export-xslt-options">
-                      <label className="export-xslt-option">
-                        <input
-                          type="radio"
-                          name="xsltSource"
-                          value="default"
-                          checked={!customXslt}
-                          onChange={() => setCustomXslt(null)}
-                        />
-                        <span>Use default IDM stylesheet</span>
-                      </label>
-                      <label className="export-xslt-option">
-                        <input
-                          type="radio"
-                          name="xsltSource"
-                          value="custom"
-                          checked={!!customXslt}
-                          onChange={() => document.getElementById('xslt-upload').click()}
-                        />
-                        <span>{customXslt ? customXslt.name : 'Upload custom XSLT...'}</span>
-                      </label>
-                      <input
-                        type="file"
-                        id="xslt-upload"
-                        accept=".xsl,.xslt"
-                        style={{ display: 'none' }}
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            setCustomXslt(file);
-                          }
-                        }}
-                      />
-                    </div>
-                    <button
-                      className="download-xslt-btn"
-                      onClick={() => {
-                        const blob = new Blob([defaultIdmXslt], { type: 'application/xslt+xml' });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = 'idm-default-stylesheet.xslt';
-                        a.click();
-                        URL.revokeObjectURL(url);
-                      }}
-                    >
-                      Download default XSLT template
-                    </button>
-
-                    <div className="export-review-option" style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid var(--border-primary, #333)' }}>
-                      <label className="export-xslt-option" style={{ cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={exportOptions.enableReview}
-                          onChange={(e) => setExportOptions(prev => ({ ...prev, enableReview: e.target.checked }))}
-                        />
-                        <span>Enable Review Mode</span>
-                      </label>
-                      <p style={{ fontSize: '11px', color: 'var(--text-tertiary, #888)', margin: '4px 0 0 22px' }}>
-                        Adds commenting UI for reviewers. They can add comments and download the annotated file, which you can import back into IDMxPPM.
-                      </p>
+                      {exportFormat === 'idm' && <span className="export-format-desc">Full project file with all data and library</span>}
                     </div>
                   </div>
-                )}
+
+                  {/* idmXML */}
+                  <div className={`export-format-option ${exportFormat === 'idmxml-v2' ? 'selected' : ''}`} data-format="idmxml-v2" onClick={() => setExportFormat('idmxml-v2')}>
+                    <input type="radio" name="exportFormat" value="idmxml-v2" checked={exportFormat === 'idmxml-v2'} onChange={(e) => setExportFormat(e.target.value)} />
+                    <div className="export-format-content">
+                      <span className="export-format-title">idmXML (.xml)</span>
+                      {exportFormat === 'idmxml-v2' && <span className="export-format-desc">ISO 29481-3 compliant XML (idmXSD 2.0)</span>}
+                    </div>
+                  </div>
+
+                  {/* HTML Document + inline sub-options */}
+                  <div className={`export-format-option ${exportFormat === 'html' ? 'selected' : ''}`} data-format="html" onClick={() => setExportFormat('html')}>
+                    <input type="radio" name="exportFormat" value="html" checked={exportFormat === 'html'} onChange={(e) => setExportFormat(e.target.value)} />
+                    <div className="export-format-content">
+                      <span className="export-format-title">HTML Document (.html)</span>
+                      {exportFormat === 'html' && (
+                        <>
+                          <span className="export-format-desc">Self-contained HTML with embedded images and BPMN diagram</span>
+                          <div className="export-suboptions" onClick={(e) => e.stopPropagation()}>
+                            <p className="export-option-label">Stylesheet:</p>
+                            <div className="export-xslt-options">
+                              <label className="export-xslt-option">
+                                <input type="radio" name="xsltSource" value="default" checked={!customXslt} onChange={() => setCustomXslt(null)} />
+                                <span>Use default IDM stylesheet</span>
+                              </label>
+                              <label className="export-xslt-option">
+                                <input type="radio" name="xsltSource" value="custom" checked={!!customXslt} onChange={() => document.getElementById('xslt-upload').click()} />
+                                <span>{customXslt ? customXslt.name : 'Upload custom XSLT...'}</span>
+                              </label>
+                              <input
+                                type="file" id="xslt-upload" accept=".xsl,.xslt" style={{ display: 'none' }}
+                                onChange={(e) => { const file = e.target.files?.[0]; if (file) setCustomXslt(file); }}
+                              />
+                            </div>
+                            <button
+                              className="download-xslt-btn"
+                              onClick={() => {
+                                const blob = new Blob([defaultIdmXslt], { type: 'application/xslt+xml' });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = 'idm-default-stylesheet.xslt';
+                                a.click();
+                                URL.revokeObjectURL(url);
+                              }}
+                            >
+                              Download default XSLT template
+                            </button>
+                            <div className="export-review-option" style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid var(--border-primary, #333)' }}>
+                              <label className="export-xslt-option" style={{ cursor: 'pointer' }}>
+                                <input type="checkbox" checked={exportOptions.enableReview} onChange={(e) => setExportOptions(prev => ({ ...prev, enableReview: e.target.checked }))} />
+                                <span>Enable Review Mode</span>
+                              </label>
+                              <p style={{ fontSize: '11px', color: 'var(--text-tertiary, #888)', margin: '4px 0 0 22px' }}>
+                                Adds commenting UI for reviewers. They can add comments and download the annotated file, which you can import back into IDMxPPM.
+                              </p>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* ZIP Bundle */}
+                  <div className={`export-format-option ${exportFormat === 'zip' ? 'selected' : ''}`} data-format="zip" onClick={() => setExportFormat('zip')}>
+                    <input type="radio" name="exportFormat" value="zip" checked={exportFormat === 'zip'} onChange={(e) => setExportFormat(e.target.value)} />
+                    <div className="export-format-content">
+                      <span className="export-format-title">ZIP Bundle (.zip)</span>
+                      {exportFormat === 'zip' && <span className="export-format-desc">idmXML + BPMN + images + project data in one archive</span>}
+                    </div>
+                  </div>
+
+                  {/* BPMN Only */}
+                  <div className={`export-format-option ${exportFormat === 'bpmn' ? 'selected' : ''}`} data-format="bpmn" onClick={() => setExportFormat('bpmn')}>
+                    <input type="radio" name="exportFormat" value="bpmn" checked={exportFormat === 'bpmn'} onChange={(e) => setExportFormat(e.target.value)} />
+                    <div className="export-format-content">
+                      <span className="export-format-title">BPMN Only (.bpmn)</span>
+                      {exportFormat === 'bpmn' && <span className="export-format-desc">Process map diagram only</span>}
+                    </div>
+                  </div>
+
+                  {/* IDS + inline sub-options */}
+                  <div className={`export-format-option ${exportFormat === 'ids' ? 'selected' : ''}`} data-format="ids" onClick={() => setExportFormat('ids')}>
+                    <input type="radio" name="exportFormat" value="ids" checked={exportFormat === 'ids'} onChange={(e) => setExportFormat(e.target.value)} />
+                    <div className="export-format-content">
+                      <span className="export-format-title">IDS (.ids)</span>
+                      {exportFormat === 'ids' && (
+                        <>
+                          <span className="export-format-desc">buildingSMART Information Delivery Specification for IFC validation</span>
+                          <div className="export-suboptions" onClick={(e) => e.stopPropagation()}>
+                            <p className="export-option-label">Target IFC Version:</p>
+                            <select
+                              value={exportOptions.idsIfcVersion}
+                              onChange={(e) => setExportOptions(prev => ({ ...prev, idsIfcVersion: e.target.value }))}
+                              className="export-ids-select"
+                            >
+                              <option value="IFC2X3">IFC 2X3</option>
+                              <option value="IFC4X3_ADD2">IFC 4X3 ADD2 (recommended)</option>
+                            </select>
+                            <p style={{ fontSize: '11px', color: 'var(--text-tertiary, #888)', margin: '4px 0 0 0' }}>
+                              IDS exports only IFC-mappable requirements. Information Units need external element mappings (e.g., Pset_WallCommon.FireRating) to be included.
+                            </p>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Save to Server */}
+                  {serverConnection.isConnected && serverConnection.isAuthenticated && (
+                    <div className={`export-format-option export-format-server ${exportFormat === 'server' ? 'selected' : ''}`} data-format="server" onClick={() => setExportFormat('server')}>
+                      <input type="radio" name="exportFormat" value="server" checked={exportFormat === 'server'} onChange={(e) => setExportFormat(e.target.value)} />
+                      <div className="export-format-content">
+                        <span className="export-format-title">Save to Server</span>
+                        {exportFormat === 'server' && <span className="export-format-desc">{serverSpecId ? 'Update existing specification on server' : 'Create new specification on server'}</span>}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="export-dialog-footer">
                 <button
@@ -5614,14 +5631,16 @@ const App = () => {
           .export-format-options {
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 8px;
+            max-height: 400px;
+            overflow-y: auto;
           }
 
           .export-format-option {
             display: flex;
             align-items: flex-start;
             gap: 12px;
-            padding: 12px 16px;
+            padding: 10px 16px;
             background: var(--bg-secondary);
             border: 1px solid var(--border-primary);
             border-radius: 6px;
@@ -5637,17 +5656,21 @@ const App = () => {
           .export-format-option.selected {
             background: var(--bg-active);
             border-color: var(--accent-primary);
+            padding: 12px 16px;
           }
 
           .export-format-option input[type="radio"] {
             margin-top: 3px;
             accent-color: var(--accent-primary);
+            flex-shrink: 0;
           }
 
           .export-format-content {
             display: flex;
             flex-direction: column;
             gap: 4px;
+            flex: 1;
+            min-width: 0;
           }
 
           .export-format-title {
@@ -5659,6 +5682,23 @@ const App = () => {
           .export-format-desc {
             font-size: 12px;
             color: var(--text-muted);
+          }
+
+          .export-suboptions {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--border-primary, #333);
+          }
+
+          .export-ids-select {
+            padding: 6px 10px;
+            border-radius: 4px;
+            border: 1px solid var(--border-primary, #555);
+            background: var(--bg-secondary, #2a2a2a);
+            color: var(--text-primary, #fff);
+            font-size: 13px;
+            width: 100%;
+            margin-bottom: 8px;
           }
 
           .export-options {
