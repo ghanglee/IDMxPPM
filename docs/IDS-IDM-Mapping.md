@@ -83,14 +83,14 @@ IDS values support multiple constraint types via XML Schema restrictions:
 | `info > date` | `headerData.creationDate` | Direct |
 | `info > milestone` | `useCaseData.targetPhases.iso22263` | Keyword-matched to ISO 22263 stages |
 | `info > author` | `useCaseData.actors[0]` | Added as actor with role "Author" |
-| `specification` | **Sub-ER** under root ER | One Sub-ER per IDS specification |
-| `specification @name` | Sub-ER name | Direct (e.g., "Structural safety") |
-| `specification @instructions` | Sub-ER description | Direct |
+| `specification` | **Parent IU** (dataType: Structured) under root ER | One parent IU per IDS specification |
+| `specification @name` | Parent IU name | Direct (e.g., "Structural safety") |
+| `specification @instructions` | Parent IU definition | Direct |
 | `specification @ifcVersion` | IU external element mapping basis | Mapped via `IFC_VERSION_MAP` |
-| `applicability > entity` | Sub-ER description | "Applies to: IfcBeam" |
-| `applicability > predefinedType` | Sub-ER description | "PredefinedType: GIRDER" |
-| `applicability > material` | Sub-ER description | Applicability context |
-| `applicability > classification` | Sub-ER description | Applicability context |
+| `applicability > entity` | Parent IU definition | "Applies to: IfcBeam" |
+| `applicability > predefinedType` | Parent IU definition | "PredefinedType: GIRDER" |
+| `applicability > material` | Parent IU definition | Applicability context |
+| `applicability > classification` | Parent IU definition | Applicability context |
 
 ### 3.2 Requirement Types → Information Units
 
@@ -150,18 +150,20 @@ External mapping: parent entity name with relation description
 
 ### 3.3 ER Hierarchy Structure
 
+Each IDS `<specification>` maps to a **parent IU with dataType "Structured"** under a single root ER. The parent IU represents the IFC entity/object type from the specification's applicability, and each requirement becomes a **sub-IU** nested under that parent.
+
 ```
 Root ER: "er_{IDS title}"
-  ├── Sub-ER: "{specification @name}"           ← one per IDS specification
-  │     ├── IU: "{baseName}"                    ← from property requirement
+  ├── IU: "{specification @name}" (Structured)  ← parent IU, one per IDS specification
+  │     ├── Sub-IU: "{baseName}"                ← from property requirement
   │     │     ├── dataType: mapped from @dataType
   │     │     ├── constraints: from value restrictions
   │     │     └── External Mapping: "{Pset}.{Property}" (basis: IFC 2x3/4x3)
-  │     ├── IU: "{attribute name}"              ← from attribute requirement
-  │     ├── IU: "Classification ({system})"     ← from classification requirement
-  │     ├── IU: "Material"                      ← from material requirement
-  │     └── IU: "PartOf ({parent})"             ← from partOf requirement
-  ├── Sub-ER: "{specification @name}"
+  │     ├── Sub-IU: "{attribute name}"          ← from attribute requirement
+  │     ├── Sub-IU: "Classification ({system})" ← from classification requirement
+  │     ├── Sub-IU: "Material"                  ← from material requirement
+  │     └── Sub-IU: "PartOf ({parent})"         ← from partOf requirement
+  ├── IU: "{specification @name}" (Structured)
   │     └── ...
   └── ...
 ```
@@ -216,11 +218,11 @@ IDM to IDS export is supported via the existing IDS exporter (`src/utils/idsExpo
 |-------------|-------------|-------|
 | `headerData.shortTitle` | `info > title` | Direct |
 | `headerData.fullTitle` | `info > description` | Direct |
-| ER with IFC external mapping | `specification` | One per IFC entity group |
-| IU name | `property > baseName` | Direct |
-| IU external mapping (Pset.Property) | `property > propertySet` + `baseName` | Split on "." |
-| IU dataType | `property @dataType` | Reverse-mapped to IFC types |
-| IU constraints | `property > value` | Exported as `simpleValue` |
+| Parent IU (Structured) with IFC external mapping | `specification` | One per parent IU (object type) |
+| Sub-IU name | `property > baseName` | Direct |
+| Sub-IU external mapping (Pset.Property) | `property > propertySet` + `baseName` | Split on "." |
+| Sub-IU dataType | `property @dataType` | Reverse-mapped to IFC types |
+| Sub-IU constraints | `property > value` | Exported as `simpleValue` |
 
 ---
 
@@ -249,7 +251,7 @@ Both IDS and LOIN can be imported into IDM, but they serve different purposes:
 
 2. **No round-trip for IDS import**: Unlike LOIN (which supports bi-directional round-trip), IDS import is primarily one-directional. The IDS export function generates IDS from IDM data but does not guarantee identical output to the original imported IDS.
 
-3. **Applicability conditions**: IDS applicability conditions (material filters, classification filters, property-based filters) are captured as descriptive text in the Sub-ER description. They are not structured data in IDM and cannot be exported back to IDS applicability rules.
+3. **Applicability conditions**: IDS applicability conditions (material filters, classification filters, property-based filters) are captured as descriptive text in the parent IU definition. They are not structured data in IDM and cannot be exported back to IDS applicability rules.
 
 4. **Value constraints**: IDS value restrictions (patterns, enumerations, ranges) are stored as text in IU constraints. They are preserved for documentation but not exported back as structured XML Schema restrictions.
 

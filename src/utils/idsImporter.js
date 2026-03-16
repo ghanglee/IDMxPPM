@@ -50,11 +50,15 @@ function generateUUID() {
 /**
  * Get text content of first child element with given localName
  */
+function normalizeWS(str) {
+  return str ? str.replace(/[\r\n\t]+/g, ' ').replace(/ {2,}/g, ' ').trim() : '';
+}
+
 function getChildText(parent, tagName) {
   if (!parent) return '';
   for (const child of parent.childNodes) {
     if (child.nodeType === 1 && child.localName === tagName) {
-      return child.textContent?.trim() || '';
+      return normalizeWS(child.textContent || '');
     }
   }
   return '';
@@ -215,7 +219,7 @@ export function parseIdsXml(content) {
   const specificationsEl = getChild(root, 'specifications');
   const specifications = specificationsEl ? getChildren(specificationsEl, 'specification') : [];
 
-  const subERs = [];
+  const rootInformationUnits = [];
   let totalIUs = 0;
 
   for (const specEl of specifications) {
@@ -292,7 +296,7 @@ export function parseIdsXml(content) {
       }
     }
 
-    // Build ER description
+    // Build description for the parent IU
     const descParts = [];
     if (specDesc) descParts.push(specDesc);
     if (entityName) descParts.push(`Applies to: ${entityName}`);
@@ -301,68 +305,78 @@ export function parseIdsXml(content) {
       descParts.push('Applicability: ' + applicabilityDetails.join('; '));
     }
 
-    // Parse requirements into Information Units
+    // Parse requirements into sub-Information Units
     const requirementsEl = getChild(specEl, 'requirements');
-    const informationUnits = [];
+    const subInformationUnits = [];
 
     if (requirementsEl) {
-      // Property requirements → IUs
+      // Property requirements → sub-IUs
       const propertyEls = getChildren(requirementsEl, 'property');
       for (const propEl of propertyEls) {
         const iu = parsePropertyRequirement(propEl, entityName, basis);
         if (iu) {
-          informationUnits.push(iu);
+          subInformationUnits.push(iu);
           totalIUs++;
         }
       }
 
-      // Attribute requirements → IUs
+      // Attribute requirements → sub-IUs
       const attributeEls = getChildren(requirementsEl, 'attribute');
       for (const attrEl of attributeEls) {
         const iu = parseAttributeRequirement(attrEl, entityName, basis);
         if (iu) {
-          informationUnits.push(iu);
+          subInformationUnits.push(iu);
           totalIUs++;
         }
       }
 
-      // Classification requirements → IUs
+      // Classification requirements → sub-IUs
       const classificationEls = getChildren(requirementsEl, 'classification');
       for (const classEl of classificationEls) {
         const iu = parseClassificationRequirement(classEl, entityName, basis);
         if (iu) {
-          informationUnits.push(iu);
+          subInformationUnits.push(iu);
           totalIUs++;
         }
       }
 
-      // Material requirements → IUs
+      // Material requirements → sub-IUs
       const materialEls = getChildren(requirementsEl, 'material');
       for (const matEl of materialEls) {
         const iu = parseMaterialRequirement(matEl, entityName, basis);
         if (iu) {
-          informationUnits.push(iu);
+          subInformationUnits.push(iu);
           totalIUs++;
         }
       }
 
-      // PartOf requirements → IUs
+      // PartOf requirements → sub-IUs
       const partOfEls = getChildren(requirementsEl, 'partOf');
       for (const partOfEl of partOfEls) {
         const iu = parsePartOfRequirement(partOfEl, entityName, basis);
         if (iu) {
-          informationUnits.push(iu);
+          subInformationUnits.push(iu);
           totalIUs++;
         }
       }
     }
 
-    subERs.push({
+    // Create a parent IU with dataType "Structured" for each IDS specification
+    rootInformationUnits.push({
       id: generateUUID(),
-      name: specName,
-      description: descParts.join('\n'),
-      informationUnits,
-      subERs: [],
+      name: entityName || specName,
+      dataType: 'Structured',
+      isMandatory: true,
+      definition: descParts.join('\n'),
+      examples: '',
+      constraints: '',
+      correspondingExternalElements: entityName ? [{
+        id: generateUUID(),
+        basis,
+        name: entityName,
+        description: '',
+      }] : [],
+      subInformationUnits,
     });
   }
 
@@ -371,33 +385,49 @@ export function parseIdsXml(content) {
     id: generateUUID(),
     name: `er_${title}`,
     description: description || `Imported from IDS: ${title}`,
-    informationUnits: [],
-    subERs,
+    informationUnits: rootInformationUnits,
+    subERs: [],
   };
 
   // Build header data
   const headerData = {
-    fullTitle: title,
-    shortTitle: title,
+    title: title || description || '',
+    fullTitle: title || description || '',
+    shortTitle: title || description || '',
     status: 'WD',
     version: '1.0',
     idmGuid: generateUUID(),
     ucGuid: generateUUID(),
     bcmGuid: generateUUID(),
-    copyright: copyright || '',
-    aimScope: description || '',
+    copyright: '',
+    language: 'EN',
+    aimAndScope: description || title || '',
+    aimScope: description || title || '',
     use: '',
-    summary: description || '',
+    summary: description || title || '',
+    authors: [],
     actorsList: [],
   };
 
+  // Add copyright holder as author (IDS <copyright> is typically an organization name)
+  if (copyright) {
+    headerData.authors.push({
+      id: generateUUID(),
+      type: 'organization',
+      organizationName: copyright,
+      organizationUri: '',
+    });
+  }
+
   // Add author if present
   if (author) {
-    headerData.actorsList.push({
+    headerData.authors.push({
       id: generateUUID(),
-      name: author,
-      role: 'Author',
-      subActors: [],
+      type: 'person',
+      givenName: author,
+      familyName: '',
+      uri: '',
+      affiliation: copyright || '',
     });
   }
 
@@ -439,7 +469,7 @@ export function parseIdsXml(content) {
     headerData,
     erHierarchy: [rootER],
     bpmnXml: null,
-    totalSpecifications: subERs.length,
+    totalSpecifications: rootInformationUnits.length,
     totalIUs,
   };
 }

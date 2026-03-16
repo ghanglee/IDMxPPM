@@ -723,31 +723,28 @@ const UseEntry = ({ uses = [], useClassification = null, onChange, onClassificat
       {classificationType === 'nbims-us-v4' && nbimsClassification && (
         <div className="use-input-row">
           <select
-            value={selectedClassificationUse}
-            onChange={(e) => setSelectedClassificationUse(e.target.value)}
+            value=""
+            onChange={(e) => {
+              const useId = e.target.value;
+              if (!useId || !nbimsClassification) return;
+              const selectedUse = nbimsClassification.uses.find(u => u.id === useId);
+              if (selectedUse) {
+                const newUse = {
+                  name: selectedUse.name,
+                  description: selectedUse.description,
+                  classificationId: nbimsClassification.id,
+                  classificationName: nbimsClassification.name
+                };
+                onChange([...uses, newUse]);
+              }
+            }}
             className="pane-select use-select"
           >
-            <option value="">Select a use...</option>
+            <option value="">Select a use to add...</option>
             {nbimsClassification.uses.map(u => (
               <option key={u.id} value={u.id}>{u.name}</option>
             ))}
           </select>
-          <button
-            type="button"
-            className="pane-add-btn-small"
-            onClick={handleAddFromNBIMS}
-            disabled={!selectedClassificationUse}
-            title="Add Use"
-          >
-            <AddIcon size={12} />
-          </button>
-        </div>
-      )}
-
-      {/* Selected use description for NBIMS */}
-      {classificationType === 'nbims-us-v4' && selectedClassificationUse && nbimsClassification && (
-        <div className="use-description-preview">
-          {nbimsClassification.uses.find(u => u.id === selectedClassificationUse)?.description || ''}
         </div>
       )}
 
@@ -957,24 +954,20 @@ const RegionSelector = ({ regions = [], options = [], onChange, label }) => {
       <label>{label}</label>
       <div className="region-selector-input">
         <select
-          value={selectedRegion}
-          onChange={(e) => setSelectedRegion(e.target.value)}
+          value=""
+          onChange={(e) => {
+            const val = e.target.value;
+            if (val && !regions.includes(val)) {
+              onChange([...regions, val]);
+            }
+          }}
           className="pane-select region-dropdown"
         >
-          <option value="">Select a region...</option>
+          <option value="">Select a region to add...</option>
           {availableOptions.map(opt => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
           ))}
         </select>
-        <button
-          type="button"
-          className="pane-add-btn-small"
-          onClick={handleAddRegion}
-          disabled={!selectedRegion}
-          title="Add region"
-        >
-          <AddIcon size={12} />
-        </button>
       </div>
       {regions.length > 0 && (
         <div className="region-tags">

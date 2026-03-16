@@ -16,9 +16,9 @@ Hierarchical ER and Information Unit modeling with mandatory/optional indicators
 	•	External Schema Mapping
 Map information units to external schemas such as IFC, bSDD, CityGML, and classification systems (UniFormat, OmniClass, MasterFormat).
 	•	IDS Export & Import
-Export Exchange Requirements as buildingSMART Information Delivery Specification (IDS) files for IFC model validation. Import IDS files to create skeleton IDM specifications.
+Export Exchange Requirements as buildingSMART Information Delivery Specification (IDS) files for IFC model validation. Import IDS files to create structured IDM specifications -- each IDS specification becomes a parent IU (dataType: Structured) with property requirements as sub-IUs under a single root ER.
 	•	LOIN Export & Import
-Bi-directional support for Level of Information Need (EN 17412 / ISO 7817-1). Export groups IUs by object type; import creates ER hierarchy from LOIN specifications. Supports CEN 17412, EN 17412-3, and ISO 7817-3 schema variants.
+Bi-directional support for Level of Information Need (EN 17412 / ISO 7817-1). Each LOIN object type maps to a parent IU (dataType: Structured) with properties as sub-IUs, enabling clean round-trip conversion. Supports CEN 17412, EN 17412-3, and ISO 7817-3 schema variants.
 	•	Review Mode HTML Export
 Self-contained HTML with embedded commenting UI. Reviewers add comments in the browser; import reviewed HTML back to restore comments.
 	•	Validation Engine

@@ -88,25 +88,33 @@ function generateUUID() {
 }
 
 /**
- * Collect all Information Units from the ER hierarchy recursively
- * Each IU is returned with its parent ER name for context
+ * Collect all Information Units from the ER hierarchy recursively.
+ * For structured parent IUs (dataType "Structured" with subInformationUnits),
+ * they are returned as entity groups rather than flat IUs.
+ * Each result item is either:
+ *   { type: 'structured', parentIU, subIUs, erName } — a structured parent IU representing an entity group
+ *   { type: 'regular', iu, erName } — a regular IU to be grouped by external mapping
  */
-function collectAllIUs(erHierarchy) {
-  const ius = [];
+function collectAllIUItems(erHierarchy) {
+  const items = [];
 
   function walkER(er) {
     if (!er) return;
-    // Collect IUs from this ER
     if (er.informationUnits && er.informationUnits.length > 0) {
       for (const iu of er.informationUnits) {
-        ius.push({ iu, erName: er.name || 'Unnamed ER' });
-        // Also collect sub-IUs recursively
-        if (iu.subInformationUnits) {
-          collectSubIUs(iu.subInformationUnits, er.name);
+        if (iu.dataType === 'Structured' && iu.subInformationUnits && iu.subInformationUnits.length > 0) {
+          // Structured parent IU: treat as an entity group
+          items.push({ type: 'structured', parentIU: iu, subIUs: iu.subInformationUnits, erName: er.name || 'Unnamed ER' });
+        } else {
+          // Regular IU
+          items.push({ type: 'regular', iu, erName: er.name || 'Unnamed ER' });
+          // Also collect sub-IUs recursively as regular IUs
+          if (iu.subInformationUnits) {
+            collectSubIUs(iu.subInformationUnits, er.name);
+          }
         }
       }
     }
-    // Recurse into sub-ERs
     if (er.subERs) {
       for (const subER of er.subERs) {
         walkER(subER);
@@ -116,7 +124,7 @@ function collectAllIUs(erHierarchy) {
 
   function collectSubIUs(subIUs, erName) {
     for (const siu of subIUs) {
-      ius.push({ iu: siu, erName });
+      items.push({ type: 'regular', iu: siu, erName });
       if (siu.subInformationUnits) {
         collectSubIUs(siu.subInformationUnits, erName);
       }
@@ -128,7 +136,7 @@ function collectAllIUs(erHierarchy) {
       walkER(er);
     }
   }
-  return ius;
+  return items;
 }
 
 /**
@@ -251,8 +259,17 @@ const PSET_ENTITY_MAP = {
  * @returns {{ xml: string, specCount: number, skippedCount: number, totalIUs: number, mappedIUs: number }}
  */
 export function generateLoinXml({ headerData, useCaseData, erHierarchy }) {
-  const allIUs = collectAllIUs(erHierarchy);
-  const totalIUs = allIUs.length;
+  const allItems = collectAllIUItems(erHierarchy);
+
+  // Count total IUs (including sub-IUs of structured parents)
+  let totalIUs = 0;
+  for (const item of allItems) {
+    if (item.type === 'structured') {
+      totalIUs += item.subIUs.length;
+    } else {
+      totalIUs++;
+    }
+  }
 
   // Group IUs by object type (IFC entity, CityGML element, classification, etc.)
   // Structure: { objectTypeName: { schema, dataModelType, classificationRef, psets: { ... }, standaloneProps: [...] } }
@@ -260,11 +277,14 @@ export function generateLoinXml({ headerData, useCaseData, erHierarchy }) {
   let mappedIUs = 0;
   const unmappedIUs = [];
 
-  for (const { iu, erName } of allIUs) {
+  /**
+   * Process a regular IU into entityGroups based on its external element mappings.
+   */
+  function processRegularIU(iu, erName) {
     const mappings = iu.correspondingExternalElements || iu.correspondingExternalElement || [];
     if (!mappings || mappings.length === 0) {
       unmappedIUs.push({ name: iu.name, erName });
-      continue;
+      return;
     }
 
     let iuMapped = false;
@@ -274,7 +294,6 @@ export function generateLoinXml({ headerData, useCaseData, erHierarchy }) {
 
       iuMapped = true;
 
-      // Determine the object type name
       let objectTypeName = parsed.objectTypeName;
       if (!objectTypeName && parsed.psetName) {
         objectTypeName = PSET_ENTITY_MAP[parsed.psetName] || 'IfcElement';
@@ -314,6 +333,82 @@ export function generateLoinXml({ headerData, useCaseData, erHierarchy }) {
       mappedIUs++;
     } else {
       unmappedIUs.push({ name: iu.name, erName });
+    }
+  }
+
+  for (const item of allItems) {
+    if (item.type === 'structured') {
+      // Structured parent IU: parent IU name/mapping determines objectType, sub-IUs are properties
+      const parentIU = item.parentIU;
+      const parentMappings = parentIU.correspondingExternalElements || parentIU.correspondingExternalElement || [];
+
+      // Determine object type name from parent IU
+      let objectTypeName = parentIU.name || 'Unspecified';
+      let schema = '';
+      let dataModelType = '';
+      let classificationRef = '';
+
+      if (parentMappings && parentMappings.length > 0) {
+        const firstMapping = parentMappings[0];
+        const parsed = parseMapping(firstMapping);
+        if (parsed) {
+          objectTypeName = parsed.objectTypeName || parsed.dataModelType || parentIU.name || 'Unspecified';
+          schema = parsed.schema || '';
+          dataModelType = parsed.dataModelType || '';
+          classificationRef = parsed.classificationRef || '';
+        }
+      }
+
+      if (!entityGroups[objectTypeName]) {
+        entityGroups[objectTypeName] = {
+          schema,
+          dataModelType,
+          classificationRef,
+          psets: {},
+          standaloneProps: []
+        };
+      }
+
+      // Process sub-IUs as properties of this entity group
+      for (const subIU of item.subIUs) {
+        const subMappings = subIU.correspondingExternalElements || subIU.correspondingExternalElement || [];
+        let propName = subIU.name || 'Unnamed';
+        let propClassificationRef = '';
+        let psetName = null;
+
+        if (subMappings && subMappings.length > 0) {
+          const subParsed = parseMapping(subMappings[0]);
+          if (subParsed) {
+            propClassificationRef = subParsed.classificationRef || '';
+            if (subParsed.psetName) {
+              psetName = subParsed.psetName;
+              propName = subParsed.propertyName || subIU.name || 'Unnamed';
+            } else if (subParsed.propertyName) {
+              propName = subParsed.propertyName;
+            }
+          }
+        }
+
+        const prop = {
+          name: propName,
+          dataType: DATA_TYPE_MAP[subIU.dataType] || 'String',
+          classificationRef: propClassificationRef,
+          unit: subIU.unit || '',
+        };
+
+        if (psetName) {
+          if (!entityGroups[objectTypeName].psets[psetName]) {
+            entityGroups[objectTypeName].psets[psetName] = [];
+          }
+          entityGroups[objectTypeName].psets[psetName].push(prop);
+        } else {
+          entityGroups[objectTypeName].standaloneProps.push(prop);
+        }
+        mappedIUs++;
+      }
+    } else {
+      // Regular IU: process as before
+      processRegularIU(item.iu, item.erName);
     }
   }
 

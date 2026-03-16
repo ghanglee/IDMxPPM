@@ -124,7 +124,7 @@ const parseFigures = (sectionElement) => {
  * Trim leading/trailing whitespace from a string value.
  * Returns empty string for null/undefined.
  */
-const trimStr = (val) => (val ? val.trim() : '');
+const trimStr = (val) => (val ? val.replace(/[\r\n\t]+/g, ' ').replace(/ {2,}/g, ' ').trim() : '');
 
 /**
  * Helper: get direct child elements by tag name (namespace-safe).

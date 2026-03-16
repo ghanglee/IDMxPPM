@@ -265,7 +265,7 @@ const parseUseCase = (doc) => {
     summaryContent = uc.querySelector('summary content');
   }
   if (summaryContent) {
-    ucData.summary = summaryContent.textContent || '';
+    ucData.summary = (summaryContent.textContent || '').replace(/[\r\n\t]+/g, ' ').replace(/ {2,}/g, ' ').trim();
     console.log('Summary found:', ucData.summary.substring(0, 50) + '...');
   } else {
     console.log('No summary content found');
@@ -280,7 +280,7 @@ const parseUseCase = (doc) => {
     aimContent = uc.querySelector('aimAndScope content');
   }
   if (aimContent) {
-    ucData.aimAndScope = aimContent.textContent || '';
+    ucData.aimAndScope = (aimContent.textContent || '').replace(/[\r\n\t]+/g, ' ').replace(/ {2,}/g, ' ').trim();
     console.log('Aim and Scope found:', ucData.aimAndScope.substring(0, 50) + '...');
   } else {
     console.log('No aimAndScope content found');

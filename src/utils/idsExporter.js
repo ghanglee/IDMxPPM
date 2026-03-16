@@ -70,90 +70,141 @@ function escapeXml(str) {
 }
 
 /**
- * Analyze an ER's IUs and external element mappings to determine:
- * - Which IFC entity this ER applies to (applicability)
- * - Which facets (property, classification, attribute) to generate
+ * Process a single IU's external element mappings to extract entity candidates and facets.
+ * Used for regular (non-structured) IUs.
  */
-function analyzeER(er) {
-  const facets = [];
-  const entityCandidates = new Set();
+function processIUMappings(iu, entityCandidates, facets) {
+  if (!iu) return;
 
-  const processIU = (iu) => {
-    if (!iu) return;
+  const mappings = iu.correspondingExternalElements || iu.correspondingExternalElement || iu.externalElements || [];
+  for (const mapping of mappings) {
+    const schema = mapping.basis || mapping.schema || mapping.standard || '';
+    const element = mapping.element || mapping.name || '';
 
-    const mappings = iu.correspondingExternalElement || iu.externalElements || [];
-    for (const mapping of mappings) {
-      const schema = mapping.schema || mapping.standard || '';
-      const element = mapping.element || mapping.name || '';
-
-      if (schema.startsWith('IFC')) {
-        // Check if it's a Pset reference (contains a dot: Pset_WallCommon.FireRating)
-        if (element.includes('.')) {
-          const [psetName, propName] = element.split('.');
-          const entity = PSET_ENTITY_MAP[psetName];
-          if (entity) entityCandidates.add(entity);
-          facets.push({
-            type: 'property',
-            propertySet: psetName,
-            baseName: propName,
-            dataType: DATA_TYPE_MAP[iu.dataType] || 'IFCLABEL',
-            cardinality: iu.isMandatory ? 'required' : 'optional',
-            instructions: iu.definition || '',
-            uri: mapping.uri || '',
-          });
-        } else if (element.startsWith('Pset_') || element.startsWith('Qto_')) {
-          // Just a Pset name without property — treat as property set reference
-          const entity = PSET_ENTITY_MAP[element];
-          if (entity) entityCandidates.add(entity);
-        } else if (element.startsWith('Ifc') || element.startsWith('IFC')) {
-          // Direct IFC entity reference
-          entityCandidates.add(toIdsEntityName(element));
-        }
+    if (schema.includes('IFC') || schema.includes('ifc')) {
+      // Check if it's a Pset reference (contains a dot: Pset_WallCommon.FireRating)
+      if (element.includes('.')) {
+        const [psetName, propName] = element.split('.');
+        const entity = PSET_ENTITY_MAP[psetName];
+        if (entity) entityCandidates.add(entity);
+        facets.push({
+          type: 'property',
+          propertySet: psetName,
+          baseName: propName,
+          dataType: DATA_TYPE_MAP[iu.dataType] || 'IFCLABEL',
+          cardinality: iu.isMandatory ? 'required' : 'optional',
+          instructions: iu.definition || '',
+          uri: mapping.uri || '',
+        });
+      } else if (element.startsWith('Pset_') || element.startsWith('Qto_')) {
+        // Just a Pset name without property — treat as property set reference
+        const entity = PSET_ENTITY_MAP[element];
+        if (entity) entityCandidates.add(entity);
+      } else if (element.startsWith('Ifc') || element.startsWith('IFC')) {
+        // Direct IFC entity reference
+        entityCandidates.add(toIdsEntityName(element));
       }
-      // Non-IFC schemas (bSDD without IFC context, CityGML, UniFormat, OmniClass, MasterFormat, Other)
-      // are skipped — IDS is strictly IFC-bound and cannot represent non-IFC requirements.
     }
-
-    // Process sub-IUs recursively
-    const subIUs = iu.subInformationUnits || iu.children || [];
-    for (const subIU of subIUs) {
-      processIU(subIU);
-    }
-  };
-
-  const ius = er.informationUnits || [];
-  for (const iu of ius) {
-    processIU(iu);
+    // Non-IFC schemas are skipped — IDS is strictly IFC-bound.
   }
 
-  return {
-    entities: Array.from(entityCandidates),
-    facets,
-  };
+  // Process sub-IUs recursively (for non-structured IUs that happen to have children)
+  const subIUs = iu.subInformationUnits || iu.children || [];
+  for (const subIU of subIUs) {
+    processIUMappings(subIU, entityCandidates, facets);
+  }
 }
 
 /**
- * Collect all leaf ERs (ERs that have IUs) from the hierarchy, flattened
+ * Collect all ERs (with IUs) from the hierarchy, flattened
  */
-function collectLeafERs(erHierarchy) {
-  const leafERs = [];
+function collectAllERs(erHierarchy) {
+  const allERs = [];
 
   const walk = (ers) => {
     for (const er of ers) {
       const hasIUs = er.informationUnits && er.informationUnits.length > 0;
-      const hasSubERs = er.subERs && er.subERs.length > 0;
 
       if (hasIUs) {
-        leafERs.push(er);
+        allERs.push(er);
       }
-      if (hasSubERs) {
+      if (er.subERs && er.subERs.length > 0) {
         walk(er.subERs);
       }
     }
   };
 
   walk(erHierarchy);
-  return leafERs;
+  return allERs;
+}
+
+/**
+ * Analyze an ER's IUs and generate IDS specifications.
+ * - Structured parent IUs (dataType "Structured" with subInformationUnits):
+ *   The parent IU's entity mapping gives the applicability, sub-IUs give the facets.
+ * - Regular IUs: processed as before by scanning their own mappings.
+ * Returns an array of { entity, facets, name, description, id } specification objects.
+ */
+function analyzeERForSpecs(er) {
+  const specs = [];
+  const ius = er.informationUnits || [];
+
+  // Collect regular (non-structured) IUs
+  const regularIUs = [];
+
+  for (const iu of ius) {
+    if (iu.dataType === 'Structured' && iu.subInformationUnits && iu.subInformationUnits.length > 0) {
+      // Structured parent IU: treat as its own specification
+      const entityCandidates = new Set();
+      const facets = [];
+
+      // Get entity from the parent IU's own mappings
+      const parentMappings = iu.correspondingExternalElements || iu.correspondingExternalElement || [];
+      for (const mapping of parentMappings) {
+        const element = mapping.element || mapping.name || '';
+        if (element.startsWith('Ifc') || element.startsWith('IFC')) {
+          entityCandidates.add(toIdsEntityName(element));
+        }
+      }
+
+      // Process sub-IUs as facets
+      for (const subIU of iu.subInformationUnits) {
+        processIUMappings(subIU, entityCandidates, facets);
+      }
+
+      if (facets.length > 0) {
+        specs.push({
+          entity: entityCandidates.size > 0 ? Array.from(entityCandidates)[0] : null,
+          facets,
+          name: iu.name || er.name || 'Unnamed',
+          description: iu.definition || '',
+          id: iu.id || '',
+        });
+      }
+    } else {
+      regularIUs.push(iu);
+    }
+  }
+
+  // Process remaining regular IUs as a single specification (legacy behavior)
+  if (regularIUs.length > 0) {
+    const entityCandidates = new Set();
+    const facets = [];
+    for (const iu of regularIUs) {
+      processIUMappings(iu, entityCandidates, facets);
+    }
+    if (facets.length > 0) {
+      specs.push({
+        entity: entityCandidates.size > 0 ? Array.from(entityCandidates)[0] : null,
+        facets,
+        name: er.name || 'Unnamed',
+        description: er.description || er.definition || '',
+        id: er.guid || er.id || '',
+      });
+    }
+  }
+
+  return specs;
 }
 
 /**
@@ -166,7 +217,7 @@ function collectLeafERs(erHierarchy) {
  * @returns {{ xml: string, specCount: number, skippedCount: number }}
  */
 export function generateIdsXml({ headerData, erHierarchy, ifcVersion = 'IFC4X3_ADD2' }) {
-  const leafERs = collectLeafERs(erHierarchy || []);
+  const allERs = collectAllERs(erHierarchy || []);
 
   // Extract author email from headerData
   const authorEmail = (() => {
@@ -203,77 +254,74 @@ export function generateIdsXml({ headerData, erHierarchy, ifcVersion = 'IFC4X3_A
   let specCount = 0;
   let skippedCount = 0;
 
-  for (const er of leafERs) {
-    const analysis = analyzeER(er);
+  for (const er of allERs) {
+    const specs = analyzeERForSpecs(er);
 
-    if (analysis.facets.length === 0) {
+    if (specs.length === 0) {
       skippedCount++;
       continue;
     }
 
-    specCount++;
+    for (const spec of specs) {
+      specCount++;
 
-    // Determine applicability entity
-    const applicabilityEntity = analysis.entities.length > 0
-      ? analysis.entities[0]
-      : null;
+      const specName = escapeXml(spec.name || `Spec_${specCount}`);
+      const specDesc = spec.description || '';
+      const specId = spec.id || '';
 
-    const erName = escapeXml(er.name || `ER_${specCount}`);
-    const erDesc = er.description || er.definition || '';
-    const erId = er.guid || er.id || '';
+      xml += `    <ids:specification name="${specName}" ifcVersion="${ifcVersion}"`;
+      if (specId) xml += ` identifier="${escapeXml(specId)}"`;
+      if (specDesc) xml += ` description="${escapeXml(specDesc)}"`;
+      xml += `>\n`;
 
-    xml += `    <ids:specification name="${erName}" ifcVersion="${ifcVersion}"`;
-    if (erId) xml += ` identifier="${escapeXml(erId)}"`;
-    if (erDesc) xml += ` description="${escapeXml(erDesc)}"`;
-    xml += `>\n`;
+      // Applicability
+      xml += `      <ids:applicability minOccurs="0" maxOccurs="unbounded">\n`;
+      if (spec.entity) {
+        xml += `        <ids:entity>\n`;
+        xml += `          <ids:name>\n`;
+        xml += `            <ids:simpleValue>${spec.entity}</ids:simpleValue>\n`;
+        xml += `          </ids:name>\n`;
+        xml += `        </ids:entity>\n`;
+      }
+      xml += `      </ids:applicability>\n`;
 
-    // Applicability
-    xml += `      <ids:applicability minOccurs="0" maxOccurs="unbounded">\n`;
-    if (applicabilityEntity) {
-      xml += `        <ids:entity>\n`;
-      xml += `          <ids:name>\n`;
-      xml += `            <ids:simpleValue>${applicabilityEntity}</ids:simpleValue>\n`;
-      xml += `          </ids:name>\n`;
-      xml += `        </ids:entity>\n`;
-    }
-    xml += `      </ids:applicability>\n`;
+      // Requirements
+      if (spec.facets.length > 0) {
+        xml += `      <ids:requirements>\n`;
 
-    // Requirements
-    if (analysis.facets.length > 0) {
-      xml += `      <ids:requirements>\n`;
-
-      for (const facet of analysis.facets) {
-        if (facet.type === 'property') {
-          xml += `        <ids:property cardinality="${facet.cardinality}"`;
-          if (facet.dataType) xml += ` dataType="${facet.dataType}"`;
-          if (facet.instructions) xml += ` instructions="${escapeXml(facet.instructions)}"`;
-          if (facet.uri) xml += ` uri="${escapeXml(facet.uri)}"`;
-          xml += `>\n`;
-          xml += `          <ids:propertySet>\n`;
-          xml += `            <ids:simpleValue>${escapeXml(facet.propertySet)}</ids:simpleValue>\n`;
-          xml += `          </ids:propertySet>\n`;
-          xml += `          <ids:baseName>\n`;
-          xml += `            <ids:simpleValue>${escapeXml(facet.baseName)}</ids:simpleValue>\n`;
-          xml += `          </ids:baseName>\n`;
-          xml += `        </ids:property>\n`;
-        } else if (facet.type === 'classification') {
-          xml += `        <ids:classification cardinality="${facet.cardinality}"`;
-          if (facet.instructions) xml += ` instructions="${escapeXml(facet.instructions)}"`;
-          xml += `>\n`;
-          xml += `          <ids:value>\n`;
-          xml += `            <ids:simpleValue>${escapeXml(facet.value)}</ids:simpleValue>\n`;
-          xml += `          </ids:value>\n`;
-          xml += `          <ids:system>\n`;
-          xml += `            <ids:simpleValue>${escapeXml(facet.system)}</ids:simpleValue>\n`;
-          xml += `          </ids:system>\n`;
-          xml += `        </ids:classification>\n`;
+        for (const facet of spec.facets) {
+          if (facet.type === 'property') {
+            xml += `        <ids:property cardinality="${facet.cardinality}"`;
+            if (facet.dataType) xml += ` dataType="${facet.dataType}"`;
+            if (facet.instructions) xml += ` instructions="${escapeXml(facet.instructions)}"`;
+            if (facet.uri) xml += ` uri="${escapeXml(facet.uri)}"`;
+            xml += `>\n`;
+            xml += `          <ids:propertySet>\n`;
+            xml += `            <ids:simpleValue>${escapeXml(facet.propertySet)}</ids:simpleValue>\n`;
+            xml += `          </ids:propertySet>\n`;
+            xml += `          <ids:baseName>\n`;
+            xml += `            <ids:simpleValue>${escapeXml(facet.baseName)}</ids:simpleValue>\n`;
+            xml += `          </ids:baseName>\n`;
+            xml += `        </ids:property>\n`;
+          } else if (facet.type === 'classification') {
+            xml += `        <ids:classification cardinality="${facet.cardinality}"`;
+            if (facet.instructions) xml += ` instructions="${escapeXml(facet.instructions)}"`;
+            xml += `>\n`;
+            xml += `          <ids:value>\n`;
+            xml += `            <ids:simpleValue>${escapeXml(facet.value)}</ids:simpleValue>\n`;
+            xml += `          </ids:value>\n`;
+            xml += `          <ids:system>\n`;
+            xml += `            <ids:simpleValue>${escapeXml(facet.system)}</ids:simpleValue>\n`;
+            xml += `          </ids:system>\n`;
+            xml += `        </ids:classification>\n`;
+          }
         }
+
+        xml += `      </ids:requirements>\n`;
       }
 
-      xml += `      </ids:requirements>\n`;
+      xml += `    </ids:specification>\n`;
     }
-
-    xml += `    </ids:specification>\n`;
   }
 
   // If no specs were generated, add an empty placeholder comment

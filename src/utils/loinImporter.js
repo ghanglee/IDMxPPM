@@ -32,11 +32,15 @@ function generateUUID() {
 /**
  * Get text content of first child element with given localName
  */
+function normalizeWS(str) {
+  return str ? str.replace(/[\r\n\t]+/g, ' ').replace(/ {2,}/g, ' ').trim() : '';
+}
+
 function getChildText(parent, tagName) {
   if (!parent) return '';
   for (const child of parent.childNodes) {
     if (child.nodeType === 1 && child.localName === tagName) {
-      return child.textContent?.trim() || '';
+      return normalizeWS(child.textContent || '');
     }
   }
   return '';
@@ -117,20 +121,20 @@ function determineBasis(refToDataModelType, refToClassification) {
 
 function parseTumcmsFormat(doc) {
   const root = doc.documentElement;
-  const specName = root.getAttribute('name') || 'LOIN Import';
+  const specName = normalizeWS(root.getAttribute('name')) || 'LOIN Import';
   const specGuid = root.getAttribute('globalId') || generateUUID();
   const description = getChildText(root, 'description') || '';
 
   // Context
   const contextEl = getChild(root, 'context');
-  const purpose = contextEl?.getAttribute('purpose') || '';
-  const milestone = contextEl?.getAttribute('informationDeliveryMileStone') || '';
-  const sendingActor = contextEl?.getAttribute('sendingActor') || '';
-  const receivingActor = contextEl?.getAttribute('receivingActor') || '';
+  const purpose = normalizeWS(contextEl?.getAttribute('purpose') || '');
+  const milestone = normalizeWS(contextEl?.getAttribute('informationDeliveryMileStone') || '');
+  const sendingActor = normalizeWS(contextEl?.getAttribute('sendingActor') || '');
+  const receivingActor = normalizeWS(contextEl?.getAttribute('receivingActor') || '');
 
   // Parse specificationPerObjectTypeList entries
   const specEntries = getChildren(root, 'specificationPerObjectTypeList');
-  const subERs = [];
+  const rootInformationUnits = [];
 
   for (const entry of specEntries) {
     const objectTypeEl = getChild(entry, 'objectType');
@@ -141,7 +145,7 @@ function parseTumcmsFormat(doc) {
 
     const alphaEl = getChild(entry, 'alphanumericInformationSpecification');
     const alphaDesc = alphaEl ? getChildText(alphaEl, 'Description') : '';
-    const informationUnits = [];
+    const subInformationUnits = [];
 
     if (alphaEl) {
       // Parse propertySets
@@ -154,7 +158,7 @@ function parseTumcmsFormat(doc) {
           if (propsEl) {
             const props = getChildren(propsEl, 'property');
             for (const prop of props) {
-              informationUnits.push(createIUFromProperty(prop, psetName, basis, refToDataModelType, refToClassification));
+              subInformationUnits.push(createIUFromProperty(prop, psetName, basis, refToDataModelType, refToClassification));
             }
           }
         }
@@ -165,7 +169,7 @@ function parseTumcmsFormat(doc) {
       if (standalonePropsEl) {
         const props = getChildren(standalonePropsEl, 'property');
         for (const prop of props) {
-          informationUnits.push(createIUFromProperty(prop, '', basis, refToDataModelType, refToClassification));
+          subInformationUnits.push(createIUFromProperty(prop, '', basis, refToDataModelType, refToClassification));
         }
       }
     }
@@ -188,16 +192,25 @@ function parseTumcmsFormat(doc) {
       if (parts.length > 0) geoDesc = '\n\nGeometric Information: ' + parts.join(', ');
     }
 
-    subERs.push({
+    // Create a parent IU with dataType "Structured" for each object type
+    rootInformationUnits.push({
       id: entry.getAttribute('globalId') || generateUUID(),
       name: objectTypeName,
-      description: (alphaDesc + geoDesc).trim(),
-      informationUnits,
-      subERs: [],
+      dataType: 'Structured',
+      isMandatory: true,
+      definition: (alphaDesc + geoDesc).trim(),
+      examples: '',
+      correspondingExternalElements: [{
+        id: generateUUID(),
+        basis,
+        name: refToDataModelType || objectTypeName,
+        description: refToClassification,
+      }],
+      subInformationUnits,
     });
   }
 
-  return buildResult(specName, specGuid, description, purpose, milestone, sendingActor, receivingActor, subERs);
+  return buildResult(specName, specGuid, description, purpose, milestone, sendingActor, receivingActor, rootInformationUnits);
 }
 
 /**
@@ -264,7 +277,7 @@ function parseENFormat(doc) {
 
   // Parse SpecificationPerObjectType entries
   const specEntries = getChildren(specEl, 'SpecificationPerObjectType');
-  const subERs = [];
+  const rootInformationUnits = [];
 
   for (const entry of specEntries) {
     // Try inline ObjectType first, then resolve via dt:Object nodeID reference
@@ -303,12 +316,12 @@ function parseENFormat(doc) {
       refToClassification = refDocEl?.getAttribute('resource') || '';
     }
 
-    const informationUnits = [];
+    const subInformationUnits = [];
 
     // Parse inline AlphanumericalInformation
     const alphaEl = getChild(entry, 'AlphanumericalInformation') || getChild(entry, 'AlphanumericInformation');
     if (alphaEl) {
-      parseAlphaInfo(alphaEl, informationUnits, objectTypeName, refToClassification, propertiesMap);
+      parseAlphaInfo(alphaEl, subInformationUnits, objectTypeName, refToClassification, propertiesMap);
     }
 
     // Parse dt:SetOfProperties references
@@ -318,7 +331,7 @@ function parseENFormat(doc) {
       if (nodeID && setsOfPropertiesMap[nodeID]) {
         const setInfo = setsOfPropertiesMap[nodeID];
         for (const propInfo of setInfo.properties) {
-          informationUnits.push(createIUFromParsedProperty(propInfo, setInfo.name, objectTypeName, refToClassification));
+          subInformationUnits.push(createIUFromParsedProperty(propInfo, setInfo.name, objectTypeName, refToClassification));
         }
       }
     }
@@ -357,16 +370,27 @@ function parseENFormat(doc) {
       }
     }
 
-    subERs.push({
+    const basis = determineBasis(objectTypeName, refToClassification);
+
+    // Create a parent IU with dataType "Structured" for each object type
+    rootInformationUnits.push({
       id: entry.getAttribute('UUID') || entry.getAttribute('nodeID') || generateUUID(),
       name: objectTypeName,
-      description: (objectTypeDef + geoDesc + docDesc).trim(),
-      informationUnits,
-      subERs: [],
+      dataType: 'Structured',
+      isMandatory: true,
+      definition: (objectTypeDef + geoDesc + docDesc).trim(),
+      examples: '',
+      correspondingExternalElements: [{
+        id: generateUUID(),
+        basis,
+        name: objectTypeName,
+        description: refToClassification,
+      }],
+      subInformationUnits,
     });
   }
 
-  return buildResult(specName, specGuid, description, purpose, milestone, sendingActor, receivingActor, subERs);
+  return buildResult(specName, specGuid, description, purpose, milestone, sendingActor, receivingActor, rootInformationUnits);
 }
 
 /**
@@ -529,28 +553,31 @@ function createIUFromParsedProperty(propInfo, psetName, objectTypeName, objectRe
 // Shared: Build final result
 // ─────────────────────────────────────────────────────────────
 
-function buildResult(specName, specGuid, description, purpose, milestone, sendingActor, receivingActor, subERs) {
+function buildResult(specName, specGuid, description, purpose, milestone, sendingActor, receivingActor, informationUnits) {
   // Build root ER
   const rootER = {
     id: generateUUID(),
     name: `er_${specName}`,
     description: description || `Imported from LOIN: ${specName}`,
-    informationUnits: [],
-    subERs,
+    informationUnits,
+    subERs: [],
   };
 
   // Build header data
   const headerData = {
-    fullTitle: description || specName,
-    shortTitle: specName,
+    title: description || specName || '',
+    fullTitle: description || specName || '',
+    shortTitle: specName || description || '',
     status: 'WD',
     version: '1.0',
     idmGuid: specGuid,
     ucGuid: generateUUID(),
     bcmGuid: generateUUID(),
-    aimScope: purpose || '',
+    language: 'EN',
+    aimAndScope: purpose || description || '',
+    aimScope: purpose || description || '',
     use: '',
-    summary: description || '',
+    summary: description || purpose || '',
     actorsList: [],
   };
 
@@ -600,13 +627,13 @@ function buildResult(specName, specGuid, description, purpose, milestone, sendin
   }
 
   const erHierarchy = [rootER];
-  const totalIUs = subERs.reduce((sum, er) => sum + er.informationUnits.length, 0);
+  const totalIUs = informationUnits.reduce((sum, iu) => (iu.subInformationUnits ? sum + iu.subInformationUnits.length : sum), 0);
 
   return {
     headerData,
     erHierarchy,
     bpmnXml: null, // No BPMN in LOIN
-    totalObjectTypes: subERs.length,
+    totalObjectTypes: informationUnits.length,
     totalIUs,
   };
 }

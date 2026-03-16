@@ -25,8 +25,7 @@ export const validateHeader = (headerData) => {
   const requiredStringFields = [
     { field: 'title', label: 'IDM Title' },
     { field: 'version', label: 'Version' },
-    { field: 'status', label: 'Status' },
-    { field: 'language', label: 'Language' }
+    { field: 'status', label: 'Status' }
   ];
 
   requiredStringFields.forEach(({ field, label }) => {
@@ -100,9 +99,9 @@ export const validateIdmXsdCompliance = (headerData) => {
   const aimAndScope = headerData?.aimAndScope || headerData?.objectives;
   if (!aimAndScope || aimAndScope.trim() === '') {
     errors.push({
-      category: 'header',
+      category: 'useCase',
       field: 'aimAndScope',
-      path: 'header.aimAndScope',
+      path: 'useCase.aimAndScope',
       message: 'Aim and Scope is required for idmXSD compliance',
       severity: 'error'
     });
@@ -111,9 +110,9 @@ export const validateIdmXsdCompliance = (headerData) => {
   // summary - required per idmXSD uc element
   if (!headerData?.summary || headerData.summary.trim() === '') {
     errors.push({
-      category: 'header',
+      category: 'useCase',
       field: 'summary',
-      path: 'header.summary',
+      path: 'useCase.summary',
       message: 'Summary is required for idmXSD compliance',
       severity: 'error'
     });
@@ -123,9 +122,9 @@ export const validateIdmXsdCompliance = (headerData) => {
   const projectStages = headerData?.projectStagesIso || headerData?.projectStages || [];
   if (!Array.isArray(projectStages) || projectStages.length === 0) {
     errors.push({
-      category: 'header',
+      category: 'useCase',
       field: 'projectStagesIso',
-      path: 'header.projectStagesIso',
+      path: 'useCase.projectStagesIso',
       message: 'At least one ISO 22263 Project Stage is required for idmXSD compliance',
       severity: 'warning' // Warning because generator will add default
     });
@@ -135,9 +134,9 @@ export const validateIdmXsdCompliance = (headerData) => {
   const uses = headerData?.uses || headerData?.useCategories || [];
   if (!Array.isArray(uses) || uses.length === 0) {
     errors.push({
-      category: 'header',
+      category: 'useCase',
       field: 'uses',
-      path: 'header.uses',
+      path: 'useCase.uses',
       message: 'At least one Use (Verb + Noun) is required for idmXSD compliance',
       severity: 'warning' // Warning because generator will add default
     });
@@ -147,9 +146,9 @@ export const validateIdmXsdCompliance = (headerData) => {
   const regions = headerData?.regions || (headerData?.region ? [headerData.region] : []);
   if (!Array.isArray(regions) || regions.length === 0) {
     errors.push({
-      category: 'header',
+      category: 'useCase',
       field: 'regions',
-      path: 'header.regions',
+      path: 'useCase.regions',
       message: 'At least one Region is required for idmXSD compliance',
       severity: 'warning' // Warning because generator will add default
     });
@@ -358,6 +357,17 @@ export const validateProject = ({ headerData, bpmnXml, erDataMap, erHierarchy })
   // Validate idmXSD compliance (ISO 29481-3 required elements)
   errors.push(...validateIdmXsdCompliance(headerData));
 
+  // Validate language (Use Case section)
+  if (!headerData?.language || headerData.language.trim() === '') {
+    errors.push({
+      category: 'useCase',
+      field: 'language',
+      path: 'useCase.language',
+      message: 'Language is required',
+      severity: 'error'
+    });
+  }
+
   // Validate diagram
   errors.push(...validateDiagram(bpmnXml));
 
@@ -398,6 +408,7 @@ export const validateProject = ({ headerData, bpmnXml, erDataMap, erHierarchy })
     warnings: warningCount,
     byCategory: {
       header: errors.filter(e => e.category === 'header').length,
+      useCase: errors.filter(e => e.category === 'useCase').length,
       er: errors.filter(e => e.category === 'er').length,
       informationUnit: errors.filter(e => e.category === 'informationUnit').length,
       diagram: errors.filter(e => e.category === 'diagram').length

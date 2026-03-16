@@ -51,30 +51,30 @@ The exporter generates LOIN XML in the CEN 17412 format (`<LOINSpecification>`),
 | `useCaseData.actors[1].name` | `context @receivingActor` | Second actor = receiving actor |
 | `useCaseData.aimScope` | `context @purpose` | Direct |
 | `useCaseData.targetPhases.iso22263` | `context @informationDeliveryMileStone` | Selected phases joined with comma |
-| IUs grouped by IFC entity | `<specificationPerObjectTypeList>` | One entry per distinct object type |
-| IFC entity name (e.g., IfcDoor) | `objectType @name`, `@refToDataModelType` | From IU's external element mapping |
+| Parent IUs (Structured) grouped by IFC entity | `<specificationPerObjectTypeList>` | One entry per distinct object type |
+| IFC entity name (e.g., IfcDoor) | `objectType @name`, `@refToDataModelType` | From parent IU's external element mapping |
 | IFC entity URL | `objectType @refToClassification` | Auto-generated from entity name |
 | IFC parent (e.g., IfcBuildingElement) | `objectType > subTypeOf` | Looked up from `IFC_PARENT_MAP` |
-| IU with Pset mapping | `propertySet > property` | Pset name from "Pset_X.PropName" format |
-| IU without Pset mapping | Standalone `<property>` | Under `<properties>` (not in a propertySet) |
-| `iu.name` | `property @name` | Direct |
-| `iu.dataType` | `<dataType>` | Mapped via `DATA_TYPE_MAP` (see Section 5) |
-| `iu.correspondingExternalElements[].description` | `property @refToClassification` | bSDD or classification reference |
+| Sub-IU with Pset mapping | `propertySet > property` | Pset name from "Pset_X.PropName" format |
+| Sub-IU without Pset mapping | Standalone `<property>` | Under `<properties>` (not in a propertySet) |
+| `subIU.name` | `property @name` | Direct |
+| `subIU.dataType` | `<dataType>` | Mapped via `DATA_TYPE_MAP` (see Section 5) |
+| `subIU.correspondingExternalElements[].description` | `property @refToClassification` | bSDD or classification reference |
 
 ### 3.2 Grouping Algorithm
 
-The export groups all Information Units across the entire ER hierarchy by their external element mappings:
+The export maps parent IUs (Structured) to LOIN object types and their sub-IUs to LOIN properties:
 
 ```
-1. Walk erHierarchy recursively → collect ALL IUs (including sub-IUs)
-2. For each IU with correspondingExternalElements:
-   a. Parse each mapping to extract: objectTypeName, psetName, propertyName
-   b. Group by objectTypeName (e.g., "IfcDoor", "Building", "Wall")
-   c. Within each group:
-      - Pset-mapped IUs → under <propertySet name="Pset_X">
-      - Other IUs → standalone <property>
-3. IUs with NO external element mappings → skipped (count reported)
-4. Generate one <specificationPerObjectTypeList> per entity group
+1. Walk erHierarchy recursively → collect parent IUs (dataType: Structured)
+2. Each parent IU maps to one <specificationPerObjectType>:
+   a. Parent IU name/external mapping → objectType
+   b. Each sub-IU → property entry
+   c. Sub-IUs with Pset external mappings → under <propertySet name="Pset_X">
+   d. Sub-IUs without Pset mappings → standalone <property>
+3. Non-Structured IUs with correspondingExternalElements → grouped by entity as before
+4. IUs with NO external element mappings → skipped (count reported)
+5. Generate one <specificationPerObjectTypeList> per entity group
 ```
 
 ### 3.3 Schema-Agnostic Support
@@ -115,49 +115,65 @@ LOIN is not bound to IFC. The exporter accepts external element mappings from an
 | `context @informationDeliveryMileStone` | `useCaseData.targetPhases.iso22263` | Parsed via phase name mapping |
 | `context @sendingActor` | `useCaseData.actors[0]` | Created with role "Sending Actor" |
 | `context @receivingActor` | `useCaseData.actors[1]` | Created with role "Receiving Actor" |
-| `<specificationPerObjectType>` | Sub-ER under root | One Sub-ER per object type |
-| `objectType @name` | Sub-ER name | e.g., "Door", "IfcDoor", "Wing Wall" |
-| `objectType @refToDataModelType` | IU external element mapping basis | Used to determine schema (IFC 2x3/4x3) |
-| `objectType @refToClassification` | IU external element mapping description | URL reference preserved |
-| `propertySet @name` | Part of IU external element mapping name | Stored as "PsetName.PropertyName" |
-| `property @name` | `iu.name` | Direct |
-| `property > <dataType>` | `iu.dataType` | Reverse-mapped via `REVERSE_DATA_TYPE_MAP` |
-| `property > <unit>` | `iu.definition` | Stored as "Unit: X" in definition |
-| `property @refToClassification` | `iu.correspondingExternalElements[].description` | bSDD/classification reference |
-| `<geometricSpecification>` | Sub-ER description | Appended as "Geometric Information: ..." |
-| `<Documentation> <RequiredDocument>` | Sub-ER description | Appended as "Required Documents: ..." |
+| `<specificationPerObjectType>` | Parent IU (dataType: Structured) under root ER | One parent IU per object type |
+| `objectType @name` | Parent IU name | e.g., "Door", "IfcDoor", "Wing Wall" |
+| `objectType @refToDataModelType` | Parent IU external element mapping basis | Used to determine schema (IFC 2x3/4x3) |
+| `objectType @refToClassification` | Parent IU external element mapping description | URL reference preserved |
+| `propertySet @name` | Part of sub-IU external element mapping name | Stored as "PsetName.PropertyName" |
+| `property @name` | `subIU.name` | Direct |
+| `property > <dataType>` | `subIU.dataType` | Reverse-mapped via `REVERSE_DATA_TYPE_MAP` |
+| `property > <unit>` | `subIU.definition` | Stored as "Unit: X" in definition |
+| `property @refToClassification` | `subIU.correspondingExternalElements[].description` | bSDD/classification reference |
+| `<geometricSpecification>` | Parent IU definition | Appended as "Geometric Information: ..." |
+| `<Documentation> <RequiredDocument>` | Parent IU definition | Appended as "Required Documents: ..." |
 
 ### 4.2 ER Hierarchy Structure
 
-The import creates a structured ER hierarchy from the flat LOIN specification:
+The import creates a structured ER hierarchy from the flat LOIN specification. Each `specificationPerObjectType` maps to a **parent IU with dataType "Structured"** under a single root ER. Each LOIN property becomes a **sub-IU** nested under the parent IU.
 
 ```
 Root ER: "er_{LOINSpecification.name}"
-  ├── Sub-ER: "{objectType.name}"        ← one per specificationPerObjectType
-  │     ├── IU: "{property.name}"        ← from propertySet properties
+  ├── IU: "{objectType.name}" (Structured)  ← parent IU, one per specificationPerObjectType
+  │     ├── Sub-IU: "{property.name}"       ← from propertySet properties
   │     │     └── External Mapping: "{PsetName}.{PropertyName}" (basis: IFC/bSDD/Other)
-  │     ├── IU: "{property.name}"        ← from standalone properties
+  │     ├── Sub-IU: "{property.name}"       ← from standalone properties
   │     │     └── External Mapping: "{objectTypeName}" (basis: IFC/bSDD/Other)
   │     └── ...
-  ├── Sub-ER: "{objectType.name}"
+  ├── IU: "{objectType.name}" (Structured)
   │     └── ...
   └── ...
 ```
 
 ### 4.3 External Element Mapping Preservation
 
-Each IU created during import includes `correspondingExternalElements` entries that enable round-trip export:
+Each sub-IU created during import includes `correspondingExternalElements` entries that enable round-trip export:
 
 ```javascript
-correspondingExternalElements: [{
-  id: "<uuid>",
-  basis: "IFC 4x3 ADD2",              // Detected from refToDataModelType/refToClassification
-  name: "Pset_DoorCommon.Width",       // PsetName.PropertyName or objectTypeName
-  description: "http://bsdd.../..."    // refToClassification reference preserved
-}]
+// Parent IU (Structured) — represents the object type
+{
+  name: "IfcDoor",
+  dataType: "Structured",
+  correspondingExternalElements: [{
+    basis: "IFC 4x3 ADD2",
+    name: "IfcDoor",
+    description: "http://..."
+  }],
+  subInformationUnits: [
+    // Sub-IU — represents a property
+    {
+      name: "Width",
+      dataType: "Numeric",
+      correspondingExternalElements: [{
+        basis: "IFC 4x3 ADD2",
+        name: "Pset_DoorCommon.Width",
+        description: "http://bsdd.../..."
+      }]
+    }
+  ]
+}
 ```
 
-This ensures that re-exporting to LOIN will correctly group IUs back under their original object types and property sets.
+This ensures that re-exporting to LOIN will correctly map parent IUs back to object types and sub-IUs back to their properties and property sets.
 
 ### 4.4 Milestone-to-Phase Mapping
 
@@ -221,7 +237,7 @@ These maps are then used when parsing `<SpecificationPerObjectType>` entries tha
 | Actors (first two) | Yes | sendingActor/receivingActor round-trip |
 | Additional actors | No | LOIN only supports two actors |
 | Target phases | Partial | Mapped to/from ISO 22263 stage names |
-| ER hierarchy | Partial | Flattened to object-type grouping, then reconstructed as Sub-ERs |
+| ER hierarchy | Partial | Flattened to object-type grouping, then reconstructed as parent IUs (Structured) with sub-IUs |
 | IU name, dataType | Yes | Direct mapping both directions |
 | IU external mappings | Yes | Stored as refToClassification / Pset.Property format |
 | IU isMandatory | No | LOIN has no mandatory flag; defaults to true on import |
@@ -236,13 +252,13 @@ These maps are then used when parsing `<SpecificationPerObjectType>` entries tha
 |------|-----------|-------|
 | Specification name/GUID | Yes | Mapped to headerData, then back to LOIN attributes |
 | Context (purpose, milestone, actors) | Yes | Full round-trip via useCaseData |
-| Object types | Yes | Sub-ER names map back to objectType |
-| Property sets | Yes | Preserved in IU external element mapping as "Pset_X.PropName" |
-| Properties (name, dataType) | Yes | IU name/dataType round-trip |
-| Property unit | Partial | Stored in IU definition; may need manual extraction |
+| Object types | Yes | Parent IU names map back to objectType |
+| Property sets | Yes | Preserved in sub-IU external element mapping as "Pset_X.PropName" |
+| Properties (name, dataType) | Yes | Sub-IU name/dataType round-trip |
+| Property unit | Partial | Stored in sub-IU definition; may need manual extraction |
 | Property refToClassification | Yes | Preserved in correspondingExternalElements[].description |
-| Geometric specification | No | Stored as text in ER description; not exported back to LOIN |
-| Documentation specification | No | Stored as text in ER description; not exported back to LOIN |
+| Geometric specification | No | Stored as text in parent IU definition; not exported back to LOIN |
+| Documentation specification | No | Stored as text in parent IU definition; not exported back to LOIN |
 
 ---
 
@@ -250,9 +266,9 @@ These maps are then used when parsing `<SpecificationPerObjectType>` entries tha
 
 1. **Actor count**: LOIN supports exactly two actors (sending/receiving). IDM can have any number of actors. Only the first two are exported.
 
-2. **Geometric information**: LOIN's geometric specification (detail level, dimensionality, location, appearance, parametric behaviour) has no direct IDM equivalent. On import, it is stored as descriptive text in the Sub-ER description. It is not exported back to LOIN.
+2. **Geometric information**: LOIN's geometric specification (detail level, dimensionality, location, appearance, parametric behaviour) has no direct IDM equivalent. On import, it is stored as descriptive text in the parent IU definition. It is not exported back to LOIN.
 
-3. **Documentation specification**: LOIN's required documents (type, purpose, content) have no direct IDM equivalent. On import, they are stored as descriptive text. They are not exported back.
+3. **Documentation specification**: LOIN's required documents (type, purpose, content) have no direct IDM equivalent. On import, they are stored as descriptive text in the parent IU definition. They are not exported back.
 
 4. **Unmapped IUs**: IUs without `correspondingExternalElements` cannot be placed in LOIN, which is inherently object-type-centric. These IUs are skipped during export with a count reported to the user.
 
