@@ -429,16 +429,20 @@ Actor names and BPMN element names stay in sync:
 
 Sub-actors (associated with BPMN Lanes) can have their own role fields, just like main actors. Sub-actor roles are exported and imported via the `<subActor><classification>` element in idmXML.
 
+### Language (Required)
+
+Specify the language used to define the IDM specification according to ISO 639-1 (e.g., EN, KO, DE, FR). This is a required field per ISO 29481-3 and defaults to "EN" (English).
+
 ### Target Project Phases
 
 Select applicable project phases:
+
 - **ISO 22263** stages (required): Inception, Brief, Design, Production, Handover, Operation, End-of-life
 - **AIA B101** phases (optional)
 - **RIBA Plan of Work** stages (optional)
 
 ### Additional Fields
 
-- Language (ISO 639-1 codes)
 - Benefits (with figure support)
 - Limitations (with figure support)
 - Keywords
