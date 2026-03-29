@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo, Component } from 'react';
 import './ERPanel.css';
 import { searchSchema, searchBsdd, getAvailableSchemas, isSchemaSearchable } from '../../utils/schemaSearch';
 import {
@@ -37,6 +37,50 @@ const DATA_TYPES = [
   'Document (PDF, DOCX, etc.)',
   'Structured (list, graph, table, JSON)'
 ];
+
+// Error Boundary to catch silent render crashes in the search modal
+class SearchErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, info) {
+    console.error('SearchErrorBoundary caught:', error, info?.componentStack);
+    if (this.props.onError) this.props.onError(error);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="er-modal-overlay">
+          <div className="er-modal" style={{ maxWidth: '400px' }}>
+            <div style={{ padding: '1.5rem', textAlign: 'center' }}>
+              <p style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '0.5rem' }}>Search encountered an error</p>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-light)', marginBottom: '1rem' }}>{this.state.error?.message || 'An unexpected error occurred'}</p>
+              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                <button
+                  className="er-action-btn"
+                  onClick={() => this.setState({ hasError: false, error: null })}
+                >
+                  Retry
+                </button>
+                <button
+                  className="er-action-btn"
+                  onClick={() => { this.setState({ hasError: false, error: null }); if (this.props.onClose) this.props.onClose(); }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // External schema options (with search support)
 const SCHEMA_OPTIONS = [
@@ -205,6 +249,8 @@ const ERPanel = ({
   const [mappingSearchResults, setMappingSearchResults] = useState([]);
   const [mappingSearchLoading, setMappingSearchLoading] = useState(false);
   const [mappingSearchError, setMappingSearchError] = useState(null);
+  const [selectedSearchResult, setSelectedSearchResult] = useState(null); // Highlighted result (click to preview, Apply to confirm)
+  const [searchClosedUnexpectedly, setSearchClosedUnexpectedly] = useState(false);
 
   // AbortController ref for cancelling in-flight search requests
   const searchAbortControllerRef = useRef(null);
@@ -1559,7 +1605,7 @@ const ERPanel = ({
     const requestId = ++searchRequestIdRef.current;
 
     setMappingSearchLoading(true);
-    setMappingSearchResults([]);
+    // Don't clear previous results — keeps them visible until new results arrive
     setMappingSearchError(null);
 
     try {
@@ -1602,7 +1648,7 @@ const ERPanel = ({
               description: r.description || '',
               category: r.category || schema,
               uri: r.uri || '',
-              score: typeof r.score === 'number' ? r.score : 1,
+              score: typeof r.score === 'number' && !isNaN(r.score) ? r.score : 1,
               matchType: r.matchType || 'exact'
             }))
             .filter(r => r.name && r.name !== 'Unknown')
@@ -1637,6 +1683,8 @@ const ERPanel = ({
     setMappingSearchResults([]);
     setMappingSearchError(null);
     setMappingSearchLoading(false);
+    setSelectedSearchResult(null);
+    setSearchClosedUnexpectedly(false);
     setShowMappingSearch(true);
   }, [cancelSearch]);
 
@@ -1651,17 +1699,20 @@ const ERPanel = ({
     setMappingSearchResults([]);
     setMappingSearchError(null);
     setMappingSearchLoading(false);
+    setSelectedSearchResult(null);
   }, [cancelSearch]);
 
   // Debounced trigger: fires executeSearch 300ms after query/schema/type change
   // IMPORTANT: Always cancel in-flight requests on every change to prevent stale
   // responses from arriving mid-debounce and causing rapid state flips.
+  // Local schema searches run immediately (no debounce needed — they're synchronous).
   useEffect(() => {
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
+      searchTimeoutRef.current = null;
     }
 
-    // Cancel any in-flight request immediately on every change
+    // Cancel any in-flight API request immediately on every change
     cancelSearch();
 
     if (!showMappingSearch || !mappingSearchQuery.trim()) {
@@ -1670,12 +1721,16 @@ const ERPanel = ({
       return;
     }
 
-    // Show loading state immediately while debouncing
-    setMappingSearchLoading(true);
+    // Check if current schema uses API (bSDD) or local data
+    const isApiSchema = mappingSearchSchema === 'bSDD';
+    // Short debounce for local schemas to coalesce rapid keystrokes;
+    // longer debounce for API schemas to avoid excessive network requests.
+    const delay = isApiSchema ? 300 : 150;
 
+    setMappingSearchLoading(true);
     searchTimeoutRef.current = setTimeout(() => {
       executeSearch(mappingSearchQuery, mappingSearchSchema, mappingSearchType);
-    }, 300);
+    }, delay);
 
     return () => {
       if (searchTimeoutRef.current) {
@@ -1779,6 +1834,14 @@ const ERPanel = ({
     setMappingSearchMappingId(null);
     setMappingSearchQuery('');
   }, [mappingSearchUnitId, mappingSearchSchema, mappingSearchMappingId, isErFirstMode, selectedItem?.id, onChange, erData, closeMappingSearch]);
+
+  // Apply the currently highlighted search result
+  const handleApplySearchResult = useCallback(() => {
+    if (selectedSearchResult) {
+      handleSelectMappingResult(selectedSearchResult);
+      setSelectedSearchResult(null);
+    }
+  }, [selectedSearchResult, handleSelectMappingResult]);
 
   // ========== Sub-ER Functions ==========
 
@@ -3060,7 +3123,8 @@ const ERPanel = ({
 
         {/* Mapping Search Modal for ER-first mode */}
         {showMappingSearch && (
-          <div className="er-modal-overlay" onClick={closeMappingSearch}>
+          <SearchErrorBoundary onClose={closeMappingSearch}>
+          <div className="er-modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) closeMappingSearch(); }}>
             <div className="er-modal er-modal-search" onClick={(e) => e.stopPropagation()}>
               <div className="er-modal-header">
                 <h3>Search Matching External Information Item</h3>
@@ -3109,8 +3173,8 @@ const ERPanel = ({
                   <input
                     type="text"
                     value={mappingSearchQuery}
-                    onChange={(e) => setMappingSearchQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleMappingSearch()}
+                    onChange={(e) => { setMappingSearchQuery(e.target.value); setSelectedSearchResult(null); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleMappingSearch(); } }}
                     placeholder={`Search ${mappingSearchSchema} elements...`}
                     className="er-input er-input-search"
                     autoFocus
@@ -3121,6 +3185,14 @@ const ERPanel = ({
                     disabled={mappingSearchLoading || !mappingSearchQuery.trim()}
                   >
                     {mappingSearchLoading ? '...' : <><SearchIcon size={14} /> Search</>}
+                  </button>
+                  <button
+                    className="er-action-btn er-action-btn-primary"
+                    onClick={handleApplySearchResult}
+                    disabled={!selectedSearchResult}
+                    title="Apply selected result as external mapping"
+                  >
+                    Apply
                   </button>
                 </div>
 
@@ -3146,16 +3218,19 @@ const ERPanel = ({
                       {mappingSearchQuery.trim() ? (
                         <span>No results found. Try a different search term.</span>
                       ) : (
-                        <span>Enter a search term to find elements</span>
+                        <span>Enter a search term to find elements. Click a result to preview details, then click <strong>Apply</strong> to confirm.</span>
                       )}
                     </div>
                   ) : (
                     <div className="er-search-result-list">
-                      {mappingSearchResults.map((result, idx) => (
+                      {mappingSearchResults.filter(r => r && r.name).map((result, idx) => {
+                        const isSelected = selectedSearchResult && (selectedSearchResult.code || selectedSearchResult.name) === (result.code || result.name) && idx === selectedSearchResult._idx;
+                        return (
                         <div
                           key={`${result.code || result.name}-${idx}`}
-                          className="er-search-result-item"
-                          onClick={() => handleSelectMappingResult(result)}
+                          className={`er-search-result-item ${isSelected ? 'er-search-result-selected' : ''}`}
+                          onClick={() => setSelectedSearchResult({ ...result, _idx: idx })}
+                          onDoubleClick={() => handleSelectMappingResult(result)}
                         >
                           <div className="er-search-result-header">
                             <span className="er-search-result-name">{result.name}</span>
@@ -3168,20 +3243,27 @@ const ERPanel = ({
                               </span>
                             )}
                           </div>
-                          {result.description && (
+                          {isSelected && result.description ? (
+                            <p className="er-search-result-desc er-search-result-desc-expanded">{result.description}</p>
+                          ) : result.description ? (
                             <p className="er-search-result-desc">{result.description}</p>
+                          ) : null}
+                          {isSelected && result.uri && (
+                            <span className="er-search-result-uri">{result.uri}</span>
                           )}
                           {result.category && (
                             <span className="er-search-result-category">{result.category}</span>
                           )}
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
               </div>
             </div>
           </div>
+          </SearchErrorBoundary>
         )}
       </div>
     );
@@ -3386,7 +3468,8 @@ const ERPanel = ({
 
       {/* Mapping Search Modal */}
       {showMappingSearch && (
-        <div className="er-modal-overlay" onClick={closeMappingSearch}>
+        <SearchErrorBoundary onClose={closeMappingSearch}>
+        <div className="er-modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) closeMappingSearch(); }}>
           <div className="er-modal er-modal-search" onClick={(e) => e.stopPropagation()}>
             <div className="er-modal-header">
               <h3>Search Matching External Information Item</h3>
@@ -3435,8 +3518,8 @@ const ERPanel = ({
                 <input
                   type="text"
                   value={mappingSearchQuery}
-                  onChange={(e) => setMappingSearchQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleMappingSearch()}
+                  onChange={(e) => { setMappingSearchQuery(e.target.value); setSelectedSearchResult(null); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleMappingSearch(); } }}
                   placeholder={`Search ${mappingSearchSchema} elements...`}
                   className="er-input er-input-search"
                   autoFocus
@@ -3447,6 +3530,14 @@ const ERPanel = ({
                   disabled={mappingSearchLoading || !mappingSearchQuery.trim()}
                 >
                   {mappingSearchLoading ? '...' : <><SearchIcon size={14} /> Search</>}
+                </button>
+                <button
+                  className="er-action-btn er-action-btn-primary"
+                  onClick={handleApplySearchResult}
+                  disabled={!selectedSearchResult}
+                  title="Apply selected result as external mapping"
+                >
+                  Apply
                 </button>
               </div>
 
@@ -3467,21 +3558,24 @@ const ERPanel = ({
                   <div className="er-search-empty er-search-error">
                     <span>{mappingSearchError}</span>
                   </div>
-                ) : mappingSearchResults.length === 0 ? (
+                ) : !Array.isArray(mappingSearchResults) || mappingSearchResults.length === 0 ? (
                   <div className="er-search-empty">
                     {mappingSearchQuery.trim() ? (
                       <span>No results found. Try a different search term.</span>
                     ) : (
-                      <span>Enter a search term to find elements</span>
+                      <span>Enter a search term to find elements. Click a result to preview details, then click <strong>Apply</strong> to confirm.</span>
                     )}
                   </div>
                 ) : (
                   <div className="er-search-result-list">
-                    {mappingSearchResults.map((result, idx) => (
+                    {mappingSearchResults.filter(r => r && r.name).map((result, idx) => {
+                      const isSelected = selectedSearchResult && (selectedSearchResult.code || selectedSearchResult.name) === (result.code || result.name) && idx === selectedSearchResult._idx;
+                      return (
                       <div
                         key={`${result.code || result.name}-${idx}`}
-                        className="er-search-result-item"
-                        onClick={() => handleSelectMappingResult(result)}
+                        className={`er-search-result-item ${isSelected ? 'er-search-result-selected' : ''}`}
+                        onClick={() => setSelectedSearchResult({ ...result, _idx: idx })}
+                        onDoubleClick={() => handleSelectMappingResult(result)}
                       >
                         <div className="er-search-result-header">
                           <span className="er-search-result-name">{result.name}</span>
@@ -3494,20 +3588,27 @@ const ERPanel = ({
                             </span>
                           )}
                         </div>
-                        {result.description && (
+                        {isSelected && result.description ? (
+                          <p className="er-search-result-desc er-search-result-desc-expanded">{result.description}</p>
+                        ) : result.description ? (
                           <p className="er-search-result-desc">{result.description}</p>
+                        ) : null}
+                        {isSelected && result.uri && (
+                          <span className="er-search-result-uri">{result.uri}</span>
                         )}
                         {result.category && (
                           <span className="er-search-result-category">{result.category}</span>
                         )}
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
             </div>
           </div>
         </div>
+        </SearchErrorBoundary>
       )}
 
       {/* Sub-ER Selection Modal */}

@@ -10,6 +10,7 @@ import SCHEMA_INFO from '../../references/external schemas/idsSchema';
  * Uses Levenshtein distance and keyword matching
  */
 const calculateSimilarity = (str1, str2) => {
+  if (!str1 || !str2) return 0;
   const s1 = str1.toLowerCase();
   const s2 = str2.toLowerCase();
 
