@@ -53,6 +53,13 @@ const FilePickerModal = ({ isOpen, onClose, onFileSelected }) => {
       description: 'Information Delivery Specification (buildingSMART)'
     },
     {
+      id: 'mvd',
+      name: 'mvdXML',
+      extension: '.mvdxml, .xml',
+      accept: '.mvdxml,.xml',
+      description: 'Model View Definition (buildingSMART mvdXML 1.1)'
+    },
+    {
       id: 'bpmn',
       name: 'BPMN Diagram',
       extension: '.bpmn',
@@ -70,7 +77,7 @@ const FilePickerModal = ({ isOpen, onClose, onFileSelected }) => {
       id: 'all',
       name: 'All Supported Formats',
       extension: '.*',
-      accept: '.idm,.json,.xml,.ids,.zip,.idmx,.xppm,.bpmn,.html,.htm',
+      accept: '.idm,.json,.xml,.ids,.mvdxml,.zip,.idmx,.xppm,.bpmn,.html,.htm',
       description: 'Show all supported file types'
     }
   ];

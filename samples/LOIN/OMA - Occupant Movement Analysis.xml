@@ -1,0 +1,426 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<LOINSpecification globalId="2895a45e-0f24-42e6-a950-2a4fe90461ec" name="OMA - Occupant Movement Analysis">
+    <description>OMA - Occupant Movement Analysis</description>
+    <context purpose="Minimum requirements for IFC models to be used in Occupant Movement Analysis"/>
+    <specificationPerObjectTypeList globalId="6974003e-700f-462b-9eb2-fef571479d9d">
+        <objectType name="IfcBuilding" refToDataModelType="IfcBuilding" refToClassification="https://standards.buildingsmart.org/IFC/RELEASE/IFC4/ADD2_TC1/HTML/schema/ifcsharedbldgelements/lexical/ifcbuilding.htm">
+            <subTypeOf name="IfcSpatialElement" refToDataModelType="IfcSpatialElement"/>
+        </objectType>
+        <alphanumericInformationSpecification>
+            <Description>Information requirements for IfcBuilding</Description>
+            <propertySets>
+                <propertySet name="Pset_BuildingCommon">
+                    <properties>
+                        <property name="OccupancyType" refToClassification="https://identifier.buildingsmart.org/uri/buildingsmart/ifc/4.3/prop/OccupancyType">
+                            <dataType>String</dataType>
+                        </property>
+                    </properties>
+                </propertySet>
+            </propertySets>
+        </alphanumericInformationSpecification>
+    </specificationPerObjectTypeList>
+    <specificationPerObjectTypeList globalId="6452f32e-92b1-4eb1-9253-c9324fa726ca">
+        <objectType name="IfcBuildingstorey" refToDataModelType="IfcBuildingstorey" refToClassification="https://standards.buildingsmart.org/IFC/RELEASE/IFC4/ADD2_TC1/HTML/schema/ifcsharedbldgelements/lexical/ifcbuildingstorey.htm">
+        </objectType>
+        <alphanumericInformationSpecification>
+            <Description>Information requirements for IfcBuildingstorey</Description>
+            <propertySets>
+                <propertySet name="Pset_BuildingStoreyCommon">
+                    <properties>
+                        <property name="ElevationOfFFLRelative" refToClassification="https://identifier.buildingsmart.org/uri/buildingsmart/ifc/4.3/prop/ElevationOfFFLRelative">
+                            <dataType>Real</dataType>
+                        </property>
+                    </properties>
+                </propertySet>
+            </propertySets>
+            <properties>
+                <property name="IfcBuildingstorey.Name" refToClassification="IFC Attribute">
+                    <dataType>String</dataType>
+                </property>
+            </properties>
+        </alphanumericInformationSpecification>
+    </specificationPerObjectTypeList>
+    <specificationPerObjectTypeList globalId="a885a045-4405-4fa6-bee0-3128a5dbe6fd">
+        <objectType name="IfcSpace" refToDataModelType="IfcSpace" refToClassification="https://standards.buildingsmart.org/IFC/RELEASE/IFC4/ADD2_TC1/HTML/schema/ifcsharedbldgelements/lexical/ifcspace.htm">
+            <subTypeOf name="IfcSpatialElement" refToDataModelType="IfcSpatialElement"/>
+        </objectType>
+        <alphanumericInformationSpecification>
+            <Description>Information requirements for IfcSpace</Description>
+            <propertySets>
+                <propertySet name="Pset_SpaceOccupancyRequirements">
+                    <properties>
+                        <property name="OccupancyNumberPeak" refToClassification="https://identifier.buildingsmart.org/uri/buildingsmart/ifc/4.3/prop/OccupancyNumberPeak">
+                            <dataType>Real</dataType>
+                        </property>
+                        <property name="AreaPerOccupant" refToClassification="https://identifier.buildingsmart.org/uri/buildingsmart/ifc/4.3/prop/OccupancyNumberPeak">
+                            <dataType>Real</dataType>
+                        </property>
+                    </properties>
+                </propertySet>
+                <propertySet name="Pset_SpaceFireSafetyRequirements">
+                    <properties>
+                        <property name="FireExit" refToClassification="https://identifier.buildingsmart.org/uri/buildingsmart/ifc/4.3/prop/FireExit">
+                            <dataType>Boolean</dataType>
+                        </property>
+                    </properties>
+                </propertySet>
+                <propertySet name="Pset_SpaceCommon">
+                    <properties>
+                        <property name="HandicapAccessible" refToClassification="https://identifier.buildingsmart.org/uri/buildingsmart/ifc/4.3/prop/HandicapAccessible">
+                            <dataType>Boolean</dataType>
+                        </property>
+                    </properties>
+                </propertySet>
+            </propertySets>
+            <properties>
+                <property name="ePset_OMA_SpaceOccupancyRequirements.DesignPeopleFlowRate">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="ePset_OMA_SpaceAnalyticalQuantities.NominalWidth">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="ePset_OMA_SpaceAnalyticalQuantities.NominalLength">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="IfcSpace.Name" refToClassification="IFC Attribute">
+                    <dataType>String</dataType>
+                </property>
+            </properties>
+        </alphanumericInformationSpecification>
+    </specificationPerObjectTypeList>
+    <specificationPerObjectTypeList globalId="f4a6fae0-5fb4-47ad-a901-ca99e1ab06ef">
+        <objectType name="IfcSpatialzone" refToDataModelType="IfcSpatialzone" refToClassification="https://standards.buildingsmart.org/IFC/RELEASE/IFC4/ADD2_TC1/HTML/schema/ifcsharedbldgelements/lexical/ifcspatialzone.htm">
+        </objectType>
+        <alphanumericInformationSpecification>
+            <Description>Information requirements for IfcSpatialzone</Description>
+            <properties>
+                <property name="ePset_OMA_SpatialZone.MovementType">
+                    <dataType>String</dataType>
+                </property>
+                <property name="IfcSpatialzone.Name" refToClassification="IFC Attribute">
+                    <dataType>String</dataType>
+                </property>
+                <property name="IfcSpatialzone.Description" refToClassification="IFC Attribute">
+                    <dataType>String</dataType>
+                </property>
+                <property name="IfcSpatialzone.PredefinedType" refToClassification="IFC Attribute">
+                    <dataType>String</dataType>
+                </property>
+            </properties>
+        </alphanumericInformationSpecification>
+    </specificationPerObjectTypeList>
+    <specificationPerObjectTypeList globalId="3b2b0ed2-c94f-4fa0-92dd-466dab965c51">
+        <objectType name="Door">
+        </objectType>
+        <alphanumericInformationSpecification>
+            <Description>Information requirements for Door</Description>
+            <propertySets>
+                <propertySet name="Pset_DoorCommon">
+                    <properties>
+                        <property name="SelfClosing">
+                            <dataType>Boolean</dataType>
+                        </property>
+                        <property name="IsExternal">
+                            <dataType>Boolean</dataType>
+                        </property>
+                        <property name="FireExit">
+                            <dataType>Boolean</dataType>
+                        </property>
+                        <property name="HandicapAccessible">
+                            <dataType>Boolean</dataType>
+                        </property>
+                    </properties>
+                </propertySet>
+            </propertySets>
+            <properties>
+                <property name="ePset_OMA_Door.EffectiveWidth">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="ePset_OMA_Door.DesignPeopleFlowRate">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="Name" refToClassification="IFC Attribute">
+                    <dataType>String</dataType>
+                </property>
+                <property name="OperationType" refToClassification="IFC Attribute">
+                    <dataType>String</dataType>
+                </property>
+            </properties>
+        </alphanumericInformationSpecification>
+    </specificationPerObjectTypeList>
+    <specificationPerObjectTypeList globalId="90ca2e57-1c59-46d9-8d62-27ce32ada009">
+        <objectType name="Stairs">
+        </objectType>
+        <alphanumericInformationSpecification>
+            <Description>Information requirements for Stairs</Description>
+            <properties>
+                <property name="RiserHeight">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="NumberOfRiser">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="TreadLength">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="NosingLength">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="NumberOfTreads">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="EffectiveWidth">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="ePset_OMA_Stair.OccupancyNumberPeak">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="ePset_OMA_Stair.DesignPeopleFlowRate">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="TravelDirection">
+                    <dataType>String</dataType>
+                </property>
+                <property name="Name" refToClassification="IFC Attribute">
+                    <dataType>String</dataType>
+                </property>
+                <property name="PredefinedType" refToClassification="IFC Attribute">
+                    <dataType>String</dataType>
+                </property>
+            </properties>
+        </alphanumericInformationSpecification>
+    </specificationPerObjectTypeList>
+    <specificationPerObjectTypeList globalId="694adf06-986c-4b14-9e4d-518d91ba041c">
+        <objectType name="IfcTransportelement" refToDataModelType="IfcTransportelement" refToClassification="https://standards.buildingsmart.org/IFC/RELEASE/IFC4/ADD2_TC1/HTML/schema/ifcsharedbldgelements/lexical/ifctransportelement.htm">
+        </objectType>
+        <alphanumericInformationSpecification>
+            <Description>Information requirements for IfcTransportelement</Description>
+            <propertySets>
+                <propertySet name="Pset_TransportElementElevator">
+                    <properties>
+                        <property name="ClearWidth">
+                            <dataType>Real</dataType>
+                        </property>
+                        <property name="ClearDepth">
+                            <dataType>Real</dataType>
+                        </property>
+                    </properties>
+                </propertySet>
+                <propertySet name="Pset_TransportElementCommon">
+                    <properties>
+                        <property name="CapacityPeople">
+                            <dataType>Real</dataType>
+                        </property>
+                        <property name="CapacityPeople">
+                            <dataType>Real</dataType>
+                        </property>
+                        <property name="CapacityPeople">
+                            <dataType>Real</dataType>
+                        </property>
+                    </properties>
+                </propertySet>
+                <propertySet name="Pset_ElementKinematics">
+                    <properties>
+                        <property name="MaximumConstantSpeed">
+                            <dataType>String</dataType>
+                        </property>
+                        <property name="MaximumConstantSpeed">
+                            <dataType>String</dataType>
+                        </property>
+                        <property name="MaximumConstantSpeed">
+                            <dataType>String</dataType>
+                        </property>
+                    </properties>
+                </propertySet>
+            </propertySets>
+            <properties>
+                <property name="ePset_OMA_TransportElementElevator.AccelerationRate">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="ePset_OMA_TransportElementElevator.DecelerationRate">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="ePset_OMA_TransportElementElevator.DoorOpeningTime">
+                    <dataType>String</dataType>
+                </property>
+                <property name="ePset_OMA_TransportElementElevator.DoorClosingTime">
+                    <dataType>String</dataType>
+                </property>
+                <property name="ePset_OMA_TransportElementElevator.DoorDwellTime">
+                    <dataType>String</dataType>
+                </property>
+                <property name="ePset_OMA_TransportElementElevator.MotorDelayTime">
+                    <dataType>String</dataType>
+                </property>
+                <property name="ePset_OMA_TransportElementElevator.StoriesServed">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="ePset_OMA_TransportElementElevator.Group">
+                    <dataType>String</dataType>
+                </property>
+                <property name="ePset_OMA_TransportElementElevator.JerkRate">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="ePset_OMA_TransportElementElevator.LevellingDelayTime">
+                    <dataType>String</dataType>
+                </property>
+                <property name="ePset_OMA_TransportElementElevator.AdvancedDoorOpeningTime">
+                    <dataType>String</dataType>
+                </property>
+                <property name="ePset_OMA_TransportElementCommon.LoadingArea">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="IfcTransportelement.Name" refToClassification="IFC Attribute">
+                    <dataType>String</dataType>
+                </property>
+                <property name="ePset_OMA_TransportElementCommon.TreadLength">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="ePset_OMA_TransportElementCommon.ClearWidth">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="ePset_OMA_TransportElementCommon.LoadingArea">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="ePset_OMA_TransportElementCommon.DesignPeopleFlowRate">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="ePset_OMA_TransportElementCommon.RiserHeight">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="ePset_OMA_TransportElementCommon.RunLength">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="ePset_OMA_TransportElementCommon.RunHeight">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="ePset_OMA_TransportElementCommon.OverallLength">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="IfcTransportelement.Name" refToClassification="IFC Attribute">
+                    <dataType>String</dataType>
+                </property>
+                <property name="ePset_OMA_TransportElementCommon.ClearWidth">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="ePset_OMA_TransportElementCommon.LoadingArea">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="ePset_OMA_TransportElementCommon.DesignPeopleFlowRate">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="ePset_OMA_TransportElementCommon.RunLength">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="ePset_OMA_TransportElementCommon.OverallLength">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="IfcTransportelement.Name" refToClassification="IFC Attribute">
+                    <dataType>String</dataType>
+                </property>
+            </properties>
+        </alphanumericInformationSpecification>
+    </specificationPerObjectTypeList>
+    <specificationPerObjectTypeList globalId="8bdca700-db14-4607-8d65-bb9b6f04b0ef">
+        <objectType name="Ramp">
+        </objectType>
+        <alphanumericInformationSpecification>
+            <Description>Information requirements for Ramp</Description>
+            <propertySets>
+                <propertySet name="Pset_RampCommon">
+                    <properties>
+                        <property name="HandicapAccessible">
+                            <dataType>Boolean</dataType>
+                        </property>
+                        <property name="RequiredSlope">
+                            <dataType>Real</dataType>
+                        </property>
+                        <property name="FireExit">
+                            <dataType>Boolean</dataType>
+                        </property>
+                    </properties>
+                </propertySet>
+            </propertySets>
+            <properties>
+                <property name="PredefinedType" refToClassification="IFC Attribute">
+                    <dataType>String</dataType>
+                </property>
+                <property name="Name" refToClassification="IFC Attribute">
+                    <dataType>String</dataType>
+                </property>
+            </properties>
+        </alphanumericInformationSpecification>
+    </specificationPerObjectTypeList>
+    <specificationPerObjectTypeList globalId="8aa5763a-31a0-4f93-8bf7-6041d867c5fd">
+        <objectType name="Gate">
+        </objectType>
+        <alphanumericInformationSpecification>
+            <Description>Information requirements for Gate</Description>
+            <properties>
+                <property name="ePset_OMA_Door.DesignPeopleFlowRate">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="ePset_OMA_DoorCommon.LoadingArea">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="OperationType" refToClassification="IFC Attribute">
+                    <dataType>String</dataType>
+                </property>
+            </properties>
+        </alphanumericInformationSpecification>
+    </specificationPerObjectTypeList>
+    <specificationPerObjectTypeList globalId="191ab96d-c49c-46df-a674-a4bc116e1d0b">
+        <objectType name="Sign">
+        </objectType>
+        <alphanumericInformationSpecification>
+            <Description>Information requirements for Sign</Description>
+            <propertySets>
+                <propertySet name="Qto_SignBaseQuantities">
+                    <properties>
+                        <property name="Height">
+                            <dataType>Real</dataType>
+                        </property>
+                        <property name="Width">
+                            <dataType>Real</dataType>
+                        </property>
+                    </properties>
+                </propertySet>
+            </propertySets>
+            <properties>
+                <property name="ePset_OMA_Signage.Title">
+                    <dataType>String</dataType>
+                </property>
+                <property name="ePset_OMA_Signage.LetterHeight">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="ePset_OMA_Signage.TextColour">
+                    <dataType>String</dataType>
+                </property>
+                <property name="ePset_OMA_Signage.BackgroundColour">
+                    <dataType>String</dataType>
+                </property>
+                <property name="ePset_OMA_Signage.Usage">
+                    <dataType>String</dataType>
+                </property>
+                <property name="ePset_OMA_Signage.LuminousFlux">
+                    <dataType>Real</dataType>
+                </property>
+                <property name="PredefinedType" refToClassification="IFC Attribute">
+                    <dataType>String</dataType>
+                </property>
+            </properties>
+        </alphanumericInformationSpecification>
+    </specificationPerObjectTypeList>
+    <specificationPerObjectTypeList globalId="123774d3-4256-4d94-b6a2-eb7dadfe811a">
+        <objectType name="Alarm">
+        </objectType>
+        <alphanumericInformationSpecification>
+            <Description>Information requirements for Alarm</Description>
+            <properties>
+                <property name="PredefinedType" refToClassification="IFC Attribute">
+                    <dataType>String</dataType>
+                </property>
+            </properties>
+        </alphanumericInformationSpecification>
+    </specificationPerObjectTypeList>
+</LOINSpecification>

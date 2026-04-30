@@ -197,11 +197,12 @@ async function handleOpenProject() {
       { name: 'idmXML (.xml)', extensions: ['xml'] },
       { name: 'LOIN XML (.xml)', extensions: ['xml'] },
       { name: 'IDS (.ids)', extensions: ['ids'] },
+      { name: 'mvdXML (.mvdxml, .xml)', extensions: ['mvdxml', 'xml'] },
       { name: 'ZIP Bundle (.zip)', extensions: ['zip', 'idmx'] },
       { name: 'xPPM Legacy (.xppm)', extensions: ['xppm'] },
       { name: 'BPMN Diagram (.bpmn)', extensions: ['bpmn'] },
       { name: 'Reviewed HTML (.html)', extensions: ['html', 'htm'] },
-      { name: 'All Supported Formats', extensions: ['idm', 'json', 'xml', 'ids', 'zip', 'idmx', 'xppm', 'bpmn', 'html', 'htm'] },
+      { name: 'All Supported Formats', extensions: ['idm', 'json', 'xml', 'ids', 'mvdxml', 'zip', 'idmx', 'xppm', 'bpmn', 'html', 'htm'] },
       { name: 'All Files', extensions: ['*'] }
     ],
     properties: ['openFile']
@@ -225,12 +226,16 @@ async function handleOpenProject() {
       type = 'xppm';
     } else if (ext === '.ids') {
       type = 'ids';
+    } else if (ext === '.mvdxml') {
+      type = 'mvdxml';
     } else if (ext === '.xml') {
       // Detect XML type by root element prefix
       if (content.includes('<loin:') || content.includes('<LOINSpecification')) {
         type = 'loin';
       } else if (content.includes('<ids:')) {
         type = 'ids';
+      } else if (/<mvdXML[\s>]/.test(content) || content.includes('buildingsmart-tech.org/mvd/XML')) {
+        type = 'mvdxml';
       } else if (content.includes('<idm:') || content.includes('<idm>') || content.includes('<idm ')) {
         // Distinguish idmXML v2.0 from v1.0/xPPM by namespace version
         const isV2 = content.includes('idmXML/2.0') || content.includes('29481/-3/ed-2');
@@ -243,14 +248,15 @@ async function handleOpenProject() {
         const choice = electronDialog.showMessageBoxSync(mainWindow, {
           type: 'question',
           title: 'Unknown XML Format',
-          message: `The file "${path.basename(filePath)}" could not be identified as idmXML, LOIN, IDS, or BPMN.\n\nHow would you like to open it?`,
-          buttons: ['As idmXML', 'As LOIN', 'As BPMN', 'Cancel'],
+          message: `The file "${path.basename(filePath)}" could not be identified as idmXML, LOIN, IDS, mvdXML, or BPMN.\n\nHow would you like to open it?`,
+          buttons: ['As idmXML', 'As LOIN', 'As mvdXML', 'As BPMN', 'Cancel'],
           defaultId: 0,
-          cancelId: 3,
+          cancelId: 4,
         });
         if (choice === 0) type = 'idmxml';
         else if (choice === 1) type = 'loin';
-        else if (choice === 2) type = 'bpmn';
+        else if (choice === 2) type = 'mvdxml';
+        else if (choice === 3) type = 'bpmn';
         else return; // Cancel
       }
     }
@@ -475,6 +481,15 @@ ipcMain.handle('shell:openExternal', async (event, url) => {
   await shell.openExternal(url);
 });
 
+// Open user manual HTML file from local resources
+ipcMain.handle('shell:openManual', async () => {
+  const manualRelPath = 'user_manuals/V1.4.0/IDMxPPM-Tutorials.html';
+  const filePath = isDev
+    ? path.join(__dirname, '..', manualRelPath)
+    : path.join(process.resourcesPath, manualRelPath);
+  await shell.openPath(filePath);
+});
+
 // IPC 핸들러들
 ipcMain.handle('dialog:openProject', handleOpenProject);
 ipcMain.handle('dialog:openBPMN', handleOpenBPMN);
@@ -588,7 +603,10 @@ ipcMain.handle('dialog:showSaveLocation', async (event, { defaultName, format })
     'idmxml-v1': [{ name: 'idmXML 1.0 Files', extensions: ['xml'] }],
     'html': [{ name: 'HTML Files', extensions: ['html'] }],
     'zip': [{ name: 'ZIP Archives', extensions: ['zip'] }],
-    'bpmn': [{ name: 'BPMN Files', extensions: ['bpmn'] }]
+    'bpmn': [{ name: 'BPMN Files', extensions: ['bpmn'] }],
+    'ids': [{ name: 'IDS Files', extensions: ['ids'] }],
+    'loin': [{ name: 'LOIN XML Files', extensions: ['xml'] }],
+    'mvd': [{ name: 'mvdXML Files', extensions: ['mvdxml', 'xml'] }]
   };
 
   const result = await dialog.showSaveDialog({

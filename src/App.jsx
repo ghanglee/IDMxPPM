@@ -28,6 +28,8 @@ import { generateIdsXml } from './utils/idsExporter';
 import { generateLoinXml } from './utils/loinExporter';
 import { isLoinXml, parseLoinXml } from './utils/loinImporter';
 import { isIdsXml, parseIdsXml } from './utils/idsImporter';
+import { generateMvdXml } from './utils/mvdXmlExporter';
+import { isMvdXml, parseMvdXml } from './utils/mvdXmlImporter';
 import { importXppm } from './utils/xppmImporter';
 import { normalizePath, basename as fpBasename, bpmnCandidates, imageCandidates } from './utils/filePathUtils.js';
 import {
@@ -171,7 +173,8 @@ const App = () => {
     includeBpmn: true,
     includeImages: true,
     enableReview: false,
-    idsIfcVersion: 'IFC4X3_ADD2'
+    idsIfcVersion: 'IFC4X3_ADD2',
+    mvdExtension: 'mvdxml'
   });
   const [customXslt, setCustomXslt] = useState(null); // Custom XSLT file for PDF export
 
@@ -2825,12 +2828,51 @@ const App = () => {
         // Detect XML type by root element prefix
         const isLoinContent = content.includes('<loin:') || content.includes('<LOINSpecification');
         const isIdsContent = content.includes('<ids:');
+        const isMvdContent = isMvdXml(content);
         const isIdmTag = content.includes('<idm:') || content.includes('<idm>') || content.includes('<idm ');
         const isV2 = content.includes('idmXML/2.0') || content.includes('29481/-3/ed-2');
         const isIdmXmlContent = isIdmTag && isV2;
         const isXppmContent = isIdmTag && !isV2;
 
-        if (isLoinContent) {
+        if (isMvdContent) {
+          // mvdXML detected — route to mvdXML importer
+          try {
+            isLoadingProjectRef.current = true;
+            const mvdData = parseMvdXml(content);
+
+            if (mvdData.erHierarchy && handleErHierarchyImport(mvdData.erHierarchy, {
+              bpmnXml: 'EMPTY',
+              headerData: mvdData.headerData,
+              dataObjectErMap: {},
+              erDataMap: {},
+              erLibrary: null,
+              filePath: file.name,
+              isDirtyAfterImport: true,
+              source: 'mvdxml'
+            })) {
+              alert(`mvdXML imported: ${mvdData.totalERs} exchange requirement(s), ${mvdData.totalConcepts} concept(s) converted to ${mvdData.totalIUs} Information Unit(s).`);
+              return;
+            }
+
+            if (mvdData.headerData) setHeaderData(mvdData.headerData);
+            if (mvdData.erHierarchy) setErHierarchy(mvdData.erHierarchy);
+            setDataObjectErMap({});
+            setErDataMap({});
+            setBpmnXml('EMPTY');
+            setCurrentFilePath(file.name);
+            setIsDirty(true);
+            setValidationResults(null);
+            setHasActiveProject(true);
+            setActivePane('specification');
+            setTimeout(() => { isLoadingProjectRef.current = false; }, 2000);
+
+            alert(`mvdXML imported: ${mvdData.totalERs} exchange requirement(s), ${mvdData.totalConcepts} concept(s) converted to ${mvdData.totalIUs} Information Unit(s).`);
+          } catch (mvdErr) {
+            console.error('Failed to parse mvdXML:', mvdErr);
+            alert('Failed to parse mvdXML file: ' + mvdErr.message);
+            isLoadingProjectRef.current = false;
+          }
+        } else if (isLoinContent) {
           // LOIN XML detected — route to LOIN importer
           try {
             isLoadingProjectRef.current = true;
@@ -3081,6 +3123,44 @@ const App = () => {
           setCurrentFilePath(null);
           setIsDirty(true);
           setHasActiveProject(true);
+        }
+      } else if (fileName.endsWith('.mvdxml')) {
+        // Parse as mvdXML file
+        try {
+          isLoadingProjectRef.current = true;
+          const mvdData = parseMvdXml(content);
+
+          if (mvdData.erHierarchy && handleErHierarchyImport(mvdData.erHierarchy, {
+            bpmnXml: 'EMPTY',
+            headerData: mvdData.headerData,
+            dataObjectErMap: {},
+            erDataMap: {},
+            erLibrary: null,
+            filePath: file.name,
+            isDirtyAfterImport: true,
+            source: 'mvdxml'
+          })) {
+            alert(`mvdXML imported: ${mvdData.totalERs} exchange requirement(s), ${mvdData.totalConcepts} concept(s) converted to ${mvdData.totalIUs} Information Unit(s).`);
+            return;
+          }
+
+          if (mvdData.headerData) setHeaderData(mvdData.headerData);
+          if (mvdData.erHierarchy) setErHierarchy(mvdData.erHierarchy);
+          setDataObjectErMap({});
+          setErDataMap({});
+          setBpmnXml('EMPTY');
+          setCurrentFilePath(file.name);
+          setIsDirty(true);
+          setValidationResults(null);
+          setHasActiveProject(true);
+          setActivePane('specification');
+          setTimeout(() => { isLoadingProjectRef.current = false; }, 2000);
+
+          alert(`mvdXML imported: ${mvdData.totalERs} exchange requirement(s), ${mvdData.totalConcepts} concept(s) converted to ${mvdData.totalIUs} Information Unit(s).`);
+        } catch (mvdErr) {
+          console.error('Failed to parse mvdXML:', mvdErr);
+          alert('Failed to parse mvdXML file: ' + mvdErr.message);
+          isLoadingProjectRef.current = false;
         }
       } else if (fileName.endsWith('.ids')) {
         // Parse as IDS file
@@ -3476,15 +3556,10 @@ const App = () => {
 
   // Open User Manual / Help
   const handleHelp = useCallback(() => {
-    // Open the user manual in a new browser tab/window
-    // In Electron, this will use the shell.openExternal
-    // In browser, this will open the markdown file or a hosted version
-    const manualUrl = 'https://htmlpreview.github.io/?https://github.com/ghanglee/IDMxPPM/blob/main/user_manuals/V1.3.1/IDMxPPM-Tutorials.html';
-
-    if (window.electronAPI && window.electronAPI.openExternal) {
-      window.electronAPI.openExternal(manualUrl);
+    if (window.electronAPI?.openManual) {
+      window.electronAPI.openManual();
     } else {
-      // Browser fallback - open in new tab
+      const manualUrl = 'https://htmlpreview.github.io/?https://github.com/ghanglee/IDMxPPM/blob/main/user_manuals/V1.4.0/IDMxPPM-Tutorials.html';
       window.open(manualUrl, '_blank', 'noopener,noreferrer');
     }
   }, []);
@@ -3589,7 +3664,8 @@ const App = () => {
       'zip': '.zip',
       'bpmn': '.bpmn',
       'ids': '.ids',
-      'loin': '.xml'
+      'loin': '.xml',
+      'mvd': exportOptions.mvdExtension === 'xml' ? '.xml' : '.mvdxml'
     };
 
     const defaultName = (exportFilename || 'idm-specification') + (extensions[exportFormat] || '');
@@ -3607,7 +3683,7 @@ const App = () => {
       const nameWithoutExt = fullName.replace(/\.[^.]+$/, '');
       setExportFilename(nameWithoutExt);
     }
-  }, [exportFilename, exportFormat]);
+  }, [exportFilename, exportFormat, exportOptions.mvdExtension]);
 
   // Save the current project to the server
   const handleSaveToServer = useCallback(async () => {
@@ -4084,6 +4160,25 @@ const App = () => {
           break;
         }
 
+        case 'mvd': {
+          // mvdXML 1.1 (buildingSMART Model View Definition)
+          const mvdResult = generateMvdXml({ headerData, erHierarchy });
+
+          if (mvdResult.conceptCount === 0) {
+            alert('No IFC-mappable Exchange Requirements found.\n\nmvdXML export requires Information Units with IFC external element mappings (e.g., Pset_WallCommon.FireRating or IfcWall).\n\n' +
+              (mvdResult.skippedIUs > 0 ? `${mvdResult.skippedIUs} Information Unit(s) were skipped because they have no IFC mappings.` : 'Add external element mappings to your Information Units first.'));
+            return;
+          }
+
+          if (mvdResult.skippedIUs > 0) {
+            console.info(`mvdXML export: ${mvdResult.conceptCount} concept(s), ${mvdResult.rootCount} root entity/entities, ${mvdResult.skippedIUs} IU(s) skipped (no IFC mappings)`);
+          }
+
+          const mvdExt = exportOptions.mvdExtension === 'xml' ? 'xml' : 'mvdxml';
+          await saveFile(mvdResult.xml, `${fileName}.${mvdExt}`, 'application/xml');
+          break;
+        }
+
         case 'server': {
           await handleSaveToServer();
           break;
@@ -4497,6 +4592,44 @@ const App = () => {
         } catch (idsErr) {
           console.error('Failed to parse IDS:', idsErr);
           alert('Failed to parse IDS file: ' + idsErr.message);
+          isLoadingProjectRef.current = false;
+        }
+      } else if (data.type === 'mvdxml') {
+        // Handle mvdXML import
+        try {
+          isLoadingProjectRef.current = true;
+          const mvdData = parseMvdXml(data.content);
+
+          if (mvdData.erHierarchy && handleErHierarchyImport(mvdData.erHierarchy, {
+            bpmnXml: 'EMPTY',
+            headerData: mvdData.headerData,
+            dataObjectErMap: {},
+            erDataMap: {},
+            erLibrary: null,
+            filePath: data.filePath || 'mvdxml-import.mvdxml',
+            isDirtyAfterImport: true,
+            source: 'mvdxml'
+          })) {
+            alert(`mvdXML imported: ${mvdData.totalERs} exchange requirement(s), ${mvdData.totalConcepts} concept(s) converted to ${mvdData.totalIUs} Information Unit(s).`);
+            return;
+          }
+
+          if (mvdData.headerData) setHeaderData(mvdData.headerData);
+          if (mvdData.erHierarchy) setErHierarchy(mvdData.erHierarchy);
+          setDataObjectErMap({});
+          setErDataMap({});
+          setBpmnXml('EMPTY');
+          setCurrentFilePath(data.filePath || null);
+          setIsDirty(true);
+          setValidationResults(null);
+          setHasActiveProject(true);
+          setActivePane('specification');
+          setTimeout(() => { isLoadingProjectRef.current = false; }, 2000);
+
+          alert(`mvdXML imported: ${mvdData.totalERs} exchange requirement(s), ${mvdData.totalConcepts} concept(s) converted to ${mvdData.totalIUs} Information Unit(s).`);
+        } catch (mvdErr) {
+          console.error('Failed to parse mvdXML:', mvdErr);
+          alert('Failed to parse mvdXML file: ' + mvdErr.message);
           isLoadingProjectRef.current = false;
         }
       } else if (data.type === 'zip') {
@@ -5015,7 +5148,8 @@ const App = () => {
                          exportFormat === 'zip' ? '.zip' :
                          exportFormat === 'bpmn' ? '.bpmn' :
                          exportFormat === 'ids' ? '.ids' :
-                         exportFormat === 'loin' ? '.xml' : ''}
+                         exportFormat === 'loin' ? '.xml' :
+                         exportFormat === 'mvd' ? (exportOptions.mvdExtension === 'xml' ? '.xml' : '.mvdxml') : ''}
                       </span>
                     </div>
                     {window.electronAPI?.showSaveLocation && (
@@ -5168,6 +5302,35 @@ const App = () => {
                           <div className="export-suboptions" onClick={(e) => e.stopPropagation()}>
                             <p style={{ fontSize: '11px', color: 'var(--text-tertiary, #888)', margin: '4px 0 0 0' }}>
                               Maps IDM actors, project phases, and Information Units to LOIN object type specifications. IUs are grouped by their external element mappings (IFC, CityGML, bSDD, UniFormat, etc.). IUs without any external element mappings will be excluded.
+                            </p>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* mvdXML */}
+                  <div className={`export-format-option ${exportFormat === 'mvd' ? 'selected' : ''}`} data-format="mvd" onClick={() => setExportFormat('mvd')}>
+                    <input type="radio" name="exportFormat" value="mvd" checked={exportFormat === 'mvd'} onChange={(e) => setExportFormat(e.target.value)} />
+                    <div className="export-format-content">
+                      <span className="export-format-title">mvdXML ({exportOptions.mvdExtension === 'xml' ? '.xml' : '.mvdxml'})</span>
+                      {exportFormat === 'mvd' && (
+                        <>
+                          <span className="export-format-desc">buildingSMART Model View Definition (mvdXML 1.1)</span>
+                          <div className="export-suboptions" onClick={(e) => e.stopPropagation()}>
+                            <p className="export-option-label">File extension:</p>
+                            <div className="export-xslt-options">
+                              <label className="export-xslt-option">
+                                <input type="radio" name="mvdExtension" value="mvdxml" checked={exportOptions.mvdExtension !== 'xml'} onChange={() => setExportOptions(prev => ({ ...prev, mvdExtension: 'mvdxml' }))} />
+                                <span>.mvdxml</span>
+                              </label>
+                              <label className="export-xslt-option">
+                                <input type="radio" name="mvdExtension" value="xml" checked={exportOptions.mvdExtension === 'xml'} onChange={() => setExportOptions(prev => ({ ...prev, mvdExtension: 'xml' }))} />
+                                <span>.xml</span>
+                              </label>
+                            </div>
+                            <p style={{ fontSize: '11px', color: 'var(--text-tertiary, #888)', margin: '4px 0 0 0' }}>
+                              Each ER becomes an ExchangeRequirement; Information Units with IFC mappings become Concepts grouped by entity type. IUs without IFC mappings are excluded. Uses generic Property/Attribute/Entity ConceptTemplates — values are captured in Concept Definitions.
                             </p>
                           </div>
                         </>

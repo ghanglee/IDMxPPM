@@ -39,6 +39,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Open external URL in default browser
   openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
 
+  // Open user manual from local resources
+  openManual: () => ipcRenderer.invoke('shell:openManual'),
+
   // 플랫폼 정보
   platform: process.platform
 });

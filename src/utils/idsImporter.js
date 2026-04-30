@@ -364,7 +364,7 @@ export function parseIdsXml(content) {
     // Create a parent IU with dataType "Structured" for each IDS specification
     rootInformationUnits.push({
       id: generateUUID(),
-      name: entityName || specName,
+      name: specName || entityName,
       dataType: 'Structured',
       isMandatory: true,
       definition: descParts.join('\n'),

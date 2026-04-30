@@ -1,6 +1,6 @@
 {
   "name": "idmxppm-neo-seoul",
-  "version": "1.3.1",
+  "version": "1.4.0",
   "description": "IDMxPPM - Neo Seoul: Information Delivery Manual authoring tool based on the eXtended Process to Product Modeling method. Cross-platform IDM authoring tool for AEC industry - ISO 29481-1 & ISO 29481-3 compliant",
   "main": "electron/main.js",
   "author": "Building Informatics Group (BIG), Yonsei University",
@@ -55,6 +55,13 @@
       {
         "from": "public",
         "to": "public",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "user_manuals",
+        "to": "user_manuals",
         "filter": [
           "**/*"
         ]
