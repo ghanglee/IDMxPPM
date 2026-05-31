@@ -3478,7 +3478,13 @@ const App = () => {
           setBpmnXml(projectData.bpmnXml);
         }
         if (projectData.headerData) {
-          setHeaderData(projectData.headerData);
+          const today = new Date().toISOString().split('T')[0];
+          setHeaderData({
+            ...projectData.headerData,
+            creationDate: today,
+            revisionHistory: [{ date: today, description: 'Initial creation' }],
+            changeLogs: [{ id: 'log-1', changeDateTime: `${today}T00:00:00`, changeSummary: 'Initial creation', changedBy: 'author-1', changes: [] }],
+          });
         }
         // Handle ER-first format (v2.0+) or migrate from legacy erDataMap
         // Consolidate to single top-level ER if needed (Rule 2 enforcement)
@@ -3501,7 +3507,13 @@ const App = () => {
       } catch (err) {
         console.error('Failed to load sample project:', err);
         // Fallback to embedded sample data (v2.0 format)
-        setHeaderData({ ...SAMPLE_HEADER_DATA });
+        const today = new Date().toISOString().split('T')[0];
+        setHeaderData({
+          ...SAMPLE_HEADER_DATA,
+          creationDate: today,
+          revisionHistory: [{ date: today, description: 'Initial creation' }],
+          changeLogs: [{ id: 'log-1', changeDateTime: `${today}T00:00:00`, changeSummary: 'Initial creation', changedBy: 'author-1', changes: [] }],
+        });
         setErDataMap({ ...SAMPLE_ER_DATA_MAP });
         setErHierarchy(autoConsolidateErHierarchy(SAMPLE_ER_HIERARCHY));
         setDataObjectErMap({ ...SAMPLE_DATA_OBJECT_ER_MAP });
