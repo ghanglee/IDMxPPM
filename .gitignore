@@ -1,3 +1,6 @@
+# Local-only folder (design docs, references, requests — not for distribution)
+_local/
+
 # Dependencies
 node_modules/
 
@@ -6,9 +9,6 @@ dist/
 dist-electron/
 release/
 releases/
-
-# Reference documents (ISO standards, not for public distribution)
-references/
 
 # Proprietary xPPM data (local only)
 xPPM/
