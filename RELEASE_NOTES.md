@@ -1,5 +1,124 @@
 # IDMxPPM neo-Seoul — Release Notes
 
+## v1.5.0 (2026-05-31)
+
+### Highlights
+
+- **idmXML 1.0 Export** — New export format producing an idmXSD v1.0 compliant ZIP archive (replaces the generic ZIP Bundle); the existing idmXML export is now explicitly labelled "idmXML 2.0"
+- **bSDD Property Search Fixes** — Corrected property retrieval caching, dot-separated drilldown queries (`IfcDoor.Width`), and display name formatting
+- **Export/Import UX** — Fixed "Export Project As…" menu action, defaulted "Save Project As…" to `.idm` extension, and fixed binary ZIP/idmXML 1.0 import in installed Electron builds
+
+---
+
+### New Features
+
+#### idmXML 1.0 Export
+
+- Generates an idmXSD v1.0 compliant ZIP archive containing the XML, BPMN, and images
+- Uses the correct v1.0 flat `<author>` / `<authoring>` structure, `standardProjectPhase`, and plain-text description content elements
+- Export dialog labels updated: "idmXML 2.0 (.xml)" and "idmXML 1.0 (.zip)" for clear disambiguation
+- IDM Project (`.idm`) description updated: "idmXSD 2.0-based full project file in JSON"
+
+#### Sample Files
+
+- Added `CostEstimation_WindowsDoors` sample set: three IDM projects for door/window cost estimation
+- Added corresponding idmXML 2.0 exports for roundtrip validation
+- Default sample on the Startup Screen is now `idmWindowCostEstimation.idm`
+
+---
+
+### Bug Fixes
+
+- **bSDD property cache** — Failed or empty property fetches are no longer permanently cached; stale empty entries are filtered out on reload
+- **bSDD dot-separated queries** — `IfcDoor.Width`-style property drilldown now splits correctly on `.` before cache lookup
+- **bSDD display names** — Removed redundant code+name concatenation; entity names display cleanly
+- **bSDD drilldown property naming** — Selected properties are saved as `IfcDoor.Width` (with group code prefix) instead of just `Width`
+- **Export Project As…** — Menu item listener was registered in the wrong scope and silently did nothing; fixed
+- **Save Project As…** — File save dialog now defaults to `.idm` extension
+- **ZIP/idmXML 1.0 import in Electron** — ZIP files were read as UTF-8 text, corrupting binary data and causing JSZip failures; main process now sends raw Buffer as base64, renderer decodes to ArrayBuffer before parsing
+- **ISO 29481-1 reference URL** — Corrected stale URL in the About dialog
+
+---
+
+### Documentation
+
+- Added V1.5.0 User Manual with Tutorial 23 (idmXML 1.0 export)
+
+---
+
+### Compatibility
+
+- **Import** — idmXSD v1.0, v2.0, idmXML 1.0 ZIP, xPPM (`.xppm`), mvdXML (`.mvdxml`), LOIN (`.xml`), IDS (`.ids`), reviewed HTML (`.html`/`.htm`), BPMN (`.bpmn`)
+- **Export** — idmXML 2.0 (`.xml`), idmXML 1.0 (`.zip`), mvdXML (`.mvdxml`), IDS v1.0, LOIN (CEN 17412), HTML (with review mode), BPMN, erXML
+
+---
+
+## v1.4.0 (2026-04-30)
+
+### Highlights
+
+- **mvdXML Import/Export** — Bi-directional support for buildingSMART mvdXML 1.1 with faithful round-trip fidelity; three export modes including verbatim re-emission
+- **Structured IU Architecture for IDS/LOIN** — Entity and object types now map to parent Structured IUs with property sub-IUs instead of sub-ERs, enabling cleaner round-trips
+- **Schema Search UX** — Apply button with preview mode, full description/URI expansion, and an error boundary for uncaught render failures
+- **Local User Manual** — User manual now opens a local HTML file via Electron instead of a GitHub URL; bundled in the installed app
+
+---
+
+### New Features
+
+#### mvdXML Import
+
+- Parses mvdXML 1.1 files (`.mvdxml`) with faithful fidelity: stores raw `_mvdTemplatesSection`, `_mvdExchangeRequirements`, and `_mvdTemplateRulesXml` for verbatim re-emission
+- Builds IU tree from `TemplateRules` parameters; each `ConceptTemplate` becomes a structured parent IU
+- Wired into `FilePickerModal`, Electron file dialogs, and drag-and-drop import
+
+#### mvdXML Export
+
+- Three export modes: **reconstructive** (verbatim re-emit stored XML), **old-format reconstructive**, and **synthetic** (generate from current ER/IU data)
+- Schema-agnostic: IFC-mapped IUs populate `TemplateRules`; non-IFC IUs are noted in descriptions
+
+#### Structured IU Architecture (IDS/LOIN)
+
+- IDS entity types and LOIN object types now create a parent IU of type **Structured** containing property sub-IUs
+- IDS/LOIN exporters read from structured parent IUs for round-trip fidelity
+- Mapped from/to existing IDS `<applicability>` and LOIN `specificationPerObjectType` structures
+
+#### Schema Search Improvements
+
+- **Apply button** — Click a search result to preview/highlight; click Apply to confirm, or double-click as a shortcut
+- **Full expansion** — Selected result shows full description and URI
+- **SearchErrorBoundary** — Uncaught render errors show a Retry/Close dialog instead of a blank panel
+- Null guards on search results and similarity calculations; 150 ms debounce for local schemas, 300 ms for bSDD API
+
+#### Validation Fixes
+
+- Aim & Scope, Summary, Uses, Regions, and Phases moved to the `useCase` validation category
+- Language field added to IDS and LOIN importers
+- IDS `copyright` stored as author (organization), not copyright field
+- Whitespace normalization: `\r\n` handling added to all four importers (IDS, LOIN, mvdXML, xPPM)
+
+#### UI Improvements
+
+- Save icon changed to floppy disk; Help icon changed to `i` (info)
+- Auto-add Use and Region on selection (removes the extra `+` button step)
+
+---
+
+### Documentation
+
+- Added [mvdXML–IDM Mapping Reference](docs/mvdXML-IDM-Mapping.md) with detailed bi-directional mapping tables
+- Updated [IDS–IDM Mapping Reference](docs/IDS-IDM-Mapping.md) and [LOIN–IDM Mapping Reference](docs/LOIN-IDM-Mapping.md) for structured IU approach
+- Added V1.4.0 User Manual with Tutorial 22 (mvdXML import/export)
+
+---
+
+### Compatibility
+
+- **Import** — idmXSD v1.0, v2.0, xPPM (`.xppm`), mvdXML (`.mvdxml`), LOIN (`.xml`), IDS (`.ids`), reviewed HTML (`.html`/`.htm`), BPMN (`.bpmn`)
+- **Export** — idmXSD v2.0 (`.xml`), mvdXML (`.mvdxml`), IDS v1.0, LOIN (CEN 17412), HTML (with review mode), BPMN, erXML
+
+---
+
 ## v1.3.1 (2026-03-15)
 
 ### Highlights

@@ -60,16 +60,24 @@ IDMxPPM (eXtended Process to Product Modeling) enables BIM professionals, standa
 
 | Format | Extension | Description |
 |--------|-----------|-------------|
-| IDM Project | `.idm` | Full project with BPMN diagram, ER hierarchy, and library |
-| idmXML | `.xml` | ISO 29481-3 compliant export with embedded BPMN and images (base64) |
-| HTML Document | `.html` | Self-contained printable document with BPMN (SVG) and images |
-| ZIP Bundle | `.zip` | idmXML + BPMN + images + project data in one archive |
+| IDM Project | `.idm` | Full project with BPMN diagram, ER hierarchy, and library (idmXSD 2.0 JSON) |
+| idmXML 2.0 | `.xml` | ISO 29481-3 idmXSD v2.0 export with embedded BPMN and images (base64) |
+| idmXML 1.0 | `.zip` | idmXSD v1.0 ZIP archive with BPMN and images |
+| HTML Document | `.html` | Self-contained printable document with BPMN (SVG) and review mode |
+| mvdXML | `.mvdxml` | buildingSMART Model View Definition XML 1.1 import/export |
+| IDS | `.ids` | buildingSMART Information Delivery Specification export/import |
+| LOIN | `.xml` | Level of Information Need (EN 17412 / ISO 7817) export/import |
 | BPMN Diagram | `.bpmn` | BPMN 2.0 XML format (diagram only) |
 | Exchange Requirement | `.erxml` | Individual ER for import/export |
 | Server | (cloud) | Save/load specs to/from connected MongoDB server |
 
 ### Import Support
-- IDM Project (`.idm`), idmXML (`.xml`), ZIP Bundle (`.zip`), BPMN (`.bpmn`)
+
+- IDM Project (`.idm`), idmXML 2.0 (`.xml`), idmXML 1.0 ZIP (`.zip`), BPMN (`.bpmn`)
+- **mvdXML** (`.mvdxml`) — buildingSMART Model View Definition XML 1.1
+- **IDS** (`.ids`) — buildingSMART Information Delivery Specification
+- **LOIN** (`.xml`) — Level of Information Need (CEN 17412, EN 17412-3, ISO 7817-3)
+- **Reviewed HTML** (`.html`) — restore review comments from exported HTML
 - **Legacy xPPM** (`.xppm`) format with full data conversion
 
 ## Installation
@@ -128,7 +136,7 @@ See [API User Manual](docs/API_User_Manual.md) for detailed server deployment, c
 1. **Launch the application** - You'll see the Startup Screen
 2. **Choose a project type**:
    - **Blank Project**: Start with an empty BPMN canvas
-   - **Sample Project**: Start with a pre-configured GDE-IDM sample
+   - **Sample Project**: Start with a pre-configured IDM sample (Cost Estimation)
    - **Open Project**: Load an existing project file
    - **Open from Server**: Browse specs on a connected server
 3. **Create your process map** using the BPMN editor
@@ -139,8 +147,8 @@ See [API User Manual](docs/API_User_Manual.md) for detailed server deployment, c
 
 ## Documentation
 
-- [User Manual (v1.2.0)](user_manuals/V1.2.0/USER_MANUAL.md) - Comprehensive guide to using IDMxPPM
-- [Tutorial Series (v1.2.0)](user_manuals/V1.2.0/IDMxPPM-Tutorials.html) - Step-by-step interactive tutorials
+- [User Manual (v1.5.0)](user_manuals/V1.5.0/USER_MANUAL.md) - Comprehensive guide to using IDMxPPM
+- [Tutorial Series (v1.5.0)](user_manuals/V1.5.0/IDMxPPM-Tutorials.html) - Step-by-step interactive tutorials
 - [API User Manual](docs/API_User_Manual.md) - Server deployment, REST API reference, and configuration
 
 ## Technology Stack
