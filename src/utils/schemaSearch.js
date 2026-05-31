@@ -3,7 +3,7 @@
  * Provides exact and semantic search for external schemas
  */
 
-import SCHEMA_INFO from '../../references/external schemas/idsSchema';
+import SCHEMA_INFO from '../data/schemas/idsSchema';
 import { getBsddCacheState, searchBsddCached, getOrFetchBsddProperties } from './bsddCache.js';
 
 /**
