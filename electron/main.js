@@ -211,18 +211,32 @@ async function handleOpenProject() {
 
   if (!result.canceled && result.filePaths.length > 0) {
     const filePath = result.filePaths[0];
+    const ext = path.extname(filePath).toLowerCase();
+
+    // ZIP/IDMX are binary — read as Buffer and send as base64 to avoid UTF-8 corruption
+    if (ext === '.zip' || ext === '.idmx') {
+      const buffer = fs.readFileSync(filePath);
+      mainWindow.webContents.send('file-opened', {
+        filePath,
+        content: buffer.toString('base64'),
+        type: 'zip',
+        bpmnContent: null,
+        imageMap: {}
+      });
+      return;
+    }
+
     let content = fs.readFileSync(filePath, 'utf-8');
     // Strip UTF-8 BOM if present (causes XML parsing issues)
     if (content.charCodeAt(0) === 0xFEFF) {
       content = content.slice(1);
     }
-    const ext = path.extname(filePath).toLowerCase();
 
     let type = 'project';
     if (ext === '.bpmn') {
       type = 'bpmn';
     } else if (ext === '.zip' || ext === '.idmx') {
-      type = 'zip';
+      type = 'zip'; // unreachable — handled above
     } else if (ext === '.xppm') {
       type = 'xppm';
     } else if (ext === '.ids') {

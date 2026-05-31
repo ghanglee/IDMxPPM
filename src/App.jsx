@@ -4696,8 +4696,69 @@ const App = () => {
           isLoadingProjectRef.current = false;
         }
       } else if (data.type === 'zip') {
-        // Handle ZIP bundle - note: Electron sends file content as string, need binary handling
-        alert('ZIP import via Electron menu is not yet supported. Please use the browser file picker via Open Project button.');
+        // Electron sends ZIP as base64 (binary-safe). Decode to ArrayBuffer for JSZip.
+        (async () => {
+          try {
+            isLoadingProjectRef.current = true;
+            const binaryStr = atob(data.content);
+            const bytes = new Uint8Array(binaryStr.length);
+            for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+            const bundleData = await importIdmBundle(bytes.buffer);
+
+            let erHierarchyToImport = [];
+            let dataObjectErMapToImport = {};
+            let erDataMapToImport = null;
+
+            if (bundleData.erHierarchy && bundleData.erHierarchy.length > 0) {
+              erHierarchyToImport = bundleData.erHierarchy;
+              dataObjectErMapToImport = bundleData.dataObjectErMap || {};
+              erDataMapToImport = bundleData.erDataMap || null;
+            } else if (bundleData.erDataMap) {
+              const migrated = migrateErDataMap(bundleData.erDataMap);
+              erHierarchyToImport = migrated.erHierarchy;
+              dataObjectErMapToImport = migrated.dataObjectErMap;
+              erDataMapToImport = bundleData.erDataMap;
+            }
+
+            const hasBpmn = !!bundleData.bpmnXml;
+            const bpmnToImport = hasBpmn ? bundleData.bpmnXml : 'DEFAULT';
+
+            if (handleErHierarchyImport(erHierarchyToImport, {
+              bpmnXml: bpmnToImport,
+              headerData: bundleData.headerData,
+              dataObjectErMap: dataObjectErMapToImport,
+              erDataMap: erDataMapToImport,
+              erLibrary: bundleData.erLibrary,
+              filePath: data.filePath,
+              isDirtyAfterImport: !hasBpmn,
+              source: 'project'
+            })) {
+              if (!hasBpmn) alert('Bundle imported. Note: No BPMN diagram found. The process map needs to be recreated manually.');
+              return;
+            }
+
+            if (bundleData.headerData) setHeaderData(bundleData.headerData);
+            setErHierarchy(normalizeMappingBases(erHierarchyToImport));
+            setDataObjectErMap(dataObjectErMapToImport);
+            if (erDataMapToImport) setErDataMap(erDataMapToImport);
+            if (bundleData.erLibrary) setErLibrary(bundleData.erLibrary);
+            setBpmnXml(bpmnToImport);
+            setIsDirty(!hasBpmn);
+            if (!hasBpmn) alert('Bundle imported. Note: No BPMN diagram found. The process map canvas needs to be recreated manually.');
+
+            setCurrentFilePath(data.filePath);
+            setValidationResults(null);
+            setHasActiveProject(true);
+            setActivePane('specification');
+            setTimeout(() => { isLoadingProjectRef.current = false; }, 2000);
+            extractDataObjectsAfterLoad();
+            linkActorsToSwimlanesByName();
+          } catch (zipErr) {
+            console.error('Failed to import ZIP bundle:', zipErr);
+            alert('Failed to import ZIP bundle: ' + zipErr.message);
+            isLoadingProjectRef.current = false;
+          }
+        })();
       } else if (data.type === 'xppm') {
         // Handle xPPM legacy import
         (async () => {
