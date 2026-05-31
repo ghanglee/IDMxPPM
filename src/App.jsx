@@ -16,7 +16,8 @@ import ElementDetailPanel from './components/TaskDetailPanel/ElementDetailPanel'
 import { ThemeProvider } from './hooks/useTheme';
 import { useServerConnection } from './hooks/useServerConnection';
 import { api } from './utils/apiClient';
-import { generateIdmXml, generateErXmlStandalone } from './utils/idmXmlGenerator';
+import { generateIdmXml, generateIdmXmlV1, generateErXmlStandalone } from './utils/idmXmlGenerator';
+import JSZip from 'jszip';
 import { downloadIdmBundle, exportIdmBundle } from './utils/idmBundleExporter';
 import { importIdmBundle, isZipBundle } from './utils/idmBundleImporter';
 import { validateProject, getValidationStatusLabel } from './utils/validation';
@@ -41,10 +42,60 @@ import {
   SAMPLE_ER_LIBRARY
 } from './data/sampleProjectData';
 
+// Migration: old .idm files stored 'bSDD' as the basis for IFC mappings.
+// Derive the correct schema from the URI when the basis is generic 'bSDD'.
+// Canonical schema names matching SCHEMA_OPTIONS values in ERPanel
+const CANONICAL_SCHEMA_NAMES = ['bSDD', 'IFC 2x3', 'IFC 4x3 ADD2', 'CityGML', 'UniFormat', 'OmniClass', 'MasterFormat', 'Other'];
+
+// Normalize a schema name string to the canonical SCHEMA_OPTIONS value.
+// Handles variant spellings like 'IFC4x3 ADD2' (no space) → 'IFC 4x3 ADD2'.
+const canonicalizeSchema = (schema) => {
+  if (!schema) return null;
+  if (CANONICAL_SCHEMA_NAMES.includes(schema)) return schema;
+  const stripped = schema.replace(/\s/g, '').toLowerCase();
+  return CANONICAL_SCHEMA_NAMES.find(s => s.replace(/\s/g, '').toLowerCase() === stripped) || null;
+};
+
+const normalizeMappingBases = (hierarchy) => {
+  if (!Array.isArray(hierarchy)) return hierarchy;
+  const fixIu = (iu) => ({
+    ...iu,
+    correspondingExternalElements: (iu.correspondingExternalElements || []).map(m => {
+      // First canonicalize the basis name (e.g. 'IFC4x3 ADD2' → 'IFC 4x3 ADD2')
+      const canonical = canonicalizeSchema(m.basis);
+      const normalizedBasis = canonical || m.basis;
+
+      // If canonical, non-bSDD, and no URI-based correction needed → done
+      if (canonical && canonical !== 'bSDD') {
+        return canonical !== m.basis ? { ...m, basis: canonical } : m;
+      }
+
+      // basis is bSDD (or unknown) — try to derive real schema from URI/name
+      const uri = m.uri || '';
+      const name = m.name || '';
+      // IFC entity names always start with 'Ifc' followed by uppercase letter
+      // bSDD IFC dictionary covers IFC 4.3, so Ifc-named mappings from bSDD → IFC 4x3 ADD2
+      const basis = uri.includes('/buildingsmart/ifc/4.3') ? 'IFC 4x3 ADD2'
+        : uri.includes('/buildingsmart/ifc/2x3') ? 'IFC 2x3'
+        : /^Ifc[A-Z]/.test(name.split('.')[0]) ? 'IFC 4x3 ADD2'
+        : (normalizedBasis || 'bSDD');
+      return basis !== m.basis ? { ...m, basis } : m;
+    }),
+    subInformationUnits: (iu.subInformationUnits || []).map(fixIu),
+  });
+  const fixEr = (er) => ({
+    ...er,
+    informationUnits: (er.informationUnits || []).map(fixIu),
+    subERs: (er.subERs || []).map(fixEr),
+    subErs: (er.subErs || []).map(fixEr),
+  });
+  return hierarchy.map(fixEr);
+};
+
 /**
  * Main Application Component
  *
- * IDMxPPM - Neo Seoul
+ * xPPM neo-Seoul
  * Information Delivery Manual authoring tool based on the
  * eXtended Process to Product Modeling method
  */
@@ -805,7 +856,7 @@ const App = () => {
     } = pendingImportData;
 
     // Set the consolidated hierarchy
-    setErHierarchy(consolidatedHierarchy);
+    setErHierarchy(normalizeMappingBases(consolidatedHierarchy));
 
     // Set other import data
     if (importBpmnXml) setBpmnXml(importBpmnXml);
@@ -929,44 +980,50 @@ const App = () => {
     const existingEr = existingErId ? findErById(erHierarchy, existingErId) : null;
 
     if (existingEr) {
-      // ER already exists in erHierarchy - always sync to erDataMap for legacy panel
-      // This ensures the detail panel shows the current data from erHierarchy
-      setErDataMap(prev => ({
-        ...prev,
-        [dataObject.id]: existingEr
-      }));
-      // Also select this ER in ER-first mode so the detail panel shows it
+      // Sync to erDataMap and select this ER in the panel
+      setErDataMap(prev => ({ ...prev, [dataObject.id]: existingEr }));
       setSelectedErId(existingErId);
+      // Single-click: open the ER panel to show the linked ER
+      setShowERPanel(true);
+      setErPanelMode('detail');
+      setActivePane(null);
+      // Double-click: also open the modal so the user can change the linked ER
+      if (dataObject.forceOpen) {
+        setNewDataObjectPending(dataObject);
+        setShowDataObjectERModal(true);
+      }
+    } else if (existingErId) {
+      // Stale mapping: the linked ER was deleted from the hierarchy.
+      // Only act on explicit double-click; ignore selection/move events.
+      if (!dataObject.forceOpen) return;
+      setDataObjectErMap(prev => {
+        const updated = { ...prev };
+        delete updated[dataObject.id];
+        return updated;
+      });
+      setNewDataObjectPending(dataObject);
+      setShowDataObjectERModal(true);
+      return;
     } else if (erDataMap[dataObject.id]) {
       // Legacy erDataMap has data but no ER-first mapping - migrate it
       const legacyEr = erDataMap[dataObject.id];
       const erId = legacyEr.id || legacyEr.guid || `er-${Date.now()}`;
 
-      // Add to erHierarchy if not already present (check inside functional update to avoid stale closure)
       setErHierarchy(prev => {
-        if (findErById(prev, erId)) return prev; // Already exists
+        if (findErById(prev, erId)) return prev;
         return [...prev, { ...legacyEr, id: erId }];
       });
-      // Create the mapping
-      setDataObjectErMap(prev => ({
-        ...prev,
-        [dataObject.id]: erId
-      }));
-      // Select this ER in ER-first mode
+      setDataObjectErMap(prev => ({ ...prev, [dataObject.id]: erId }));
       setSelectedErId(erId);
-    } else {
-      // No ER exists - show modal to let user select existing ER or create new one
-      // This gives users control over the ER association instead of auto-creating
-      setNewDataObjectPending(dataObject);
-      setShowDataObjectERModal(true);
-      // Don't open ER panel yet - wait for user to complete the modal
-      return;
-    }
-
-    if (dataObject.forceOpen || !showERPanel) {
       setShowERPanel(true);
       setErPanelMode('detail');
-      setActivePane(null); // Close content pane when opening ER panel
+      setActivePane(null);
+    } else {
+      // No mapping at all - only prompt on explicit double-click, not on selection/move
+      if (!dataObject.forceOpen) return;
+      setNewDataObjectPending(dataObject);
+      setShowDataObjectERModal(true);
+      return;
     }
   }, [erDataMap, dataObjectErMap, erHierarchy, showERPanel, findErById]);
 
@@ -1504,7 +1561,7 @@ const App = () => {
 
     const authorName = headerData.authors?.[0]?.givenName
       ? `${headerData.authors[0].givenName} ${headerData.authors[0].familyName || ''}`.trim()
-      : 'IDMxPPM User';
+      : 'xPPM User';
     const xmlContent = generateErXmlStandalone(er, authorName);
     const safeName = (er.name || 'ER').replace(/[^a-zA-Z0-9_-]/g, '_');
 
@@ -2741,7 +2798,7 @@ const App = () => {
           if (bundleData.headerData) {
             setHeaderData(bundleData.headerData);
           }
-          setErHierarchy(erHierarchyToImport);
+          setErHierarchy(normalizeMappingBases(erHierarchyToImport));
           setDataObjectErMap(dataObjectErMapToImport);
           if (erDataMapToImport) {
             setErDataMap(erDataMapToImport);
@@ -2811,7 +2868,7 @@ const App = () => {
         // No modal needed - proceed with direct import
         if (projectData.bpmnXml) setBpmnXml(projectData.bpmnXml);
         if (projectData.headerData) setHeaderData(projectData.headerData);
-        setErHierarchy(erHierarchyToImport);
+        setErHierarchy(normalizeMappingBases(erHierarchyToImport));
         setDataObjectErMap(dataObjectErMapToImport);
         if (erDataMapToImport) setErDataMap(erDataMapToImport);
         if (projectData.erLibrary) setErLibrary(projectData.erLibrary);
@@ -2974,7 +3031,7 @@ const App = () => {
             }
 
             if (xppmResult.headerData) setHeaderData(xppmResult.headerData);
-            setErHierarchy(erHierarchyToImport);
+            setErHierarchy(normalizeMappingBases(erHierarchyToImport));
             setDataObjectErMap(dataObjectErMapToImport);
             if (xppmResult.erDataMap) setErDataMap(xppmResult.erDataMap);
             if (xppmResult.erLibrary) setErLibrary(xppmResult.erLibrary);
@@ -3056,7 +3113,7 @@ const App = () => {
 
             // No modal needed - proceed with direct import
             if (idmData.headerData) setHeaderData(idmData.headerData);
-            if (idmData.erHierarchy) setErHierarchy(idmData.erHierarchy);
+            if (idmData.erHierarchy) setErHierarchy(normalizeMappingBases(idmData.erHierarchy));
             setDataObjectErMap(newDataObjectErMap);
             if (idmData.erDataMap) setErDataMap(idmData.erDataMap);
             setBpmnXml(bpmnToImport);
@@ -3220,7 +3277,7 @@ const App = () => {
 
           const projectDataEl = doc.getElementById('idmxppm-project-data');
           if (!projectDataEl) {
-            alert('This HTML file has no embedded IDMxPPM project data. Only HTML files exported from IDMxPPM with Review Mode enabled can be imported.');
+            alert('This HTML file has no embedded xPPM project data. Only HTML files exported from xPPM neo-Seoul with Review Mode enabled can be imported.');
             isLoadingProjectRef.current = false;
             return;
           }
@@ -3265,7 +3322,7 @@ const App = () => {
           // No modal needed - proceed with direct import
           if (projectData.bpmnXml) setBpmnXml(projectData.bpmnXml);
           if (projectData.headerData) setHeaderData(projectData.headerData);
-          setErHierarchy(erHierarchyToImport);
+          setErHierarchy(normalizeMappingBases(erHierarchyToImport));
           setDataObjectErMap(dataObjectErMapToImport);
           if (projectData.erDataMap) setErDataMap(projectData.erDataMap);
           if (projectData.erLibrary) setErLibrary(projectData.erLibrary);
@@ -3320,7 +3377,7 @@ const App = () => {
 
           // No modal needed - proceed with direct import
           if (xppmResult.headerData) setHeaderData(xppmResult.headerData);
-          setErHierarchy(erHierarchyToImport);
+          setErHierarchy(normalizeMappingBases(erHierarchyToImport));
           setDataObjectErMap(dataObjectErMapToImport);
           if (xppmResult.erDataMap) setErDataMap(xppmResult.erDataMap);
           if (xppmResult.erLibrary) setErLibrary(xppmResult.erLibrary);
@@ -3410,7 +3467,7 @@ const App = () => {
       // Load GDE-IDM sample project from file
       try {
         isLoadingProjectRef.current = true;
-        const response = await fetch('./samples/GDE-IDM.idm');
+        const response = await fetch('./samples/IDM/CostEstimation_WindowsDoors/idmWindowCostEstimation.idm');
         if (!response.ok) {
           throw new Error(`Failed to fetch sample: ${response.status}`);
         }
@@ -3559,7 +3616,7 @@ const App = () => {
     if (window.electronAPI?.openManual) {
       window.electronAPI.openManual();
     } else {
-      const manualUrl = 'https://htmlpreview.github.io/?https://github.com/ghanglee/IDMxPPM/blob/main/user_manuals/V1.4.0/IDMxPPM-Tutorials.html';
+      const manualUrl = 'https://htmlpreview.github.io/?https://github.com/ghanglee/IDMxPPM/blob/main/user_manuals/V1.5.0/xPPM-Tutorials.html';
       window.open(manualUrl, '_blank', 'noopener,noreferrer');
     }
   }, []);
@@ -3699,7 +3756,7 @@ const App = () => {
 
     const projectData = {
       version: '2.0.0',
-      appName: 'IDMxPPM - Neo Seoul',
+      appName: 'xPPM neo-Seoul',
       bpmnXml: currentBpmnXml,
       headerData,
       erHierarchy,
@@ -3858,7 +3915,7 @@ const App = () => {
           const projectData = {
             version: '2.0.0',
             format: 'idm-binary',
-            appName: 'IDMxPPM - Neo Seoul',
+            appName: 'xPPM neo-Seoul',
             bpmnXml: currentBpmnXml,
             headerData,
             erHierarchy,          // ER-first: ordered hierarchical array of ERs
@@ -3875,10 +3932,9 @@ const App = () => {
         }
 
         case 'zip': {
-          // ZIP archive with multiple files including images
-          // Uses JSZip for proper ZIP bundle export
+          // idmXML 1.0 ZIP: v1.0 XML + BPMN in a ZIP archive
 
-          // Build erDataMap from ER-first architecture for bundle export
+          // Build erDataMap from ER-first architecture
           const bundleErDataMap = {};
           Object.entries(dataObjectErMap).forEach(([dataObjectId, erId]) => {
             const findEr = (items) => {
@@ -3894,32 +3950,34 @@ const App = () => {
             const er = findEr(erHierarchy);
             if (er) bundleErDataMap[dataObjectId] = er;
           });
-          // Include legacy erDataMap entries
           Object.entries(erDataMap).forEach(([dataObjectId, er]) => {
             if (!bundleErDataMap[dataObjectId]) bundleErDataMap[dataObjectId] = er;
           });
 
-          const zipFilename = `${fileName}.zip`;
-          const bundleParams = {
+          const v1Result = generateIdmXmlV1({
             headerData,
             bpmnXml: currentBpmnXml,
             erDataMap: bundleErDataMap,
             erHierarchy,
-            dataObjectErMap,
-            dataObjects,
-            erLibrary
-          };
+            dataObjects
+          });
 
-          // In Electron: use save dialog for overwrite handling
+          const zipV1 = new JSZip();
+          zipV1.file('idm-specification.xml', v1Result.xml);
+          if (currentBpmnXml) {
+            zipV1.file('process-map.bpmn', currentBpmnXml);
+          }
+          const zipV1Filename = `${fileName}.zip`;
+          const zipV1Blob = await zipV1.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+
+          // Electron: show OS save dialog and write binary via IPC
           if (window.electronAPI?.showSaveLocation && window.electronAPI?.saveToPath) {
-            const zipBlob = await exportIdmBundle(bundleParams);
             const locResult = await window.electronAPI.showSaveLocation({
-              defaultName: zipFilename,
+              defaultName: zipV1Filename,
               format: 'zip'
             });
             if (locResult.success && locResult.filePath) {
-              // Convert blob to base64 for Electron IPC
-              const arrayBuffer = await zipBlob.arrayBuffer();
+              const arrayBuffer = await zipV1Blob.arrayBuffer();
               const uint8Array = new Uint8Array(arrayBuffer);
               const binaryStr = Array.from(uint8Array, b => String.fromCharCode(b)).join('');
               const base64Content = btoa(binaryStr);
@@ -3929,15 +3987,20 @@ const App = () => {
                 isBinary: true
               });
               if (saveResult.success) {
-                finalizeSave(null);
-                return; // Already handled — skip the main finalizeSave at switch end
+                finalizeSave(locResult.filePath);
               }
             }
-            break; // User cancelled
+            break;
           }
 
-          // Browser fallback
-          await downloadIdmBundle(bundleParams, zipFilename);
+          // Browser fallback: trigger download via blob URL
+          const zipV1Url = URL.createObjectURL(zipV1Blob);
+          const zipV1Link = document.createElement('a');
+          zipV1Link.href = zipV1Url;
+          zipV1Link.download = zipV1Filename;
+          zipV1Link.click();
+          URL.revokeObjectURL(zipV1Url);
+          finalizeSave(null);
           break;
         }
 
@@ -4213,7 +4276,7 @@ const App = () => {
 
     const projectData = {
       version: '2.0.0',
-      appName: 'IDMxPPM - Neo Seoul',
+      appName: 'xPPM neo-Seoul',
       bpmnXml: currentBpmnXml,
       headerData,
       erHierarchy,          // ER-first: ordered hierarchical array of ERs
@@ -4229,7 +4292,7 @@ const App = () => {
     // Use shortTitle as default filename, fallback to title
     const defaultFileName = (headerData.shortTitle || headerData.title || 'idm-project')
       .replace(/[/\\?%*:|"<>]/g, '_')
-      .trim() + '.json';
+      .trim() + '.idm';
 
     if (currentFilePath && !saveAs) {
       const result = await window.electronAPI.saveFile({ content, filePath: currentFilePath });
@@ -4356,7 +4419,7 @@ const App = () => {
           // No modal needed - proceed with direct import
           if (projectData.bpmnXml) setBpmnXml(projectData.bpmnXml);
           if (projectData.headerData) setHeaderData(projectData.headerData);
-          setErHierarchy(erHierarchyToImport);
+          setErHierarchy(normalizeMappingBases(erHierarchyToImport));
           setDataObjectErMap(dataObjectErMapToImport);
           if (erDataMapToImport) setErDataMap(erDataMapToImport);
           if (projectData.erLibrary) setErLibrary(projectData.erLibrary);
@@ -4483,7 +4546,7 @@ const App = () => {
 
           // No modal needed - proceed with direct import
           if (idmData.headerData) setHeaderData(idmData.headerData);
-          if (idmData.erHierarchy) setErHierarchy(idmData.erHierarchy);
+          if (idmData.erHierarchy) setErHierarchy(normalizeMappingBases(idmData.erHierarchy));
           setDataObjectErMap(newDataObjectErMap);
           if (idmData.erDataMap) setErDataMap(idmData.erDataMap);
           setBpmnXml(bpmnToImport);
@@ -4718,7 +4781,7 @@ const App = () => {
 
           // No modal needed - proceed with direct import
           if (xppmResult.headerData) setHeaderData(xppmResult.headerData);
-          setErHierarchy(erHierarchyToImport);
+          setErHierarchy(normalizeMappingBases(erHierarchyToImport));
           setDataObjectErMap(dataObjectErMapToImport);
           if (xppmResult.erDataMap) setErDataMap(xppmResult.erDataMap);
           if (xppmResult.erLibrary) setErLibrary(xppmResult.erLibrary);
@@ -4804,6 +4867,7 @@ const App = () => {
     window.electronAPI.onMenuSave(() => saveProject(false));
     window.electronAPI.onMenuSaveAs(() => saveProject(true));
     window.electronAPI.onMenuServerConnect(() => setShowServerModal(true));
+    window.electronAPI.onMenuExportIdmXML(() => setShowExportDialog(true));
 
     return () => {
       window.electronAPI.removeAllListeners('file-opened');
@@ -4812,6 +4876,7 @@ const App = () => {
       window.electronAPI.removeAllListeners('menu-save');
       window.electronAPI.removeAllListeners('menu-save-as');
       window.electronAPI.removeAllListeners('menu-server-connect');
+      window.electronAPI.removeAllListeners('menu-export-idmxml');
     };
   }, [isDirty, handleImportER, extractDataObjectsAfterLoad, linkActorsToSwimlanesByName]);
 
@@ -4821,7 +4886,13 @@ const App = () => {
     <ThemeProvider>
       <div className="app">
         {/* Spec Name Bar (Top) */}
-        <SpecNameBar specName={isProjectOpen ? (headerData.title || 'Untitled Project') : 'Welcome'} />
+        <SpecNameBar specName={isProjectOpen ? (
+          headerData.shortTitle || headerData.title ||
+          (currentFilePath
+            ? currentFilePath.replace(/\\/g, '/').split('/').pop().replace(/\.[^.]+$/, '')
+            : null) ||
+          'Untitled Project'
+        ) : 'Welcome'} />
 
         {/* Main area */}
         <div className="app-main">
@@ -5180,16 +5251,25 @@ const App = () => {
                     <input type="radio" name="exportFormat" value="idm" checked={exportFormat === 'idm'} onChange={(e) => setExportFormat(e.target.value)} />
                     <div className="export-format-content">
                       <span className="export-format-title">IDM Project (.idm)</span>
-                      {exportFormat === 'idm' && <span className="export-format-desc">Full project file with all data and library</span>}
+                      {exportFormat === 'idm' && <span className="export-format-desc">idmXSD 2.0-based full project file in JSON</span>}
                     </div>
                   </div>
 
-                  {/* idmXML */}
+                  {/* idmXML 2.0 */}
                   <div className={`export-format-option ${exportFormat === 'idmxml-v2' ? 'selected' : ''}`} data-format="idmxml-v2" onClick={() => setExportFormat('idmxml-v2')}>
                     <input type="radio" name="exportFormat" value="idmxml-v2" checked={exportFormat === 'idmxml-v2'} onChange={(e) => setExportFormat(e.target.value)} />
                     <div className="export-format-content">
-                      <span className="export-format-title">idmXML (.xml)</span>
+                      <span className="export-format-title">idmXML 2.0 (.xml)</span>
                       {exportFormat === 'idmxml-v2' && <span className="export-format-desc">ISO 29481-3 compliant XML (idmXSD 2.0)</span>}
+                    </div>
+                  </div>
+
+                  {/* idmXML 1.0 */}
+                  <div className={`export-format-option ${exportFormat === 'zip' ? 'selected' : ''}`} data-format="zip" onClick={() => setExportFormat('zip')}>
+                    <input type="radio" name="exportFormat" value="zip" checked={exportFormat === 'zip'} onChange={(e) => setExportFormat(e.target.value)} />
+                    <div className="export-format-content">
+                      <span className="export-format-title">idmXML 1.0 (.zip)</span>
+                      {exportFormat === 'zip' && <span className="export-format-desc">ISO 29481-3 compliant XML (idmXSD 1.0) with BPMN in a ZIP archive</span>}
                     </div>
                   </div>
 
@@ -5243,15 +5323,6 @@ const App = () => {
                           </div>
                         </>
                       )}
-                    </div>
-                  </div>
-
-                  {/* ZIP Bundle */}
-                  <div className={`export-format-option ${exportFormat === 'zip' ? 'selected' : ''}`} data-format="zip" onClick={() => setExportFormat('zip')}>
-                    <input type="radio" name="exportFormat" value="zip" checked={exportFormat === 'zip'} onChange={(e) => setExportFormat(e.target.value)} />
-                    <div className="export-format-content">
-                      <span className="export-format-title">ZIP Bundle (.zip)</span>
-                      {exportFormat === 'zip' && <span className="export-format-desc">idmXML + BPMN + images + project data in one archive</span>}
                     </div>
                   </div>
 
@@ -5412,9 +5483,9 @@ const App = () => {
             <button
               className="app-version-btn"
               onClick={() => setShowAboutDialog(true)}
-              title="About IDMxPPM"
+              title="About xPPM neo-Seoul"
             >
-              IDMxPPM neo-Seoul v{typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0'}
+              xPPM neo-Seoul v{typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0'}
             </button>
           </div>
         </div>
@@ -5425,7 +5496,7 @@ const App = () => {
             <div className="modal-overlay" onClick={() => setShowAboutDialog(false)} />
             <div className="about-dialog">
               <div className="about-dialog-header">
-                <h2>IDMxPPM neo-Seoul Edition</h2>
+                <h2>xPPM neo-Seoul</h2>
                 <button className="about-close-btn" onClick={() => setShowAboutDialog(false)}>×</button>
               </div>
               <div className="about-dialog-body">
@@ -5489,11 +5560,18 @@ const App = () => {
         <DataObjectERSelectModal
           isOpen={showDataObjectERModal}
           dataObject={newDataObjectPending}
+          currentErId={newDataObjectPending ? dataObjectErMap[newDataObjectPending.id] : null}
           erHierarchy={erHierarchy}
           queueLength={unassociatedDataObjectsQueue.length}
           onSelectExistingER={handleDataObjectERSelected}
           onCreateNewER={handleDataObjectNewER}
           onClose={handleDataObjectERModalClose}
+          existingErNames={(() => {
+            const names = new Set();
+            const collect = (ers) => ers?.forEach(er => { if (er.name) names.add(er.name); collect(er.subERs); });
+            collect(erHierarchy);
+            return names;
+          })()}
         />
 
         {/* Root ER Selection Modal (for imports with multiple top-level ERs) */}

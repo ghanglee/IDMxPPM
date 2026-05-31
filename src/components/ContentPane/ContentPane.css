@@ -979,6 +979,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-top: 8px;
   margin-bottom: 8px;
 }
 
@@ -1519,6 +1520,7 @@
   display: flex;
   gap: 6px;
   align-items: center;
+  margin-top: 8px;
 }
 
 .region-selector-input .region-dropdown {

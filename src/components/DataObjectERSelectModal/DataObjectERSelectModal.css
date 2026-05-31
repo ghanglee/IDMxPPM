@@ -306,6 +306,18 @@
   color: var(--text-muted, #64748b);
 }
 
+.do-er-input-error {
+  border-color: var(--error, #ef4444) !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2) !important;
+}
+
+.do-er-error-msg {
+  display: block;
+  margin-top: 5px;
+  font-size: 12px;
+  color: var(--error, #ef4444);
+}
+
 .do-er-hint {
   font-size: 12px;
   color: var(--text-muted, #94a3b8);

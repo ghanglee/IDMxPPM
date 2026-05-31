@@ -1,0 +1,860 @@
+{
+  "version": "2.0.0",
+  "appName": "IDMxPPM - Neo Seoul",
+  "bpmnXml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<definitions xmlns=\"http://www.omg.org/spec/BPMN/20100524/MODEL\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:bpmndi=\"http://www.omg.org/spec/BPMN/20100524/DI\" xmlns:dc=\"http://www.omg.org/spec/DD/20100524/DC\" xmlns:di=\"http://www.omg.org/spec/DD/20100524/DI\" id=\"Definitions_1\" targetNamespace=\"http://example.org/bpmn/openings-cost\">\n  <collaboration id=\"Collaboration_1\">\n    <participant id=\"Participant_Architect\" name=\"Architect\" processRef=\"Process_Architect\" />\n    <participant id=\"Participant_CostEstimator\" name=\"Cost Estimator\" processRef=\"Process_CostEstimator\" />\n    <messageFlow id=\"MF_Arch_Cost\" sourceRef=\"Task_SendDesign\" targetRef=\"Task_ExtractQTO\" />\n    <messageFlow id=\"MF_Cost_Arch\" sourceRef=\"Task_PerformCostEstimation\" targetRef=\"Task_ReviewCostEstimation\" />\n  </collaboration>\n  <process id=\"Process_Architect\" isExecutable=\"false\">\n    <startEvent id=\"Start_Architect\" name=\"Start\">\n      <outgoing>SF_Start_Design</outgoing>\n    </startEvent>\n    <task id=\"Task_DesignBuilding\" name=\"Design a building\">\n      <incoming>SF_Start_Design</incoming>\n      <incoming>SF_No_Loop</incoming>\n      <outgoing>SF_Design_Specify</outgoing>\n    </task>\n    <task id=\"Task_SpecifyOpenings\" name=\"Specify window and door requirements\">\n      <incoming>SF_Design_Specify</incoming>\n      <outgoing>SF_Specify_Send</outgoing>\n      <dataOutputAssociation id=\"DOA_WinProps\">\n        <targetRef>DataObjectReference_WindowProperties</targetRef>\n      </dataOutputAssociation>\n      <dataOutputAssociation id=\"DOA_DoorProps\">\n        <targetRef>DataObjectReference_DoorProperties</targetRef>\n      </dataOutputAssociation>\n    </task>\n    <task id=\"Task_SendDesign\" name=\"Send the design to the cost estimator\">\n      <incoming>SF_Specify_Send</incoming>\n    </task>\n    <task id=\"Task_ReviewCostEstimation\" name=\"Review the combined cost estimation\">\n      <outgoing>SF_Review_Gateway</outgoing>\n      <property id=\"Prop_Review_Win\" name=\"__targetRef_placeholder\" />\n      <dataInputAssociation id=\"DIA_ReviewWinCost\">\n        <sourceRef>DataObjectReference_WindowCostEstimate</sourceRef>\n        <targetRef>Prop_Review_Win</targetRef>\n      </dataInputAssociation>\n      <property id=\"Prop_Review_Door\" name=\"__targetRef_placeholder\" />\n      <dataInputAssociation id=\"DIA_ReviewDoorCost\">\n        <sourceRef>DataObjectReference_DoorCostEstimate</sourceRef>\n        <targetRef>Prop_Review_Door</targetRef>\n      </dataInputAssociation>\n    </task>\n    <exclusiveGateway id=\"GW_BudgetCheck\" name=\"Is the combined cost below the budget?\">\n      <incoming>SF_Review_Gateway</incoming>\n      <outgoing>SF_Yes_End</outgoing>\n      <outgoing>SF_No_Loop</outgoing>\n    </exclusiveGateway>\n    <endEvent id=\"End_Architect\" name=\"End\">\n      <incoming>SF_Yes_End</incoming>\n    </endEvent>\n    <sequenceFlow id=\"SF_Start_Design\" sourceRef=\"Start_Architect\" targetRef=\"Task_DesignBuilding\" />\n    <sequenceFlow id=\"SF_Design_Specify\" sourceRef=\"Task_DesignBuilding\" targetRef=\"Task_SpecifyOpenings\" />\n    <sequenceFlow id=\"SF_Specify_Send\" sourceRef=\"Task_SpecifyOpenings\" targetRef=\"Task_SendDesign\" />\n    <sequenceFlow id=\"SF_Review_Gateway\" sourceRef=\"Task_ReviewCostEstimation\" targetRef=\"GW_BudgetCheck\" />\n    <sequenceFlow id=\"SF_Yes_End\" name=\"Yes\" sourceRef=\"GW_BudgetCheck\" targetRef=\"End_Architect\">\n      <conditionExpression xsi:type=\"tFormalExpression\">Yes</conditionExpression>\n    </sequenceFlow>\n    <sequenceFlow id=\"SF_No_Loop\" name=\"No — revise design\" sourceRef=\"GW_BudgetCheck\" targetRef=\"Task_DesignBuilding\">\n      <conditionExpression xsi:type=\"tFormalExpression\">No</conditionExpression>\n    </sequenceFlow>\n    <dataObjectReference id=\"DataObjectReference_WindowProperties\" name=\"er_WindowProperties\" dataObjectRef=\"DataObject_WindowProperties\" />\n    <dataObject id=\"DataObject_WindowProperties\" />\n    <dataObjectReference id=\"DataObjectReference_DoorProperties\" name=\"er_DoorProperties\" dataObjectRef=\"DataObject_DoorProperties\" />\n    <dataObject id=\"DataObject_DoorProperties\" />\n    <dataObjectReference id=\"DataObjectReference_WindowCostEstimate\" name=\"er_WindowCostEstimate\" dataObjectRef=\"DataObject_WindowCostEstimate\" />\n    <dataObject id=\"DataObject_WindowCostEstimate\" />\n    <dataObjectReference id=\"DataObjectReference_DoorCostEstimate\" name=\"er_DoorCostEstimate\" dataObjectRef=\"DataObject_DoorCostEstimate\" />\n    <dataObject id=\"DataObject_DoorCostEstimate\" />\n  </process>\n  <process id=\"Process_CostEstimator\" isExecutable=\"false\">\n    <task id=\"Task_ExtractQTO\" name=\"Extract window and door quantity takeoffs\">\n      <outgoing>SF_Extract_Perform</outgoing>\n      <property id=\"Prop_Extract_Win\" name=\"__targetRef_placeholder\" />\n      <dataInputAssociation id=\"DIA_ExtractWinBIM\">\n        <sourceRef>DataObjectReference_WindowProperties</sourceRef>\n        <targetRef>Prop_Extract_Win</targetRef>\n      </dataInputAssociation>\n      <property id=\"Prop_Extract_Door\" name=\"__targetRef_placeholder\" />\n      <dataInputAssociation id=\"DIA_ExtractDoorBIM\">\n        <sourceRef>DataObjectReference_DoorProperties</sourceRef>\n        <targetRef>Prop_Extract_Door</targetRef>\n      </dataInputAssociation>\n      <dataOutputAssociation id=\"DOA_WinQTO\">\n        <targetRef>DataObjectReference_WindowQTO</targetRef>\n      </dataOutputAssociation>\n      <dataOutputAssociation id=\"DOA_DoorQTO\">\n        <targetRef>DataObjectReference_DoorQTO</targetRef>\n      </dataOutputAssociation>\n    </task>\n    <task id=\"Task_PerformCostEstimation\" name=\"Perform the combined cost estimation\">\n      <incoming>SF_Extract_Perform</incoming>\n      <property id=\"Prop_Cost_Win\" name=\"__targetRef_placeholder\" />\n      <dataInputAssociation id=\"DIA_PerformWinQTO\">\n        <sourceRef>DataObjectReference_WindowQTO</sourceRef>\n        <targetRef>Prop_Cost_Win</targetRef>\n      </dataInputAssociation>\n      <property id=\"Prop_Cost_Door\" name=\"__targetRef_placeholder\" />\n      <dataInputAssociation id=\"DIA_PerformDoorQTO\">\n        <sourceRef>DataObjectReference_DoorQTO</sourceRef>\n        <targetRef>Prop_Cost_Door</targetRef>\n      </dataInputAssociation>\n      <dataOutputAssociation id=\"DOA_WinCostEst\">\n        <targetRef>DataObjectReference_WindowCostEstimate</targetRef>\n      </dataOutputAssociation>\n      <dataOutputAssociation id=\"DOA_DoorCostEst\">\n        <targetRef>DataObjectReference_DoorCostEstimate</targetRef>\n      </dataOutputAssociation>\n    </task>\n    <sequenceFlow id=\"SF_Extract_Perform\" sourceRef=\"Task_ExtractQTO\" targetRef=\"Task_PerformCostEstimation\" />\n    <dataObjectReference id=\"DataObjectReference_WindowQTO\" name=\"er_WindowQuantities\" dataObjectRef=\"DataObject_WindowQTO\" />\n    <dataObject id=\"DataObject_WindowQTO\" />\n    <dataObjectReference id=\"DataObjectReference_DoorQTO\" name=\"er_DoorQuantities\" dataObjectRef=\"DataObject_DoorQTO\" />\n    <dataObject id=\"DataObject_DoorQTO\" />\n  </process>\n  <bpmndi:BPMNDiagram id=\"BPMNDiagram_1\">\n    <bpmndi:BPMNPlane id=\"BPMNPlane_1\" bpmnElement=\"Collaboration_1\">\n      <bpmndi:BPMNShape id=\"Shape_Participant_Architect\" bpmnElement=\"Participant_Architect\" isHorizontal=\"true\">\n        <dc:Bounds x=\"100\" y=\"40\" width=\"1500\" height=\"400\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Shape_Start\" bpmnElement=\"Start_Architect\">\n        <dc:Bounds x=\"152\" y=\"202\" width=\"36\" height=\"36\" />\n        <bpmndi:BPMNLabel><dc:Bounds x=\"149\" y=\"243\" width=\"42\" height=\"14\" /></bpmndi:BPMNLabel>\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Shape_DesignBuilding\" bpmnElement=\"Task_DesignBuilding\">\n        <dc:Bounds x=\"240\" y=\"180\" width=\"120\" height=\"80\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Shape_SpecifyOpenings\" bpmnElement=\"Task_SpecifyOpenings\">\n        <dc:Bounds x=\"420\" y=\"180\" width=\"155\" height=\"80\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Shape_SendDesign\" bpmnElement=\"Task_SendDesign\">\n        <dc:Bounds x=\"645\" y=\"180\" width=\"130\" height=\"80\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Shape_ReviewCost\" bpmnElement=\"Task_ReviewCostEstimation\">\n        <dc:Bounds x=\"885\" y=\"180\" width=\"160\" height=\"80\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Shape_Gateway\" bpmnElement=\"GW_BudgetCheck\" isMarkerVisible=\"true\">\n        <dc:Bounds x=\"1120\" y=\"195\" width=\"50\" height=\"50\" />\n        <bpmndi:BPMNLabel><dc:Bounds x=\"1082\" y=\"251\" width=\"127\" height=\"40\" /></bpmndi:BPMNLabel>\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Shape_End\" bpmnElement=\"End_Architect\">\n        <dc:Bounds x=\"1247\" y=\"202\" width=\"36\" height=\"36\" />\n        <bpmndi:BPMNLabel><dc:Bounds x=\"1245\" y=\"243\" width=\"40\" height=\"14\" /></bpmndi:BPMNLabel>\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Shape_WinProps\" bpmnElement=\"DataObjectReference_WindowProperties\">\n        <dc:Bounds x=\"450\" y=\"300\" width=\"36\" height=\"50\" />\n        <bpmndi:BPMNLabel><dc:Bounds x=\"420\" y=\"358\" width=\"96\" height=\"27\" /></bpmndi:BPMNLabel>\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Shape_DoorProps\" bpmnElement=\"DataObjectReference_DoorProperties\">\n        <dc:Bounds x=\"540\" y=\"300\" width=\"36\" height=\"50\" />\n        <bpmndi:BPMNLabel><dc:Bounds x=\"510\" y=\"358\" width=\"96\" height=\"27\" /></bpmndi:BPMNLabel>\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Shape_WinCostEst\" bpmnElement=\"DataObjectReference_WindowCostEstimate\">\n        <dc:Bounds x=\"912\" y=\"300\" width=\"36\" height=\"50\" />\n        <bpmndi:BPMNLabel><dc:Bounds x=\"878\" y=\"358\" width=\"104\" height=\"27\" /></bpmndi:BPMNLabel>\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Shape_DoorCostEst\" bpmnElement=\"DataObjectReference_DoorCostEstimate\">\n        <dc:Bounds x=\"1002\" y=\"300\" width=\"36\" height=\"50\" />\n        <bpmndi:BPMNLabel><dc:Bounds x=\"968\" y=\"358\" width=\"104\" height=\"27\" /></bpmndi:BPMNLabel>\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNEdge id=\"Edge_SF_Start_Design\" bpmnElement=\"SF_Start_Design\">\n        <di:waypoint x=\"188\" y=\"220\" /><di:waypoint x=\"240\" y=\"220\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Edge_SF_Design_Specify\" bpmnElement=\"SF_Design_Specify\">\n        <di:waypoint x=\"360\" y=\"220\" /><di:waypoint x=\"420\" y=\"220\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Edge_SF_Specify_Send\" bpmnElement=\"SF_Specify_Send\">\n        <di:waypoint x=\"575\" y=\"220\" /><di:waypoint x=\"645\" y=\"220\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Edge_SF_Review_Gateway\" bpmnElement=\"SF_Review_Gateway\">\n        <di:waypoint x=\"1045\" y=\"220\" /><di:waypoint x=\"1120\" y=\"220\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Edge_SF_Yes_End\" bpmnElement=\"SF_Yes_End\">\n        <di:waypoint x=\"1170\" y=\"220\" /><di:waypoint x=\"1247\" y=\"220\" />\n        <bpmndi:BPMNLabel><dc:Bounds x=\"1199\" y=\"202\" width=\"18\" height=\"14\" /></bpmndi:BPMNLabel>\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Edge_SF_No_Loop\" bpmnElement=\"SF_No_Loop\">\n        <di:waypoint x=\"1145\" y=\"195\" /><di:waypoint x=\"1145\" y=\"100\" /><di:waypoint x=\"300\" y=\"100\" /><di:waypoint x=\"300\" y=\"180\" />\n        <bpmndi:BPMNLabel><dc:Bounds x=\"660\" y=\"66\" width=\"100\" height=\"27\" /></bpmndi:BPMNLabel>\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Edge_DOA_WinProps\" bpmnElement=\"DOA_WinProps\">\n        <di:waypoint x=\"475\" y=\"260\" /><di:waypoint x=\"468\" y=\"300\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Edge_DOA_DoorProps\" bpmnElement=\"DOA_DoorProps\">\n        <di:waypoint x=\"525\" y=\"260\" /><di:waypoint x=\"558\" y=\"300\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Edge_DIA_ReviewWinCost\" bpmnElement=\"DIA_ReviewWinCost\">\n        <di:waypoint x=\"930\" y=\"300\" /><di:waypoint x=\"930\" y=\"260\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Edge_DIA_ReviewDoorCost\" bpmnElement=\"DIA_ReviewDoorCost\">\n        <di:waypoint x=\"1020\" y=\"300\" /><di:waypoint x=\"1020\" y=\"260\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNShape id=\"Shape_Participant_CostEstimator\" bpmnElement=\"Participant_CostEstimator\" isHorizontal=\"true\">\n        <dc:Bounds x=\"100\" y=\"560\" width=\"1500\" height=\"250\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Shape_ExtractQTO\" bpmnElement=\"Task_ExtractQTO\">\n        <dc:Bounds x=\"645\" y=\"590\" width=\"160\" height=\"80\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Shape_PerformCost\" bpmnElement=\"Task_PerformCostEstimation\">\n        <dc:Bounds x=\"885\" y=\"590\" width=\"170\" height=\"80\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Shape_WinQTO\" bpmnElement=\"DataObjectReference_WindowQTO\">\n        <dc:Bounds x=\"668\" y=\"700\" width=\"36\" height=\"50\" />\n        <bpmndi:BPMNLabel><dc:Bounds x=\"638\" y=\"758\" width=\"96\" height=\"27\" /></bpmndi:BPMNLabel>\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Shape_DoorQTO\" bpmnElement=\"DataObjectReference_DoorQTO\">\n        <dc:Bounds x=\"758\" y=\"700\" width=\"36\" height=\"50\" />\n        <bpmndi:BPMNLabel><dc:Bounds x=\"728\" y=\"758\" width=\"96\" height=\"27\" /></bpmndi:BPMNLabel>\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNEdge id=\"Edge_SF_Extract_Perform\" bpmnElement=\"SF_Extract_Perform\">\n        <di:waypoint x=\"805\" y=\"630\" /><di:waypoint x=\"885\" y=\"630\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Edge_DOA_WinQTO\" bpmnElement=\"DOA_WinQTO\">\n        <di:waypoint x=\"700\" y=\"670\" /><di:waypoint x=\"686\" y=\"700\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Edge_DOA_DoorQTO\" bpmnElement=\"DOA_DoorQTO\">\n        <di:waypoint x=\"750\" y=\"670\" /><di:waypoint x=\"776\" y=\"700\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Edge_DIA_PerformWinQTO\" bpmnElement=\"DIA_PerformWinQTO\">\n        <di:waypoint x=\"704\" y=\"725\" /><di:waypoint x=\"885\" y=\"625\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Edge_DIA_PerformDoorQTO\" bpmnElement=\"DIA_PerformDoorQTO\">\n        <di:waypoint x=\"794\" y=\"725\" /><di:waypoint x=\"885\" y=\"640\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Edge_DOA_WinCostEst\" bpmnElement=\"DOA_WinCostEst\">\n        <di:waypoint x=\"930\" y=\"590\" /><di:waypoint x=\"930\" y=\"350\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Edge_DOA_DoorCostEst\" bpmnElement=\"DOA_DoorCostEst\">\n        <di:waypoint x=\"1020\" y=\"590\" /><di:waypoint x=\"1020\" y=\"350\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Edge_DIA_ExtractWinBIM\" bpmnElement=\"DIA_ExtractWinBIM\">\n        <di:waypoint x=\"468\" y=\"350\" /><di:waypoint x=\"468\" y=\"630\" /><di:waypoint x=\"645\" y=\"630\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Edge_DIA_ExtractDoorBIM\" bpmnElement=\"DIA_ExtractDoorBIM\">\n        <di:waypoint x=\"558\" y=\"350\" /><di:waypoint x=\"558\" y=\"640\" /><di:waypoint x=\"645\" y=\"640\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"MF_Arch_Cost_di\" bpmnElement=\"MF_Arch_Cost\">\n        <di:waypoint x=\"710\" y=\"260\" /><di:waypoint x=\"725\" y=\"590\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"MF_Cost_Arch_di\" bpmnElement=\"MF_Cost_Arch\">\n        <di:waypoint x=\"970\" y=\"590\" /><di:waypoint x=\"970\" y=\"440\" /><di:waypoint x=\"965\" y=\"440\" /><di:waypoint x=\"965\" y=\"260\" />\n      </bpmndi:BPMNEdge>\n    </bpmndi:BPMNPlane>\n  </bpmndi:BPMNDiagram>\n</definitions>\n",
+  "headerData": {
+    "title": "Information Delivery Manual for Cost Estimation of Doors and Windows",
+    "shortTitle": "OpeningsCostIDM",
+    "subTitle": "An integrated IDM for window and door cost estimation in building projects",
+    "authors": [
+      {
+        "type": "person",
+        "id": "author-1",
+        "givenName": "Building Informatics Group",
+        "familyName": "",
+        "middleInitial": "",
+        "affiliation": "Yonsei University",
+        "uri": "big@yonsei.ac.kr",
+        "prefix": "",
+        "suffix": "",
+        "postnominalDesignation": ""
+      }
+    ],
+    "organization": "",
+    "version": "1.0",
+    "creationDate": "",
+    "status": "WD",
+    "localDocumentStatus": "",
+    "localCode": "",
+    "language": "EN",
+    "projectStages": ["design", "production"],
+    "projectStagesIso": ["design", "production"],
+    "projectStagesAia": [],
+    "projectStagesRiba": [],
+    "useCategories": ["Estimate Cost", "Quantify Windows", "Quantify Doors"],
+    "uses": [
+      { "verb": "Estimate", "noun": "Cost" },
+      { "verb": "Quantify", "noun": "Windows" },
+      { "verb": "Quantify", "noun": "Doors" }
+    ],
+    "useClassification": null,
+    "region": "international",
+    "regions": ["international"],
+    "summary": "This IDM specifies the information required to support the combined cost estimation of windows and doors in building projects. It integrates the Exchange Requirements from the IDM for Cost Estimation of Windows and the IDM for Cost Estimation of Doors into a single specification, enabling architects and cost estimators to exchange all necessary opening-related data in one coordinated process. The IDM covers geometric properties, material and hardware specifications, quantity take-offs, and cost data for both element types, supporting accurate budget preparation and procurement planning during the design and production stages.",
+    "revisionHistory": [
+      {
+        "date": "2026-05-22",
+        "description": "Initial creation — combining WindowCostIDM and DoorCostIDM"
+      }
+    ],
+    "changeLogs": [
+      {
+        "id": "log-1",
+        "changeDateTime": "2026-05-22T00:00:00",
+        "changeSummary": "Initial creation — combining WindowCostIDM and DoorCostIDM",
+        "changedBy": "author-1",
+        "changes": []
+      }
+    ],
+    "contributors": [],
+    "copyright": "Copyright 2026 Building Informatics Group (BIG), Yonsei University",
+    "keywords": ["cost estimation", "windows", "doors", "openings", "BIM", "quantity takeoff"],
+    "relatedStandards": [],
+    "externalReferences": [],
+    "objectives": "The aim of this IDM is to define the minimum information that must be exchanged between design authoring tools (e.g., architectural BIM software) and cost estimation tools when performing cost estimation for both windows and doors in a building project. By combining the two opening types in a single IDM, this specification enables a coordinated cost estimation workflow in which the architect provides specifications for all openings in a single handover, and the cost estimator processes them together. The scope covers all window types in building envelopes and all door types in building envelopes and interior partitions. Structural opening works (lintels, reveals, cills) and specialist glazing systems are outside the scope.",
+    "aimAndScope": "The aim of this IDM is to define the minimum information that must be exchanged between design authoring tools (e.g., architectural BIM software) and cost estimation tools when performing cost estimation for both windows and doors in a building project. By combining the two opening types in a single IDM, this specification enables a coordinated cost estimation workflow in which the architect provides specifications for all openings in a single handover, and the cost estimator processes them together. The scope covers all window types in building envelopes and all door types in building envelopes and interior partitions. Structural opening works (lintels, reveals, cills) and specialist glazing systems are outside the scope.",
+    "benefits": "Enables a single coordinated BIM handover from architect to cost estimator covering all opening elements. Reduces duplication of effort compared to running window and door cost estimation as separate processes. Supports early cost feedback during the design phase for the full opening budget. Provides a structured basis for procurement planning, hardware scheduling, and glazing specifications in one document. Fire-rated openings (both doors and windows) can be systematically identified and priced.",
+    "limitations": "This IDM does not cover specialist glazing systems requiring bespoke structural engineering (e.g., structural glass fins, electrochromic glass) or automated door systems requiring specialist mechanical engineering. Costs for structural opening works, wall reveals, sub-sills, and lintels are outside the scope. Regional price variations must be accounted for separately. The IDM assumes a single cost estimator handles both element types; where doors and windows are estimated by separate subcontractors, the individual IDMs (WindowCostIDM, DoorCostIDM) should be used instead.",
+    "actors": "",
+    "summaryFigures": [],
+    "aimAndScopeFigures": [],
+    "benefitsFigures": [],
+    "limitationsFigures": [],
+    "actorsList": [
+      {
+        "id": "actor-1",
+        "name": "Architect",
+        "actorType": "group",
+        "bpmnShapeName": "",
+        "role": "Design Author",
+        "subActors": [],
+        "bpmnId": "Participant_Architect"
+      },
+      {
+        "id": "actor-2",
+        "name": "Cost Estimator",
+        "actorType": "group",
+        "bpmnShapeName": "",
+        "role": "Cost Engineer",
+        "subActors": [],
+        "bpmnId": "Participant_CostEstimator"
+      },
+      {
+        "id": "actor-3",
+        "name": "Quantity Surveyor",
+        "actorType": "individual",
+        "bpmnShapeName": "",
+        "role": "Quantity Surveyor",
+        "subActors": []
+      }
+    ],
+    "preconditions": "",
+    "postconditions": "",
+    "triggeringEvents": "",
+    "requiredCapabilities": "",
+    "complianceCriteria": "",
+    "idmGuid": "f1a2b3c4-d5e6-4f70-8a9b-0c1d2e3f4a5b",
+    "ucGuid": "a2b3c4d5-e6f7-4a81-9b0c-1d2e3f4a5b6c",
+    "bcmGuid": "b3c4d5e6-f7a8-4b92-0c1d-2e3f4a5b6c7d",
+    "pmId": "PM-OPENINGS-COST-001",
+    "idmCode": "IDM-OPENINGS-COST-001",
+    "rootERName": "er_OpeningsCostIDM",
+    "rootERId": "c4d5e6f7-a8b9-4c03-1d2e-3f4a5b6c7d8e",
+    "idmXsdVersion": "2.0",
+    "idmXsdVersionConfidence": "high"
+  },
+  "erHierarchy": [
+    {
+      "id": "DW-COST-ROOT",
+      "guid": "c4d5e6f7-a8b9-4c03-1d2e-3f4a5b6c7d8e",
+      "shortTitle": "er_OpeningsCostIDM",
+      "name": "er_OpeningsCostIDM",
+      "description": "Root Exchange Requirement for the combined cost estimation of windows and doors in building projects. Contains the window cost IDM ERs (er_WindowCostIDM) and door cost IDM ERs (er_DoorCostIDM) as sub-ERs.",
+      "descriptionFigures": [],
+      "informationUnits": [],
+      "subERs": [
+        {
+          "id": "WIN-COST-ROOT",
+          "guid": "b8d2e4f6-a1c3-4b05-9d7e-2f0a8c6b4d10",
+          "shortTitle": "er_WindowCostIDM",
+          "name": "er_WindowCostIDM",
+          "description": "Exchange Requirements for window cost estimation, as defined in the IDM for Cost Estimation of Windows (WindowCostIDM). Contains window properties, quantities, and cost information sub-ERs.",
+          "descriptionFigures": [],
+          "informationUnits": [],
+          "subERs": [
+            {
+              "id": "WIN-PROP-001",
+              "guid": "c9e3f5a7-b2d4-4c06-ae8f-3a1b9d7e5f21",
+              "shortTitle": "er_WindowProperties",
+              "name": "er_WindowProperties",
+              "description": "Geometric and product properties of windows required for cost estimation, including operational type, dimensions, materials, and performance specifications.",
+              "descriptionFigures": [],
+              "informationUnits": [
+                {
+                  "id": "iu-win-type",
+                  "name": "Window Type",
+                  "dataType": "String",
+                  "isMandatory": true,
+                  "definition": "Classification of the window by its operational mechanism (e.g., Fixed, Casement, Sliding, Tilt-and-Turn, Awning, Curtain Wall). Determines hardware requirements and installation complexity, both of which significantly affect unit cost.",
+                  "definitionFigures": [],
+                  "examples": "Fixed; Casement; Sliding; Tilt-and-Turn; Top-Hung Awning; Curtain Wall Panel",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-1779469080394-bd9fd3", "basis": "IFC 4x3 ADD2", "name": "IfcWindow" },
+                    { "id": "CEE-1779469080394-ebyzy6", "basis": "IFC 4x3 ADD2", "name": "IfcWindowType" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-win-width",
+                  "name": "Window Width",
+                  "dataType": "Numeric",
+                  "isMandatory": true,
+                  "definition": "Overall width of the window unit including frame, measured from outside face of frame to outside face of frame, in millimetres (mm).",
+                  "definitionFigures": [],
+                  "examples": "900; 1200; 1500; 1800; 2100",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-1779469080394-644ma8", "basis": "IFC 4x3 ADD2", "name": "IfcWindow.OverallWidth" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-win-height",
+                  "name": "Window Height",
+                  "dataType": "Numeric",
+                  "isMandatory": true,
+                  "definition": "Overall height of the window unit including frame, measured from outside face of sill to outside face of head, in millimetres (mm).",
+                  "definitionFigures": [],
+                  "examples": "900; 1050; 1200; 1500; 2100",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-1779469080394-fxxph1", "basis": "IFC 4x3 ADD2", "name": "IfcWindow.OverallHeight" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-win-frame-material",
+                  "name": "Frame Material",
+                  "dataType": "String",
+                  "isMandatory": true,
+                  "definition": "Material composition of the window frame and sash. Determines durability, maintenance requirements, and a major portion of the supply cost.",
+                  "definitionFigures": [],
+                  "examples": "uPVC; Aluminium; Timber; Steel; Aluminium-Timber composite; uPVC-Aluminium composite",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-1779469080394-zc6c8q", "basis": "IFC 4x3 ADD2", "name": "IfcWindowType.ConstructionType" },
+                    { "id": "CEE-1779469080394-apuuux", "basis": "IFC 4x3 ADD2", "name": "IfcMaterial" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-glazing-type",
+                  "name": "Glazing Type",
+                  "dataType": "String",
+                  "isMandatory": true,
+                  "definition": "Specification of the glazing configuration, including number of panes, coatings, and gas fills. Directly drives the glazing cost component of the window unit price.",
+                  "definitionFigures": [],
+                  "examples": "Single glazing; Double glazing - air filled; Double glazing - argon filled; Triple glazing - argon filled; Laminated safety glass; Toughened glass",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-1779469080394-nij7fj", "basis": "IFC 4x3 ADD2", "name": "IfcWindowPanelProperties.PanelOperation" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-u-value",
+                  "name": "Thermal Transmittance (U-value)",
+                  "dataType": "Numeric",
+                  "isMandatory": true,
+                  "definition": "Overall thermal transmittance of the complete window unit (frame and glazing combined), expressed in W/(m&sup2;K). Required for compliance verification with energy regulations and specification confirmation.",
+                  "definitionFigures": [],
+                  "examples": "5.6 (single glazing); 2.8 (standard double); 1.6 (double low-e); 0.8 (triple glazing)",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-1779469080394-j4703c", "basis": "IFC 4x3 ADD2", "name": "IfcWindowType.ThermalTransmittance" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-win-fire-rating",
+                  "name": "Fire Rating",
+                  "dataType": "String",
+                  "isMandatory": false,
+                  "definition": "Fire resistance classification of the window unit per EN 13501-2. Required for windows located in fire-compartment walls or escape routes. Significantly increases unit cost.",
+                  "definitionFigures": [],
+                  "examples": "None; EW 30; EW 60; EI 30; EI 60; EI 90",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-1779469080394-3yfv5v", "basis": "IFC 4x3 ADD2", "name": "IfcWindow" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-win-acoustic-rating",
+                  "name": "Acoustic Rating (Rw)",
+                  "dataType": "Numeric",
+                  "isMandatory": false,
+                  "definition": "Weighted sound reduction index of the window unit in decibels (dB) per ISO 717-1. Required for windows in noise-sensitive locations, e.g., adjacent to roads, railways, or industrial areas.",
+                  "definitionFigures": [],
+                  "examples": "28; 32; 36; 40; 44; 48",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-1779469080394-s66tvv", "basis": "IFC 4x3 ADD2", "name": "IfcWindow" }
+                  ],
+                  "subInformationUnits": []
+                }
+              ],
+              "subERs": []
+            },
+            {
+              "id": "WIN-QTY-001",
+              "guid": "d0f4a6b8-c3e5-4d07-bf9a-4b2c0e8f6a32",
+              "shortTitle": "er_WindowQuantities",
+              "name": "er_WindowQuantities",
+              "description": "Quantity take-off data for windows required for cost estimation, including unit counts and areas per window type.",
+              "descriptionFigures": [],
+              "informationUnits": [
+                {
+                  "id": "iu-win-count",
+                  "name": "Window Count",
+                  "dataType": "Numeric",
+                  "isMandatory": true,
+                  "definition": "Total number of window units of the same type within the scope of the cost estimation. Shall be provided as a positive integer.",
+                  "definitionFigures": [],
+                  "examples": "1; 12; 48; 120",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-1779469080394-ur844j", "basis": "IFC 4x3 ADD2", "name": "IfcQuantityCount" },
+                    { "id": "CEE-1779469080394-arzj6d", "basis": "IFC 4x3 ADD2", "name": "IfcElementQuantity" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-win-gross-area",
+                  "name": "Gross Window Area",
+                  "dataType": "Numeric",
+                  "isMandatory": true,
+                  "definition": "Overall area of a single window unit including frame, expressed in square metres (m&sup2;). Calculated as OverallWidth &times; OverallHeight (converted to metres). Used for wall opening deductions and overall supply cost.",
+                  "definitionFigures": [],
+                  "examples": "0.81; 1.26; 1.80; 2.52; 4.41",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-1779469080394-cvsd29", "basis": "IFC 4x3 ADD2", "name": "IfcQuantityArea" },
+                    { "id": "CEE-1779469080394-fmfnlo", "basis": "IFC 4x3 ADD2", "name": "IfcWindow" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-win-net-area",
+                  "name": "Net Glazed Area",
+                  "dataType": "Numeric",
+                  "isMandatory": true,
+                  "definition": "Clear glazed area of a single window unit excluding frame, expressed in square metres (m&sup2;). Used for glazing cost calculation and daylight performance checks.",
+                  "definitionFigures": [],
+                  "examples": "0.54; 0.90; 1.35; 1.98; 3.60",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-1779469080394-y3sd3r", "basis": "IFC 4x3 ADD2", "name": "IfcQuantityArea" },
+                    { "id": "CEE-1779469080394-xljryc", "basis": "IFC 4x3 ADD2", "name": "IfcWindowLiningProperties" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-win-perimeter",
+                  "name": "Window Perimeter",
+                  "dataType": "Numeric",
+                  "isMandatory": false,
+                  "definition": "Perimeter of the window opening in millimetres, calculated as 2 &times; (OverallWidth + OverallHeight). Used for sealant, membrane tape, and draught-proofing material quantities.",
+                  "definitionFigures": [],
+                  "examples": "3600; 4200; 5400; 6600; 9600",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-1779469080394-1sb0fn", "basis": "IFC 4x3 ADD2", "name": "IfcQuantityLength" }
+                  ],
+                  "subInformationUnits": []
+                }
+              ],
+              "subERs": []
+            },
+            {
+              "id": "WIN-COST-001",
+              "guid": "e1a5b7c9-d4f6-4e08-c0ab-5c3d1f9a7b43",
+              "shortTitle": "er_WindowCostEstimate",
+              "name": "er_WindowCostEstimate",
+              "description": "Cost data required for window cost estimation, including unit supply rates, installation costs, totals, and estimation metadata.",
+              "descriptionFigures": [],
+              "informationUnits": [
+                {
+                  "id": "iu-win-unit-supply-cost",
+                  "name": "Unit Supply Cost",
+                  "dataType": "Numeric",
+                  "isMandatory": true,
+                  "definition": "Supply cost per single window unit excluding installation, expressed in the stated currency. Shall be based on a current manufacturer quote, contractor tender price, or approved cost database rate.",
+                  "definitionFigures": [],
+                  "examples": "250.00; 450.00; 1200.00; 3500.00; 8000.00",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-1779469080394-ye0mol", "basis": "IFC 4x3 ADD2", "name": "IfcCostValue" },
+                    { "id": "CEE-1779469080394-8f48ua", "basis": "IFC 4x3 ADD2", "name": "IfcCostItem" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-win-unit-install-cost",
+                  "name": "Unit Installation Cost",
+                  "dataType": "Numeric",
+                  "isMandatory": true,
+                  "definition": "Labour and fixing cost per single window unit for installation into the prepared opening, expressed in the stated currency. Includes off-loading, handling, positioning, fixing, and first-fix sealing. Hoisting allowances for upper floors shall be itemised separately.",
+                  "definitionFigures": [],
+                  "examples": "80.00; 120.00; 250.00; 500.00; 1200.00",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-1779469080394-zyqjx8", "basis": "IFC 4x3 ADD2", "name": "IfcCostValue" },
+                    { "id": "CEE-1779469080394-0ts7hf", "basis": "IFC 4x3 ADD2", "name": "IfcTask" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-win-total-cost",
+                  "name": "Total Cost per Window Type",
+                  "dataType": "Numeric",
+                  "isMandatory": true,
+                  "definition": "Total estimated cost for all windows of the same type within the project scope, calculated as (Unit Supply Cost + Unit Installation Cost) &times; Window Count. Expressed in the stated currency. Excludes contingency unless stated otherwise.",
+                  "definitionFigures": [],
+                  "examples": "4080.00; 14400.00; 87600.00; 216000.00",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-1779469080394-om4wqz", "basis": "IFC 4x3 ADD2", "name": "IfcCostItem" },
+                    { "id": "CEE-1779469080394-m7klxy", "basis": "IFC 4x3 ADD2", "name": "IfcCostSchedule" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-win-currency",
+                  "name": "Cost Currency",
+                  "dataType": "String",
+                  "isMandatory": true,
+                  "definition": "ISO 4217 three-letter currency code applicable to all cost values in this Exchange Requirement.",
+                  "definitionFigures": [],
+                  "examples": "EUR; USD; GBP; KRW; CHF; AUD",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-1779469080394-fi01jo", "basis": "IFC 4x3 ADD2", "name": "IfcCurrencyRelationship" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-win-cost-ref-date",
+                  "name": "Cost Reference Date",
+                  "dataType": "Date/Time",
+                  "isMandatory": true,
+                  "definition": "The date on which the cost estimate is based, in ISO 8601 format (YYYY-MM-DD). Used for cost index adjustment when estimates prepared at different project stages are compared or updated.",
+                  "definitionFigures": [],
+                  "examples": "2026-01-01; 2026-06-01; 2027-03-01",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-1779469080394-jhf1qe", "basis": "IFC 4x3 ADD2", "name": "IfcCostSchedule.SubmittedOn" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-win-cost-method",
+                  "name": "Cost Estimation Method",
+                  "dataType": "String",
+                  "isMandatory": true,
+                  "definition": "Method used to derive the unit cost rates. Must be stated to allow reviewers to assess estimate reliability. Accepted values: Manufacturer Quote, Historical Data, Cost Database (specify name and edition), Elemental Rate, Approximate Elemental Rate.",
+                  "definitionFigures": [],
+                  "examples": "Manufacturer Quote; BCIS Historical Data; Spon's External Works 2026; Approximate Elemental Rate",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-1779469080394-8sd25u", "basis": "IFC 4x3 ADD2", "name": "IfcCostSchedule.PredefinedType" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-win-contingency",
+                  "name": "Cost Contingency Percentage",
+                  "dataType": "Numeric",
+                  "isMandatory": false,
+                  "definition": "Contingency allowance applied to the window cost estimate, expressed as a percentage (%) of the total cost before contingency. Reflects residual uncertainty in the estimate at the time of preparation.",
+                  "definitionFigures": [],
+                  "examples": "5; 10; 15; 20",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-1779469080395-xlxhn5", "basis": "IFC 4x3 ADD2", "name": "IfcCostValue.AppliedValue" }
+                  ],
+                  "subInformationUnits": []
+                }
+              ],
+              "subERs": []
+            }
+          ]
+        },
+        {
+          "id": "DOOR-COST-ROOT",
+          "guid": "5e7f9a1b-d3c5-4f47-2b6a-0e8d4c1f3a59",
+          "shortTitle": "er_DoorCostIDM",
+          "name": "er_DoorCostIDM",
+          "description": "Exchange Requirements for door cost estimation, as defined in the IDM for Cost Estimation of Doors (DoorCostIDM). Contains door properties, quantities, and cost information sub-ERs.",
+          "descriptionFigures": [],
+          "informationUnits": [],
+          "subERs": [
+            {
+              "id": "DOOR-PROP-001",
+              "guid": "6f8a0b2c-e4d6-4a58-3c7b-1f9e5d2a4b60",
+              "shortTitle": "er_DoorProperties",
+              "name": "er_DoorProperties",
+              "description": "Geometric and product properties of doors required for cost estimation, including type, dimensions, materials, hardware, and performance specifications.",
+              "descriptionFigures": [],
+              "informationUnits": [
+                {
+                  "id": "iu-door-type",
+                  "name": "Door Type",
+                  "dataType": "String",
+                  "isMandatory": true,
+                  "definition": "Classification of the door by its operational mechanism and leaf configuration. Determines hardware complexity and installation method, both of which significantly affect unit cost.",
+                  "definitionFigures": [],
+                  "examples": "Hinged Single-Leaf; Hinged Double-Leaf; Sliding Single; Sliding Double; Folding; Bi-fold; Revolving; Overhead Sectional",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-DOOR-0001-a1b2c3", "basis": "IFC 4x3 ADD2", "name": "IfcDoor" },
+                    { "id": "CEE-DOOR-0001-d4e5f6", "basis": "IFC 4x3 ADD2", "name": "IfcDoorType" },
+                    { "id": "CEE-DOOR-0001-g7h8i9", "basis": "IFC 4x3 ADD2", "name": "IfcDoor.PredefinedType" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-door-width",
+                  "name": "Door Width",
+                  "dataType": "Numeric",
+                  "isMandatory": true,
+                  "definition": "Overall width of the door unit including frame and lining, measured from outside face of frame to outside face of frame, in millimetres (mm).",
+                  "definitionFigures": [],
+                  "examples": "762; 838; 900; 1000; 1200; 1800; 2100",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-DOOR-0002-j0k1l2", "basis": "IFC 4x3 ADD2", "name": "IfcDoor.OverallWidth" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-door-height",
+                  "name": "Door Height",
+                  "dataType": "Numeric",
+                  "isMandatory": true,
+                  "definition": "Overall height of the door unit including frame and lining, measured from finished floor level to outside face of head, in millimetres (mm).",
+                  "definitionFigures": [],
+                  "examples": "1981; 2040; 2100; 2200; 2400; 3000",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-DOOR-0003-m3n4o5", "basis": "IFC 4x3 ADD2", "name": "IfcDoor.OverallHeight" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-door-frame-material",
+                  "name": "Frame and Lining Material",
+                  "dataType": "String",
+                  "isMandatory": true,
+                  "definition": "Material of the door frame and lining set. Determines durability, fire resistance capability, finishing requirements, and a significant portion of the supply cost.",
+                  "definitionFigures": [],
+                  "examples": "Softwood timber; Hardwood timber; Aluminium; Steel; uPVC; Composite (timber-aluminium)",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-DOOR-0004-p6q7r8", "basis": "IFC 4x3 ADD2", "name": "IfcDoorLiningProperties" },
+                    { "id": "CEE-DOOR-0004-s9t0u1", "basis": "IFC 4x3 ADD2", "name": "IfcMaterial" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-door-panel-material",
+                  "name": "Door Panel Material",
+                  "dataType": "String",
+                  "isMandatory": true,
+                  "definition": "Material and construction of the door leaf panel. Affects weight, acoustic and thermal performance, security rating, and the dominant share of the door supply cost.",
+                  "definitionFigures": [],
+                  "examples": "Solid-core timber; Hollow-core timber; Full-glazed (aluminium frame); Part-glazed timber; Steel flush panel; GRP; Aluminium panel",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-DOOR-0005-v2w3x4", "basis": "IFC 4x3 ADD2", "name": "IfcDoorPanelProperties" },
+                    { "id": "CEE-DOOR-0005-y5z6a7", "basis": "IFC 4x3 ADD2", "name": "IfcMaterial" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-door-panel-operation",
+                  "name": "Panel Operation",
+                  "dataType": "String",
+                  "isMandatory": true,
+                  "definition": "The operational mode of the door panel per IfcDoorPanelProperties.PanelOperation. Determines swing direction, clearance requirements, and hardware selection.",
+                  "definitionFigures": [],
+                  "examples": "SWINGING; DOUBLE_ACTING; SLIDING; FOLDING; REVOLVING; ROLLINGUP; FIXEDPANEL",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-DOOR-0006-b8c9d0", "basis": "IFC 4x3 ADD2", "name": "IfcDoorPanelProperties.PanelOperation" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-door-fire-rating",
+                  "name": "Fire Rating",
+                  "dataType": "String",
+                  "isMandatory": false,
+                  "definition": "Fire resistance classification of the door assembly per EN 13501-2 or national equivalent. Required for doors in fire-compartment walls and escape routes. Significantly increases unit cost due to intumescent seals, fire-rated ironmongery, and tested assembly requirements.",
+                  "definitionFigures": [],
+                  "examples": "None; FD30 (E30); FD60 (E60); FD30S (EI30); FD60S (EI60); EI 90; EI 120",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-DOOR-0007-e1f2g3", "basis": "IFC 4x3 ADD2", "name": "IfcDoor" },
+                    { "id": "CEE-DOOR-0007-h4i5j6", "basis": "IFC 4x3 ADD2", "name": "IfcDoorType" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-door-acoustic-rating",
+                  "name": "Acoustic Rating (Rw)",
+                  "dataType": "Numeric",
+                  "isMandatory": false,
+                  "definition": "Weighted sound reduction index of the door assembly in decibels (dB) per ISO 717-1. Required for doors between spaces with different noise requirements, such as meeting rooms, recording studios, or plant rooms.",
+                  "definitionFigures": [],
+                  "examples": "25; 30; 35; 40; 45; 50",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-DOOR-0008-k7l8m9", "basis": "IFC 4x3 ADD2", "name": "IfcDoor" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-door-hardware-set",
+                  "name": "Hardware Set",
+                  "dataType": "String",
+                  "isMandatory": true,
+                  "definition": "Classification of the ironmongery and hardware set specified for the door. Hardware is a significant cost driver and must be captured as a named set or specification reference. Includes handles, locks, hinges, door closers, and any access control devices.",
+                  "definitionFigures": [],
+                  "examples": "Standard residential (lever handle, latch); Commercial lever handle and mortice lock; Panic bar (single-point); Panic bar (multi-point); Electromagnetic hold-open; Access control reader + electric strike",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-DOOR-0009-n0o1p2", "basis": "IFC 4x3 ADD2", "name": "IfcDoor" },
+                    { "id": "CEE-DOOR-0009-q3r4s5", "basis": "IFC 4x3 ADD2", "name": "IfcDoorType" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-door-access-control",
+                  "name": "Access Control Required",
+                  "dataType": "Boolean",
+                  "isMandatory": false,
+                  "definition": "Indicates whether the door requires an electronic access control system (e.g., card reader, PIN pad, biometric reader). When true, electronic access control hardware and cabling must be included in the cost estimate.",
+                  "definitionFigures": [],
+                  "examples": "true; false",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-DOOR-0010-t6u7v8", "basis": "IFC 4x3 ADD2", "name": "IfcDoor" }
+                  ],
+                  "subInformationUnits": []
+                }
+              ],
+              "subERs": []
+            },
+            {
+              "id": "DOOR-QTY-001",
+              "guid": "7a9b1c3d-f5e7-4b69-4d8c-2a0f6e3b5c71",
+              "shortTitle": "er_DoorQuantities",
+              "name": "er_DoorQuantities",
+              "description": "Quantity take-off data for doors required for cost estimation, including unit counts and areas per door type.",
+              "descriptionFigures": [],
+              "informationUnits": [
+                {
+                  "id": "iu-door-count",
+                  "name": "Door Count",
+                  "dataType": "Numeric",
+                  "isMandatory": true,
+                  "definition": "Total number of door units of the same type within the scope of the cost estimation. Shall be provided as a positive integer.",
+                  "definitionFigures": [],
+                  "examples": "1; 8; 24; 60; 120",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-DOOR-0011-w9x0y1", "basis": "IFC 4x3 ADD2", "name": "IfcQuantityCount" },
+                    { "id": "CEE-DOOR-0011-z2a3b4", "basis": "IFC 4x3 ADD2", "name": "IfcElementQuantity" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-door-gross-area",
+                  "name": "Gross Door Area",
+                  "dataType": "Numeric",
+                  "isMandatory": true,
+                  "definition": "Overall area of a single door unit including frame and lining, expressed in square metres (m&sup2;). Calculated as OverallWidth &times; OverallHeight (converted to metres). Used for wall opening deductions and overall supply cost.",
+                  "definitionFigures": [],
+                  "examples": "1.51; 1.76; 1.89; 2.10; 2.52; 5.04",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-DOOR-0012-c5d6e7", "basis": "IFC 4x3 ADD2", "name": "IfcQuantityArea" },
+                    { "id": "CEE-DOOR-0012-f8g9h0", "basis": "IFC 4x3 ADD2", "name": "IfcDoor" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-door-leaf-area",
+                  "name": "Net Door Leaf Area",
+                  "dataType": "Numeric",
+                  "isMandatory": true,
+                  "definition": "Net area of the door leaf (or combined leaves for double doors) excluding frame and lining, expressed in square metres (m&sup2;). Used for door leaf supply cost and, where glazed, for glazing cost calculation.",
+                  "definitionFigures": [],
+                  "examples": "1.35; 1.58; 1.68; 1.88; 2.26; 4.52",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-DOOR-0013-i1j2k3", "basis": "IFC 4x3 ADD2", "name": "IfcQuantityArea" },
+                    { "id": "CEE-DOOR-0013-l4m5n6", "basis": "IFC 4x3 ADD2", "name": "IfcDoorPanelProperties" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-door-perimeter",
+                  "name": "Door Perimeter",
+                  "dataType": "Numeric",
+                  "isMandatory": false,
+                  "definition": "Perimeter of the door opening in millimetres, calculated as 2 &times; (OverallWidth + OverallHeight). Used for intumescent strip, acoustic seals, draught-proofing, and threshold material quantities.",
+                  "definitionFigures": [],
+                  "examples": "5486; 5960; 6162; 6600; 7200",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-DOOR-0014-o7p8q9", "basis": "IFC 4x3 ADD2", "name": "IfcQuantityLength" }
+                  ],
+                  "subInformationUnits": []
+                }
+              ],
+              "subERs": []
+            },
+            {
+              "id": "DOOR-COST-001",
+              "guid": "8b0c2d4e-a6f8-4c70-5e9d-3b1a7f4c6d82",
+              "shortTitle": "er_DoorCostEstimate",
+              "name": "er_DoorCostEstimate",
+              "description": "Cost data required for door cost estimation, including unit supply rates, hardware costs, installation costs, totals, and estimation metadata.",
+              "descriptionFigures": [],
+              "informationUnits": [
+                {
+                  "id": "iu-door-unit-supply-cost",
+                  "name": "Unit Supply Cost",
+                  "dataType": "Numeric",
+                  "isMandatory": true,
+                  "definition": "Supply cost per single door unit (door leaf and frame set) excluding hardware and installation, expressed in the stated currency. Shall be based on a current manufacturer quote, contractor tender price, or approved cost database rate.",
+                  "definitionFigures": [],
+                  "examples": "150.00; 320.00; 600.00; 1500.00; 4000.00; 12000.00",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-DOOR-0015-r0s1t2", "basis": "IFC 4x3 ADD2", "name": "IfcCostValue" },
+                    { "id": "CEE-DOOR-0015-u3v4w5", "basis": "IFC 4x3 ADD2", "name": "IfcCostItem" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-door-unit-hardware-cost",
+                  "name": "Unit Hardware Cost",
+                  "dataType": "Numeric",
+                  "isMandatory": true,
+                  "definition": "Cost of the complete hardware (ironmongery) set per single door unit, expressed in the stated currency. Hardware is priced separately because the same door leaf may carry different hardware sets at significantly different costs (e.g., standard latch vs. access-controlled panic bar).",
+                  "definitionFigures": [],
+                  "examples": "40.00; 120.00; 350.00; 800.00; 2500.00",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-DOOR-0016-x6y7z8", "basis": "IFC 4x3 ADD2", "name": "IfcCostValue" },
+                    { "id": "CEE-DOOR-0016-a9b0c1", "basis": "IFC 4x3 ADD2", "name": "IfcCostItem" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-door-unit-install-cost",
+                  "name": "Unit Installation Cost",
+                  "dataType": "Numeric",
+                  "isMandatory": true,
+                  "definition": "Labour and fixing cost per single door unit for installation into the prepared opening, expressed in the stated currency. Includes off-loading, handling, fitting frame, hanging leaf, adjusting, and first-fix sealing.",
+                  "definitionFigures": [],
+                  "examples": "60.00; 100.00; 180.00; 350.00; 700.00",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-DOOR-0017-d2e3f4", "basis": "IFC 4x3 ADD2", "name": "IfcCostValue" },
+                    { "id": "CEE-DOOR-0017-g5h6i7", "basis": "IFC 4x3 ADD2", "name": "IfcTask" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-door-total-cost",
+                  "name": "Total Cost per Door Type",
+                  "dataType": "Numeric",
+                  "isMandatory": true,
+                  "definition": "Total estimated cost for all doors of the same type within the project scope, calculated as (Unit Supply Cost + Unit Hardware Cost + Unit Installation Cost) &times; Door Count. Expressed in the stated currency. Excludes contingency unless stated otherwise.",
+                  "definitionFigures": [],
+                  "examples": "2500.00; 12800.00; 54000.00; 168000.00",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-DOOR-0018-j8k9l0", "basis": "IFC 4x3 ADD2", "name": "IfcCostItem" },
+                    { "id": "CEE-DOOR-0018-m1n2o3", "basis": "IFC 4x3 ADD2", "name": "IfcCostSchedule" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-door-currency",
+                  "name": "Cost Currency",
+                  "dataType": "String",
+                  "isMandatory": true,
+                  "definition": "ISO 4217 three-letter currency code applicable to all cost values in this Exchange Requirement.",
+                  "definitionFigures": [],
+                  "examples": "EUR; USD; GBP; KRW; CHF; AUD",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-DOOR-0019-p4q5r6", "basis": "IFC 4x3 ADD2", "name": "IfcCurrencyRelationship" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-door-cost-ref-date",
+                  "name": "Cost Reference Date",
+                  "dataType": "Date/Time",
+                  "isMandatory": true,
+                  "definition": "The date on which the cost estimate is based, in ISO 8601 format (YYYY-MM-DD). Used for cost index adjustment when estimates prepared at different project stages are compared or updated.",
+                  "definitionFigures": [],
+                  "examples": "2026-01-01; 2026-06-01; 2027-03-01",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-DOOR-0020-s7t8u9", "basis": "IFC 4x3 ADD2", "name": "IfcCostSchedule.SubmittedOn" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-door-cost-method",
+                  "name": "Cost Estimation Method",
+                  "dataType": "String",
+                  "isMandatory": true,
+                  "definition": "Method used to derive the unit cost rates. Must be stated to allow reviewers to assess estimate reliability. Accepted values: Manufacturer Quote, Historical Data, Cost Database (specify name and edition), Elemental Rate, Approximate Elemental Rate.",
+                  "definitionFigures": [],
+                  "examples": "Manufacturer Quote; BCIS Historical Data; Spon's A&B Price Book 2026; Approximate Elemental Rate",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-DOOR-0021-v0w1x2", "basis": "IFC 4x3 ADD2", "name": "IfcCostSchedule.PredefinedType" }
+                  ],
+                  "subInformationUnits": []
+                },
+                {
+                  "id": "iu-door-contingency",
+                  "name": "Cost Contingency Percentage",
+                  "dataType": "Numeric",
+                  "isMandatory": false,
+                  "definition": "Contingency allowance applied to the door cost estimate, expressed as a percentage (%) of the total cost before contingency. Reflects residual uncertainty in the estimate at the time of preparation.",
+                  "definitionFigures": [],
+                  "examples": "5; 10; 15; 20",
+                  "exampleImages": [],
+                  "correspondingExternalElements": [
+                    { "id": "CEE-DOOR-0022-y3z4a5", "basis": "IFC 4x3 ADD2", "name": "IfcCostValue.AppliedValue" }
+                  ],
+                  "subInformationUnits": []
+                }
+              ],
+              "subERs": []
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "dataObjectErMap": {
+    "DataObjectReference_WindowProperties": "WIN-PROP-001",
+    "DataObjectReference_WindowQTO": "WIN-QTY-001",
+    "DataObjectReference_WindowCostEstimate": "WIN-COST-001",
+    "DataObjectReference_DoorProperties": "DOOR-PROP-001",
+    "DataObjectReference_DoorQTO": "DOOR-QTY-001",
+    "DataObjectReference_DoorCostEstimate": "DOOR-COST-001"
+  },
+  "erDataMap": {
+    "DataObjectReference_WindowProperties": {
+      "id": "WIN-PROP-001",
+      "guid": "c9e3f5a7-b2d4-4c06-ae8f-3a1b9d7e5f21",
+      "name": "er_WindowProperties",
+      "description": "Geometric and product properties of windows required for cost estimation."
+    },
+    "DataObjectReference_WindowQTO": {
+      "id": "WIN-QTY-001",
+      "guid": "d0f4a6b8-c3e5-4d07-bf9a-4b2c0e8f6a32",
+      "name": "er_WindowQuantities",
+      "description": "Quantity take-off data for windows required for cost estimation."
+    },
+    "DataObjectReference_WindowCostEstimate": {
+      "id": "WIN-COST-001",
+      "guid": "e1a5b7c9-d4f6-4e08-c0ab-5c3d1f9a7b43",
+      "name": "er_WindowCostEstimate",
+      "description": "Cost data required for window cost estimation."
+    },
+    "DataObjectReference_DoorProperties": {
+      "id": "DOOR-PROP-001",
+      "guid": "6f8a0b2c-e4d6-4a58-3c7b-1f9e5d2a4b60",
+      "name": "er_DoorProperties",
+      "description": "Geometric and product properties of doors required for cost estimation."
+    },
+    "DataObjectReference_DoorQTO": {
+      "id": "DOOR-QTY-001",
+      "guid": "7a9b1c3d-f5e7-4b69-4d8c-2a0f6e3b5c71",
+      "name": "er_DoorQuantities",
+      "description": "Quantity take-off data for doors required for cost estimation."
+    },
+    "DataObjectReference_DoorCostEstimate": {
+      "id": "DOOR-COST-001",
+      "guid": "8b0c2d4e-a6f8-4c70-5e9d-3b1a7f4c6d82",
+      "name": "er_DoorCostEstimate",
+      "description": "Cost data required for door cost estimation."
+    }
+  },
+  "erLibrary": [],
+  "savedAt": "2026-05-22T23:30:00.000Z"
+}

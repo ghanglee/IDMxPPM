@@ -1,5 +1,5 @@
 /**
- * Self-contained Review Commenting UI for IDMxPPM HTML exports.
+ * Self-contained Review Commenting UI for xPPM neo-Seoul HTML exports.
  * Returns JavaScript and CSS as strings to be embedded in exported HTML.
  * Reviewers can add/resolve/delete comments and download the annotated file.
  */
@@ -8,7 +8,7 @@
  * Returns the CSS styles for the review UI as a string to embed in <style>.
  */
 export const getReviewUIStyles = () => `
-/* ===== IDMxPPM Review Mode Styles ===== */
+/* ===== xPPM neo-Seoul Review Mode Styles ===== */
 #review-toolbar {
   position: sticky; top: 0; z-index: 1000;
   background: #1a1a2e; color: #eee;

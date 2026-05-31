@@ -24,7 +24,7 @@ const StartupScreen = ({ onNewBlank, onNewSample, onOpen, onOpenFromServer, isSe
               <path d="M9 21V9" />
             </svg>
           </div>
-          <h1 className="startup-title">IDMxPPM neo-Seoul</h1>
+          <h1 className="startup-title">xPPM neo-Seoul</h1>
           <p className="startup-subtitle">Information Delivery Manual Authoring Tool</p>
           <p className="startup-compliance">ISO 29481-1 / ISO 29481-3 Compliant</p>
         </div>

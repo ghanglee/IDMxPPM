@@ -12,24 +12,24 @@ const FilePickerModal = ({ isOpen, onClose, onFileSelected }) => {
   const fileFormats = [
     {
       id: 'idm',
-      name: 'IDMxPPM Project',
+      name: 'IDM Project',
       extension: '.idm',
       accept: '.idm,.json',
-      description: 'Full project file with all data and ER library'
+      description: 'idmXSD 2.0-based full project file in JSON'
     },
     {
       id: 'idmxml',
-      name: 'idmXML - ISO 29481-3',
+      name: 'idmXML 2.0 - ISO 29481-3',
       extension: '.xml',
       accept: '.xml',
-      description: 'ISO 29481-3 compliant XML file'
+      description: 'ISO 29481-3 compliant XML (idmXSD 2.0)'
     },
     {
       id: 'zip',
-      name: 'ZIP Bundle',
+      name: 'idmXML 1.0',
       extension: '.zip',
       accept: '.zip,.idmx',
-      description: 'Archive with idmXML, BPMN, and images'
+      description: 'ISO 29481-3 compliant XML (idmXSD 1.0) with BPMN in a ZIP archive'
     },
     {
       id: 'xppm',

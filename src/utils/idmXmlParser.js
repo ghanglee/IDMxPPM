@@ -1137,7 +1137,7 @@ const parseInformationUnit = (iuElement) => {
     if (name.trim()) {
       unit.correspondingExternalElements.push({
         id: `CEE-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        basis: m.getAttribute('basis') || 'IFC',
+        basis: m.getAttribute('basis') || 'IFC 4x3 ADD2',
         name: name
       });
     }

@@ -1,0 +1,1150 @@
+{
+  "version": "2.0.0",
+  "appName": "IDMxPPM - Neo Seoul",
+  "bpmnXml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<definitions xmlns=\"http://www.omg.org/spec/BPMN/20100524/MODEL\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:bpmndi=\"http://www.omg.org/spec/BPMN/20100524/DI\" xmlns:dc=\"http://www.omg.org/spec/DD/20100524/DC\" xmlns:di=\"http://www.omg.org/spec/DD/20100524/DI\" id=\"Definitions_1\" targetNamespace=\"http://example.org/bpmn/window-cost\">\n  <collaboration id=\"Collaboration_1\">\n    <participant id=\"Participant_Architect\" name=\"Architect\" processRef=\"Process_Architect\" />\n    <participant id=\"Participant_CostEstimator\" name=\"Cost Estimator\" processRef=\"Process_CostEstimator\" />\n    <messageFlow id=\"Flow_0rahjjp\" sourceRef=\"Task_SendDesign\" targetRef=\"Task_ExtractQTO\" />\n    <messageFlow id=\"Flow_1qfm1br\" sourceRef=\"Task_PerformCostEstimation\" targetRef=\"Task_ReviewCostEstimation\" />\n  </collaboration>\n  <process id=\"Process_Architect\" isExecutable=\"false\">\n    <startEvent id=\"Start_Architect\" name=\"Start\">\n      <outgoing>SF_Start_Design</outgoing>\n    </startEvent>\n    <task id=\"Task_DesignBuilding\" name=\"Design a building\">\n      <incoming>SF_Start_Design</incoming>\n      <incoming>SF_No_Loop</incoming>\n      <outgoing>SF_Design_Specify</outgoing>\n    </task>\n    <task id=\"Task_SpecifyWindows\" name=\"Specify window requirements\">\n      <incoming>SF_Design_Specify</incoming>\n      <outgoing>SF_Specify_Send</outgoing>\n      <dataOutputAssociation id=\"DOA_BIMModel\">\n        <targetRef>DataObjectReference_BIMModel</targetRef>\n      </dataOutputAssociation>\n    </task>\n    <task id=\"Task_SendDesign\" name=\"Send the design to the cost estimator\">\n      <incoming>SF_Specify_Send</incoming>\n    </task>\n    <task id=\"Task_ReviewCostEstimation\" name=\"Review the window cost estimation\">\n      <outgoing>SF_Review_Gateway</outgoing>\n      <property id=\"Property_0x64fqq\" name=\"__targetRef_placeholder\" />\n      <dataInputAssociation id=\"DataInputAssociation_0ki6g2d\">\n        <sourceRef>DataObjectReference_CostEstimate</sourceRef>\n        <targetRef>Property_0x64fqq</targetRef>\n      </dataInputAssociation>\n    </task>\n    <exclusiveGateway id=\"GW_BudgetCheck\" name=\"Is the window cost below the budget?\">\n      <incoming>SF_Review_Gateway</incoming>\n      <outgoing>SF_Yes_End</outgoing>\n      <outgoing>SF_No_Loop</outgoing>\n    </exclusiveGateway>\n    <endEvent id=\"End_Architect\" name=\"End\">\n      <incoming>SF_Yes_End</incoming>\n    </endEvent>\n    <sequenceFlow id=\"SF_Start_Design\" sourceRef=\"Start_Architect\" targetRef=\"Task_DesignBuilding\" />\n    <sequenceFlow id=\"SF_Design_Specify\" sourceRef=\"Task_DesignBuilding\" targetRef=\"Task_SpecifyWindows\" />\n    <sequenceFlow id=\"SF_Specify_Send\" sourceRef=\"Task_SpecifyWindows\" targetRef=\"Task_SendDesign\" />\n    <sequenceFlow id=\"SF_Review_Gateway\" sourceRef=\"Task_ReviewCostEstimation\" targetRef=\"GW_BudgetCheck\" />\n    <sequenceFlow id=\"SF_Yes_End\" name=\"Yes\" sourceRef=\"GW_BudgetCheck\" targetRef=\"End_Architect\">\n      <conditionExpression xsi:type=\"tFormalExpression\">Yes</conditionExpression>\n    </sequenceFlow>\n    <sequenceFlow id=\"SF_No_Loop\" name=\"No — revise window design\" sourceRef=\"GW_BudgetCheck\" targetRef=\"Task_DesignBuilding\">\n      <conditionExpression xsi:type=\"tFormalExpression\">No</conditionExpression>\n    </sequenceFlow>\n    <dataObjectReference id=\"DataObjectReference_BIMModel\" name=\"er_WindowProperties\" dataObjectRef=\"DataObject_BIMModel\" />\n    <dataObject id=\"DataObject_BIMModel\" />\n  </process>\n  <process id=\"Process_CostEstimator\" isExecutable=\"false\">\n    <task id=\"Task_ExtractQTO\" name=\"Extract window quantity takeoffs\">\n      <outgoing>SF_Extract_Perform</outgoing>\n      <property id=\"Property_1wnz2mi\" name=\"__targetRef_placeholder\" />\n      <dataInputAssociation id=\"DataInputAssociation_15b2zhy\">\n        <sourceRef>DataObjectReference_BIMModel</sourceRef>\n        <targetRef>Property_1wnz2mi</targetRef>\n      </dataInputAssociation>\n      <dataOutputAssociation id=\"DataOutputAssociation_0wv7hys\">\n        <targetRef>DataObjectReference_QTO</targetRef>\n      </dataOutputAssociation>\n    </task>\n    <task id=\"Task_PerformCostEstimation\" name=\"Perform the window cost estimation\">\n      <incoming>SF_Extract_Perform</incoming>\n      <property id=\"Property_1266e34\" name=\"__targetRef_placeholder\" />\n      <dataInputAssociation id=\"DataInputAssociation_0bqf3u2\">\n        <sourceRef>DataObjectReference_QTO</sourceRef>\n        <targetRef>Property_1266e34</targetRef>\n      </dataInputAssociation>\n      <dataOutputAssociation id=\"DataOutputAssociation_1taz3ny\">\n        <targetRef>DataObjectReference_CostEstimate</targetRef>\n      </dataOutputAssociation>\n    </task>\n    <sequenceFlow id=\"SF_Extract_Perform\" sourceRef=\"Task_ExtractQTO\" targetRef=\"Task_PerformCostEstimation\" />\n    <dataObjectReference id=\"DataObjectReference_CostEstimate\" name=\"er_WindowCostInformation\" dataObjectRef=\"DataObject_CostEstimate\" />\n    <dataObject id=\"DataObject_CostEstimate\" />\n    <dataObjectReference id=\"DataObjectReference_QTO\" name=\"er_WindowQuantities\" dataObjectRef=\"DataObject_QTO\" />\n    <dataObject id=\"DataObject_QTO\" />\n  </process>\n  <bpmndi:BPMNDiagram id=\"BPMNDiagram_1\">\n    <bpmndi:BPMNPlane id=\"BPMNPlane_1\" bpmnElement=\"Collaboration_1\">\n      <bpmndi:BPMNShape id=\"Shape_Participant_Architect\" bpmnElement=\"Participant_Architect\" isHorizontal=\"true\">\n        <dc:Bounds x=\"100\" y=\"40\" width=\"1160\" height=\"286\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Shape_Start\" bpmnElement=\"Start_Architect\">\n        <dc:Bounds x=\"152\" y=\"147\" width=\"36\" height=\"36\" />\n        <bpmndi:BPMNLabel>\n          <dc:Bounds x=\"149\" y=\"188\" width=\"42\" height=\"14\" />\n        </bpmndi:BPMNLabel>\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Shape_DesignBuilding\" bpmnElement=\"Task_DesignBuilding\">\n        <dc:Bounds x=\"240\" y=\"125\" width=\"110\" height=\"80\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Shape_SpecifyWindows\" bpmnElement=\"Task_SpecifyWindows\">\n        <dc:Bounds x=\"400\" y=\"125\" width=\"120\" height=\"80\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Shape_SendDesign\" bpmnElement=\"Task_SendDesign\">\n        <dc:Bounds x=\"572\" y=\"125\" width=\"120\" height=\"80\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Shape_ReviewCost\" bpmnElement=\"Task_ReviewCostEstimation\">\n        <dc:Bounds x=\"840\" y=\"125\" width=\"150\" height=\"80\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Shape_Gateway\" bpmnElement=\"GW_BudgetCheck\" isMarkerVisible=\"true\">\n        <dc:Bounds x=\"1050\" y=\"140\" width=\"50\" height=\"50\" />\n        <bpmndi:BPMNLabel>\n          <dc:Bounds x=\"1022\" y=\"196\" width=\"108\" height=\"40\" />\n        </bpmndi:BPMNLabel>\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Shape_End\" bpmnElement=\"End_Architect\">\n        <dc:Bounds x=\"1162\" y=\"147\" width=\"36\" height=\"36\" />\n        <bpmndi:BPMNLabel>\n          <dc:Bounds x=\"1160\" y=\"188\" width=\"40\" height=\"14\" />\n        </bpmndi:BPMNLabel>\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Shape_BIMModel\" bpmnElement=\"DataObjectReference_BIMModel\">\n        <dc:Bounds x=\"447\" y=\"237\" width=\"36\" height=\"50\" />\n        <bpmndi:BPMNLabel>\n          <dc:Bounds x=\"465\" y=\"296\" width=\"89\" height=\"27\" />\n        </bpmndi:BPMNLabel>\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNEdge id=\"Edge_SF_Start_Design\" bpmnElement=\"SF_Start_Design\">\n        <di:waypoint x=\"188\" y=\"165\" />\n        <di:waypoint x=\"240\" y=\"165\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Edge_SF_Design_Specify\" bpmnElement=\"SF_Design_Specify\">\n        <di:waypoint x=\"350\" y=\"165\" />\n        <di:waypoint x=\"400\" y=\"165\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Edge_SF_Specify_Send\" bpmnElement=\"SF_Specify_Send\">\n        <di:waypoint x=\"520\" y=\"165\" />\n        <di:waypoint x=\"572\" y=\"165\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Edge_SF_Review_Gateway\" bpmnElement=\"SF_Review_Gateway\">\n        <di:waypoint x=\"990\" y=\"165\" />\n        <di:waypoint x=\"1050\" y=\"165\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Edge_SF_Yes_End\" bpmnElement=\"SF_Yes_End\">\n        <di:waypoint x=\"1100\" y=\"165\" />\n        <di:waypoint x=\"1162\" y=\"165\" />\n        <bpmndi:BPMNLabel>\n          <dc:Bounds x=\"1122\" y=\"147\" width=\"18\" height=\"14\" />\n        </bpmndi:BPMNLabel>\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Edge_SF_No_Loop\" bpmnElement=\"SF_No_Loop\">\n        <di:waypoint x=\"1075\" y=\"140\" />\n        <di:waypoint x=\"1075\" y=\"90\" />\n        <di:waypoint x=\"295\" y=\"90\" />\n        <di:waypoint x=\"295\" y=\"125\" />\n        <bpmndi:BPMNLabel>\n          <dc:Bounds x=\"654\" y=\"56\" width=\"73\" height=\"27\" />\n        </bpmndi:BPMNLabel>\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNShape id=\"Shape_Participant_CostEstimator\" bpmnElement=\"Participant_CostEstimator\" isHorizontal=\"true\">\n        <dc:Bounds x=\"100\" y=\"440\" width=\"1160\" height=\"200\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Shape_ExtractQTO\" bpmnElement=\"Task_ExtractQTO\">\n        <dc:Bounds x=\"572\" y=\"470\" width=\"150\" height=\"80\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Shape_PerformCost\" bpmnElement=\"Task_PerformCostEstimation\">\n        <dc:Bounds x=\"840\" y=\"470\" width=\"150\" height=\"80\" />\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Shape_CostEstimate\" bpmnElement=\"DataObjectReference_CostEstimate\">\n        <dc:Bounds x=\"1032\" y=\"485\" width=\"36\" height=\"50\" />\n        <bpmndi:BPMNLabel>\n          <dc:Bounds x=\"1006\" y=\"547\" width=\"87\" height=\"27\" />\n        </bpmndi:BPMNLabel>\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNShape id=\"Shape_QTO\" bpmnElement=\"DataObjectReference_QTO\">\n        <dc:Bounds x=\"772\" y=\"535\" width=\"36\" height=\"50\" />\n        <bpmndi:BPMNLabel>\n          <dc:Bounds x=\"747\" y=\"596\" width=\"88\" height=\"27\" />\n        </bpmndi:BPMNLabel>\n      </bpmndi:BPMNShape>\n      <bpmndi:BPMNEdge id=\"Edge_SF_Extract_Perform\" bpmnElement=\"SF_Extract_Perform\">\n        <di:waypoint x=\"722\" y=\"510\" />\n        <di:waypoint x=\"840\" y=\"510\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Edge_DOA_BIMModel\" bpmnElement=\"DOA_BIMModel\">\n        <di:waypoint x=\"460\" y=\"205\" />\n        <di:waypoint x=\"460\" y=\"237\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Edge_DIA_ReviewCost\" bpmnElement=\"DataInputAssociation_0ki6g2d\">\n        <di:waypoint x=\"1048\" y=\"485\" />\n        <di:waypoint x=\"932\" y=\"205\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Edge_DIA_ExtractBIM\" bpmnElement=\"DataInputAssociation_15b2zhy\">\n        <di:waypoint x=\"460\" y=\"287\" />\n        <di:waypoint x=\"460\" y=\"510\" />\n        <di:waypoint x=\"572\" y=\"510\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Edge_DOA_QTO\" bpmnElement=\"DataOutputAssociation_0wv7hys\">\n        <di:waypoint x=\"722\" y=\"536\" />\n        <di:waypoint x=\"772\" y=\"554\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Edge_DIA_PerformQTO\" bpmnElement=\"DataInputAssociation_0bqf3u2\">\n        <di:waypoint x=\"808\" y=\"553\" />\n        <di:waypoint x=\"840\" y=\"540\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Edge_DOA_CostEstimate\" bpmnElement=\"DataOutputAssociation_1taz3ny\">\n        <di:waypoint x=\"990\" y=\"510\" />\n        <di:waypoint x=\"1032\" y=\"510\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Flow_0rahjjp_di\" bpmnElement=\"Flow_0rahjjp\">\n        <di:waypoint x=\"632\" y=\"205\" />\n        <di:waypoint x=\"632\" y=\"470\" />\n      </bpmndi:BPMNEdge>\n      <bpmndi:BPMNEdge id=\"Flow_1qfm1br_di\" bpmnElement=\"Flow_1qfm1br\">\n        <di:waypoint x=\"915\" y=\"470\" />\n        <di:waypoint x=\"915\" y=\"205\" />\n      </bpmndi:BPMNEdge>\n    </bpmndi:BPMNPlane>\n  </bpmndi:BPMNDiagram>\n</definitions>\n",
+  "headerData": {
+    "title": "Information Delivery Manual for Cost Estimation of Windows",
+    "shortTitle": "WindowCostIDM",
+    "subTitle": "",
+    "authors": [
+      {
+        "type": "person",
+        "id": "author-1",
+        "givenName": "Building Informatics Group",
+        "familyName": "",
+        "middleInitial": "",
+        "affiliation": "Yonsei University",
+        "uri": "big@yonsei.ac.kr",
+        "prefix": "",
+        "suffix": "",
+        "postnominalDesignation": ""
+      }
+    ],
+    "organization": "",
+    "version": "1.0",
+    "creationDate": "",
+    "status": "WD",
+    "localDocumentStatus": "",
+    "localCode": "",
+    "language": "EN",
+    "projectStages": [
+      "design",
+      "production"
+    ],
+    "projectStagesIso": [
+      "design",
+      "production"
+    ],
+    "projectStagesAia": [],
+    "projectStagesRiba": [],
+    "useCategories": [
+      "Estimate Cost",
+      "Quantify Windows"
+    ],
+    "uses": [
+      {
+        "verb": "Estimate",
+        "noun": "Cost"
+      },
+      {
+        "verb": "Quantify",
+        "noun": "Windows"
+      }
+    ],
+    "useClassification": null,
+    "region": "international",
+    "regions": [
+      "international"
+    ],
+    "summary": "This IDM specifies the information required to support the cost estimation of windows in building projects. It defines the exchange requirements for geometric properties, material specifications, quantities, and cost data associated with windows, enabling accurate budget preparation and procurement planning during the design and production stages of a project.",
+    "revisionHistory": [
+      {
+        "date": "2026-05-22",
+        "description": "Initial creation"
+      }
+    ],
+    "changeLogs": [
+      {
+        "id": "log-1",
+        "changeDateTime": "2026-05-22T00:00:00",
+        "changeSummary": "Initial creation",
+        "changedBy": "author-1",
+        "changes": []
+      }
+    ],
+    "contributors": [],
+    "copyright": "Copyright 2026 Building Informatics Group (BIG), Yonsei University",
+    "keywords": [],
+    "relatedStandards": [],
+    "externalReferences": [],
+    "objectives": "The aim of this IDM is to define the minimum information that must be exchanged between design authoring tools (e.g., architectural BIM software) and cost estimation tools when performing window cost estimation. The scope covers all window types in building envelopes including fixed, casement, sliding, tilt-and-turn, and curtain wall windows. It addresses supply costs, installation costs, and cost classification references. Sub-structure works such as wall openings, reveals, and lintels are out of scope.",
+    "aimAndScope": "The aim of this IDM is to define the minimum information that must be exchanged between design authoring tools (e.g., architectural BIM software) and cost estimation tools when performing window cost estimation. The scope covers all window types in building envelopes including fixed, casement, sliding, tilt-and-turn, and curtain wall windows. It addresses supply costs, installation costs, and cost classification references. Sub-structure works such as wall openings, reveals, and lintels are out of scope.",
+    "benefits": "Enables automated extraction of window quantities and properties from BIM models, reducing manual take-off effort and improving cost estimation accuracy. Supports early cost feedback during the design phase and provides a structured basis for procurement planning and tender documentation.",
+    "limitations": "This IDM does not cover specialist glazing systems requiring bespoke structural engineering (e.g., structural glass fins, electrochromic glass). Costs for ancillary works such as reveals, sub-sills, and lintels are outside the scope. Regional price variations must be accounted for separately by the cost estimator.",
+    "actors": "",
+    "summaryFigures": [],
+    "aimAndScopeFigures": [],
+    "benefitsFigures": [],
+    "limitationsFigures": [],
+    "actorsList": [
+      {
+        "id": "actor-1",
+        "name": "Architect",
+        "actorType": "group",
+        "bpmnShapeName": "",
+        "role": "Design Author",
+        "subActors": [],
+        "bpmnId": "Participant_Architect"
+      },
+      {
+        "id": "actor-2",
+        "name": "Cost Estimator",
+        "actorType": "group",
+        "bpmnShapeName": "",
+        "role": "Cost Engineer",
+        "subActors": [],
+        "bpmnId": "Participant_CostEstimator"
+      },
+      {
+        "id": "actor-3",
+        "name": "Quantity Surveyor",
+        "actorType": "individual",
+        "bpmnShapeName": "",
+        "role": "Quantity Surveyor",
+        "subActors": []
+      }
+    ],
+    "preconditions": "",
+    "postconditions": "",
+    "triggeringEvents": "",
+    "requiredCapabilities": "",
+    "complianceCriteria": "",
+    "idmGuid": "3a7f2c91-b4d8-4e05-a6f1-8c2e0d5b9f47",
+    "ucGuid": "7c1d4b82-e3f9-4a07-b5d2-9f6a3c0e8d14",
+    "bcmGuid": "f5e9a3d7-c2b1-4f08-8e6d-0a7b4c5d2e91",
+    "pmId": "PM-WIN-COST-001",
+    "idmCode": "IDM-WIN-COST-001",
+    "rootERName": "er_WindowCostIDM",
+    "rootERId": "b8d2e4f6-a1c3-4b05-9d7e-2f0a8c6b4d10",
+    "idmXsdVersion": "2.0",
+    "idmXsdVersionConfidence": "high"
+  },
+  "erHierarchy": [
+    {
+      "id": "WIN-COST-ROOT",
+      "guid": "b8d2e4f6-a1c3-4b05-9d7e-2f0a8c6b4d10",
+      "shortTitle": "er_WindowCostIDM",
+      "name": "er_WindowCostIDM",
+      "description": "Root Exchange Requirement containing all information units required for the cost estimation of windows in building projects.",
+      "descriptionFigures": [],
+      "informationUnits": [],
+      "subERs": [
+        {
+          "id": "WIN-PROP-001",
+          "guid": "c9e3f5a7-b2d4-4c06-ae8f-3a1b9d7e5f21",
+          "shortTitle": "er_WindowProperties",
+          "name": "er_WindowProperties",
+          "description": "Geometric and product properties of windows required for cost estimation, including operational type, dimensions, materials, and performance specifications.",
+          "descriptionFigures": [],
+          "informationUnits": [
+            {
+              "id": "iu-win-type",
+              "name": "Window Type",
+              "dataType": "String",
+              "isMandatory": true,
+              "definition": "Classification of the window by its operational mechanism (e.g., Fixed, Casement, Sliding, Tilt-and-Turn, Awning, Curtain Wall). Determines hardware requirements and installation complexity, both of which significantly affect unit cost.",
+              "definitionFigures": [],
+              "examples": "Fixed; Casement; Sliding; Tilt-and-Turn; Top-Hung Awning; Curtain Wall Panel",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1779469080394-bd9fd3",
+                  "basis": "IFC 4x3 ADD2",
+                  "name": "IfcWindow"
+                },
+                {
+                  "id": "CEE-1779469080394-ebyzy6",
+                  "basis": "IFC 4x3 ADD2",
+                  "name": "IfcWindowType"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "iu-win-width",
+              "name": "Window Width",
+              "dataType": "Numeric",
+              "isMandatory": true,
+              "definition": "Overall width of the window unit including frame, measured from outside face of frame to outside face of frame, in millimetres (mm).",
+              "definitionFigures": [],
+              "examples": "900; 1200; 1500; 1800; 2100",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1779469080394-644ma8",
+                  "basis": "IFC 4x3 ADD2",
+                  "name": "IfcWindow.OverallWidth"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "iu-win-height",
+              "name": "Window Height",
+              "dataType": "Numeric",
+              "isMandatory": true,
+              "definition": "Overall height of the window unit including frame, measured from outside face of sill to outside face of head, in millimetres (mm).",
+              "definitionFigures": [],
+              "examples": "900; 1050; 1200; 1500; 2100",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1779469080394-fxxph1",
+                  "basis": "IFC 4x3 ADD2",
+                  "name": "IfcWindow.OverallHeight"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "iu-frame-material",
+              "name": "Frame Material",
+              "dataType": "String",
+              "isMandatory": true,
+              "definition": "Material composition of the window frame and sash. Determines durability, maintenance requirements, and a major portion of the supply cost.",
+              "definitionFigures": [],
+              "examples": "uPVC; Aluminium; Timber; Steel; Aluminium-Timber composite; uPVC-Aluminium composite",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1779469080394-zc6c8q",
+                  "basis": "IFC 4x3 ADD2",
+                  "name": "IfcWindowType.ConstructionType"
+                },
+                {
+                  "id": "CEE-1779469080394-apuuux",
+                  "basis": "IFC 4x3 ADD2",
+                  "name": "IfcMaterial"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "iu-glazing-type",
+              "name": "Glazing Type",
+              "dataType": "String",
+              "isMandatory": true,
+              "definition": "Specification of the glazing configuration, including number of panes, coatings, and gas fills. Directly drives the glazing cost component of the window unit price.",
+              "definitionFigures": [],
+              "examples": "Single glazing; Double glazing - air filled; Double glazing - argon filled; Triple glazing - argon filled; Laminated safety glass; Toughened glass",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1779469080394-nij7fj",
+                  "basis": "IFC 4x3 ADD2",
+                  "name": "IfcWindowPanelProperties.PanelOperation"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "iu-u-value",
+              "name": "Thermal Transmittance (U-value)",
+              "dataType": "Numeric",
+              "isMandatory": true,
+              "definition": "Overall thermal transmittance of the complete window unit (frame and glazing combined), expressed in W/(m&sup2;K). Required for compliance verification with energy regulations and specification confirmation.",
+              "definitionFigures": [],
+              "examples": "5.6 (single glazing); 2.8 (standard double); 1.6 (double low-e); 0.8 (triple glazing)",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1779469080394-j4703c",
+                  "basis": "IFC 4x3 ADD2",
+                  "name": "IfcWindowType.ThermalTransmittance"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "iu-fire-rating",
+              "name": "Fire Rating",
+              "dataType": "String",
+              "isMandatory": false,
+              "definition": "Fire resistance classification of the window unit per EN 13501-2. Required for windows located in fire-compartment walls or escape routes. Significantly increases unit cost.",
+              "definitionFigures": [],
+              "examples": "None; EW 30; EW 60; EI 30; EI 60; EI 90",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1779469080394-3yfv5v",
+                  "basis": "IFC 4x3 ADD2",
+                  "name": "IfcWindow"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "iu-acoustic-rating",
+              "name": "Acoustic Rating (Rw)",
+              "dataType": "Numeric",
+              "isMandatory": false,
+              "definition": "Weighted sound reduction index of the window unit in decibels (dB) per ISO 717-1. Required for windows in noise-sensitive locations, e.g., adjacent to roads, railways, or industrial areas.",
+              "definitionFigures": [],
+              "examples": "28; 32; 36; 40; 44; 48",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1779469080394-s66tvv",
+                  "basis": "IFC 4x3 ADD2",
+                  "name": "IfcWindow"
+                }
+              ],
+              "subInformationUnits": []
+            }
+          ],
+          "subERs": []
+        },
+        {
+          "id": "WIN-QTY-001",
+          "guid": "d0f4a6b8-c3e5-4d07-bf9a-4b2c0e8f6a32",
+          "shortTitle": "er_WindowQuantities",
+          "name": "er_WindowQuantities",
+          "description": "Quantity take-off data for windows required for cost estimation, including unit counts and areas per window type.",
+          "descriptionFigures": [],
+          "informationUnits": [
+            {
+              "id": "iu-win-count",
+              "name": "Window Count",
+              "dataType": "Numeric",
+              "isMandatory": true,
+              "definition": "Total number of window units of the same type within the scope of the cost estimation. Shall be provided as a positive integer.",
+              "definitionFigures": [],
+              "examples": "1; 12; 48; 120",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1779469080394-ur844j",
+                  "basis": "IFC 4x3 ADD2",
+                  "name": "IfcQuantityCount"
+                },
+                {
+                  "id": "CEE-1779469080394-arzj6d",
+                  "basis": "IFC 4x3 ADD2",
+                  "name": "IfcElementQuantity"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "iu-win-gross-area",
+              "name": "Gross Window Area",
+              "dataType": "Numeric",
+              "isMandatory": true,
+              "definition": "Overall area of a single window unit including frame, expressed in square metres (m&sup2;). Calculated as OverallWidth &times; OverallHeight (converted to metres). Used for wall opening deductions and overall supply cost.",
+              "definitionFigures": [],
+              "examples": "0.81; 1.26; 1.80; 2.52; 4.41",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1779469080394-cvsd29",
+                  "basis": "IFC 4x3 ADD2",
+                  "name": "IfcQuantityArea"
+                },
+                {
+                  "id": "CEE-1779469080394-fmfnlo",
+                  "basis": "IFC 4x3 ADD2",
+                  "name": "IfcWindow"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "iu-win-net-area",
+              "name": "Net Glazed Area",
+              "dataType": "Numeric",
+              "isMandatory": true,
+              "definition": "Clear glazed area of a single window unit excluding frame, expressed in square metres (m&sup2;). Used for glazing cost calculation and daylight performance checks.",
+              "definitionFigures": [],
+              "examples": "0.54; 0.90; 1.35; 1.98; 3.60",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1779469080394-y3sd3r",
+                  "basis": "IFC 4x3 ADD2",
+                  "name": "IfcQuantityArea"
+                },
+                {
+                  "id": "CEE-1779469080394-xljryc",
+                  "basis": "IFC 4x3 ADD2",
+                  "name": "IfcWindowLiningProperties"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "iu-win-perimeter",
+              "name": "Window Perimeter",
+              "dataType": "Numeric",
+              "isMandatory": false,
+              "definition": "Perimeter of the window opening in millimetres, calculated as 2 &times; (OverallWidth + OverallHeight). Used for sealant, membrane tape, and draught-proofing material quantities.",
+              "definitionFigures": [],
+              "examples": "3600; 4200; 5400; 6600; 9600",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1779469080394-1sb0fn",
+                  "basis": "IFC 4x3 ADD2",
+                  "name": "IfcQuantityLength"
+                }
+              ],
+              "subInformationUnits": []
+            }
+          ],
+          "subERs": []
+        },
+        {
+          "id": "WIN-COST-001",
+          "guid": "e1a5b7c9-d4f6-4e08-c0ab-5c3d1f9a7b43",
+          "shortTitle": "er_WindowCostInformation",
+          "name": "er_WindowCostEstimate",
+          "description": "Cost data required for window cost estimation, including unit supply rates, installation costs, totals, and estimation metadata.",
+          "descriptionFigures": [],
+          "informationUnits": [
+            {
+              "id": "iu-unit-supply-cost",
+              "name": "Unit Supply Cost",
+              "dataType": "Numeric",
+              "isMandatory": true,
+              "definition": "Supply cost per single window unit excluding installation, expressed in the stated currency. Shall be based on a current manufacturer quote, contractor tender price, or approved cost database rate.",
+              "definitionFigures": [],
+              "examples": "250.00; 450.00; 1200.00; 3500.00; 8000.00",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1779469080394-ye0mol",
+                  "basis": "IFC 4x3 ADD2",
+                  "name": "IfcCostValue"
+                },
+                {
+                  "id": "CEE-1779469080394-8f48ua",
+                  "basis": "IFC 4x3 ADD2",
+                  "name": "IfcCostItem"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "iu-unit-install-cost",
+              "name": "Unit Installation Cost",
+              "dataType": "Numeric",
+              "isMandatory": true,
+              "definition": "Labour and fixing cost per single window unit for installation into the prepared opening, expressed in the stated currency. Includes off-loading, handling, positioning, fixing, and first-fix sealing. Hoisting allowances for upper floors shall be itemised separately.",
+              "definitionFigures": [],
+              "examples": "80.00; 120.00; 250.00; 500.00; 1200.00",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1779469080394-zyqjx8",
+                  "basis": "IFC 4x3 ADD2",
+                  "name": "IfcCostValue"
+                },
+                {
+                  "id": "CEE-1779469080394-0ts7hf",
+                  "basis": "IFC 4x3 ADD2",
+                  "name": "IfcTask"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "iu-total-cost",
+              "name": "Total Cost per Window Type",
+              "dataType": "Numeric",
+              "isMandatory": true,
+              "definition": "Total estimated cost for all windows of the same type within the project scope, calculated as (Unit Supply Cost + Unit Installation Cost) &times; Window Count. Expressed in the stated currency. Excludes contingency unless stated otherwise.",
+              "definitionFigures": [],
+              "examples": "4080.00; 14400.00; 87600.00; 216000.00",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1779469080394-om4wqz",
+                  "basis": "IFC 4x3 ADD2",
+                  "name": "IfcCostItem"
+                },
+                {
+                  "id": "CEE-1779469080394-m7klxy",
+                  "basis": "IFC 4x3 ADD2",
+                  "name": "IfcCostSchedule"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "iu-currency",
+              "name": "Cost Currency",
+              "dataType": "String",
+              "isMandatory": true,
+              "definition": "ISO 4217 three-letter currency code applicable to all cost values in this Exchange Requirement.",
+              "definitionFigures": [],
+              "examples": "EUR; USD; GBP; KRW; CHF; AUD",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1779469080394-fi01jo",
+                  "basis": "IFC 4x3 ADD2",
+                  "name": "IfcCurrencyRelationship"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "iu-cost-ref-date",
+              "name": "Cost Reference Date",
+              "dataType": "Date/Time",
+              "isMandatory": true,
+              "definition": "The date on which the cost estimate is based, in ISO 8601 format (YYYY-MM-DD). Used for cost index adjustment when estimates prepared at different project stages are compared or updated.",
+              "definitionFigures": [],
+              "examples": "2026-01-01; 2026-06-01; 2027-03-01",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1779469080394-jhf1qe",
+                  "basis": "IFC 4x3 ADD2",
+                  "name": "IfcCostSchedule.SubmittedOn"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "iu-cost-method",
+              "name": "Cost Estimation Method",
+              "dataType": "String",
+              "isMandatory": true,
+              "definition": "Method used to derive the unit cost rates. Must be stated to allow reviewers to assess estimate reliability. Accepted values: Manufacturer Quote, Historical Data, Cost Database (specify name and edition), Elemental Rate, Approximate Elemental Rate.",
+              "definitionFigures": [],
+              "examples": "Manufacturer Quote; BCIS Historical Data; Spon's External Works 2026; Approximate Elemental Rate",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1779469080394-8sd25u",
+                  "basis": "IFC 4x3 ADD2",
+                  "name": "IfcCostSchedule.PredefinedType"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "iu-contingency",
+              "name": "Cost Contingency Percentage",
+              "dataType": "Numeric",
+              "isMandatory": false,
+              "definition": "Contingency allowance applied to the window cost estimate, expressed as a percentage (%) of the total cost before contingency. Reflects residual uncertainty in the estimate at the time of preparation. Typical values range from 5% (detailed design) to 20% (concept stage).",
+              "definitionFigures": [],
+              "examples": "5; 10; 15; 20",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1779469080395-xlxhn5",
+                  "basis": "IFC 4x3 ADD2",
+                  "name": "IfcCostValue.AppliedValue"
+                }
+              ],
+              "subInformationUnits": []
+            }
+          ],
+          "subERs": []
+        }
+      ]
+    }
+  ],
+  "dataObjectErMap": {
+    "DataObjectReference_BIMModel": "WIN-PROP-001",
+    "DataObjectReference_CostEstimate": "WIN-COST-001",
+    "DataObjectReference_QTO": "WIN-QTY-001"
+  },
+  "erDataMap": {
+    "DataObjectReference_BIMModel": {
+      "id": "WIN-PROP-001",
+      "guid": "c9e3f5a7-b2d4-4c06-ae8f-3a1b9d7e5f21",
+      "shortTitle": "er_WindowProperties",
+      "name": "er_WindowProperties",
+      "description": "Geometric and product properties of windows required for cost estimation, including operational type, dimensions, materials, and performance specifications.",
+      "descriptionFigures": [],
+      "informationUnits": [
+        {
+          "id": "iu-win-type",
+          "name": "Window Type",
+          "dataType": "String",
+          "isMandatory": true,
+          "definition": "Classification of the window by its operational mechanism (e.g., Fixed, Casement, Sliding, Tilt-and-Turn, Awning, Curtain Wall). Determines hardware requirements and installation complexity, both of which significantly affect unit cost.",
+          "definitionFigures": [],
+          "examples": "Fixed; Casement; Sliding; Tilt-and-Turn; Top-Hung Awning; Curtain Wall Panel",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1779469080394-bd9fd3",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcWindow"
+            },
+            {
+              "id": "CEE-1779469080394-ebyzy6",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcWindowType"
+            }
+          ],
+          "subInformationUnits": []
+        },
+        {
+          "id": "iu-win-width",
+          "name": "Window Width",
+          "dataType": "Numeric",
+          "isMandatory": true,
+          "definition": "Overall width of the window unit including frame, measured from outside face of frame to outside face of frame, in millimetres (mm).",
+          "definitionFigures": [],
+          "examples": "900; 1200; 1500; 1800; 2100",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1779469080394-644ma8",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcWindow.OverallWidth"
+            }
+          ],
+          "subInformationUnits": []
+        },
+        {
+          "id": "iu-win-height",
+          "name": "Window Height",
+          "dataType": "Numeric",
+          "isMandatory": true,
+          "definition": "Overall height of the window unit including frame, measured from outside face of sill to outside face of head, in millimetres (mm).",
+          "definitionFigures": [],
+          "examples": "900; 1050; 1200; 1500; 2100",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1779469080394-fxxph1",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcWindow.OverallHeight"
+            }
+          ],
+          "subInformationUnits": []
+        },
+        {
+          "id": "iu-frame-material",
+          "name": "Frame Material",
+          "dataType": "String",
+          "isMandatory": true,
+          "definition": "Material composition of the window frame and sash. Determines durability, maintenance requirements, and a major portion of the supply cost.",
+          "definitionFigures": [],
+          "examples": "uPVC; Aluminium; Timber; Steel; Aluminium-Timber composite; uPVC-Aluminium composite",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1779469080394-zc6c8q",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcWindowType.ConstructionType"
+            },
+            {
+              "id": "CEE-1779469080394-apuuux",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcMaterial"
+            }
+          ],
+          "subInformationUnits": []
+        },
+        {
+          "id": "iu-glazing-type",
+          "name": "Glazing Type",
+          "dataType": "String",
+          "isMandatory": true,
+          "definition": "Specification of the glazing configuration, including number of panes, coatings, and gas fills. Directly drives the glazing cost component of the window unit price.",
+          "definitionFigures": [],
+          "examples": "Single glazing; Double glazing - air filled; Double glazing - argon filled; Triple glazing - argon filled; Laminated safety glass; Toughened glass",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1779469080394-nij7fj",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcWindowPanelProperties.PanelOperation"
+            }
+          ],
+          "subInformationUnits": []
+        },
+        {
+          "id": "iu-u-value",
+          "name": "Thermal Transmittance (U-value)",
+          "dataType": "Numeric",
+          "isMandatory": true,
+          "definition": "Overall thermal transmittance of the complete window unit (frame and glazing combined), expressed in W/(m&sup2;K). Required for compliance verification with energy regulations and specification confirmation.",
+          "definitionFigures": [],
+          "examples": "5.6 (single glazing); 2.8 (standard double); 1.6 (double low-e); 0.8 (triple glazing)",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1779469080394-j4703c",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcWindowType.ThermalTransmittance"
+            }
+          ],
+          "subInformationUnits": []
+        },
+        {
+          "id": "iu-fire-rating",
+          "name": "Fire Rating",
+          "dataType": "String",
+          "isMandatory": false,
+          "definition": "Fire resistance classification of the window unit per EN 13501-2. Required for windows located in fire-compartment walls or escape routes. Significantly increases unit cost.",
+          "definitionFigures": [],
+          "examples": "None; EW 30; EW 60; EI 30; EI 60; EI 90",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1779469080394-3yfv5v",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcWindow"
+            }
+          ],
+          "subInformationUnits": []
+        },
+        {
+          "id": "iu-acoustic-rating",
+          "name": "Acoustic Rating (Rw)",
+          "dataType": "Numeric",
+          "isMandatory": false,
+          "definition": "Weighted sound reduction index of the window unit in decibels (dB) per ISO 717-1. Required for windows in noise-sensitive locations, e.g., adjacent to roads, railways, or industrial areas.",
+          "definitionFigures": [],
+          "examples": "28; 32; 36; 40; 44; 48",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1779469080394-s66tvv",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcWindow"
+            }
+          ],
+          "subInformationUnits": []
+        }
+      ],
+      "subERs": []
+    },
+    "DataObjectReference_CostEstimate": {
+      "id": "WIN-COST-001",
+      "guid": "e1a5b7c9-d4f6-4e08-c0ab-5c3d1f9a7b43",
+      "shortTitle": "er_WindowCostInformation",
+      "name": "er_WindowCostInformation",
+      "description": "Cost data required for window cost estimation, including unit supply rates, installation costs, totals, and estimation metadata.",
+      "descriptionFigures": [],
+      "informationUnits": [
+        {
+          "id": "iu-unit-supply-cost",
+          "name": "Unit Supply Cost",
+          "dataType": "Numeric",
+          "isMandatory": true,
+          "definition": "Supply cost per single window unit excluding installation, expressed in the stated currency. Shall be based on a current manufacturer quote, contractor tender price, or approved cost database rate.",
+          "definitionFigures": [],
+          "examples": "250.00; 450.00; 1200.00; 3500.00; 8000.00",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1779469080394-ye0mol",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcCostValue"
+            },
+            {
+              "id": "CEE-1779469080394-8f48ua",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcCostItem"
+            }
+          ],
+          "subInformationUnits": []
+        },
+        {
+          "id": "iu-unit-install-cost",
+          "name": "Unit Installation Cost",
+          "dataType": "Numeric",
+          "isMandatory": true,
+          "definition": "Labour and fixing cost per single window unit for installation into the prepared opening, expressed in the stated currency. Includes off-loading, handling, positioning, fixing, and first-fix sealing. Hoisting allowances for upper floors shall be itemised separately.",
+          "definitionFigures": [],
+          "examples": "80.00; 120.00; 250.00; 500.00; 1200.00",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1779469080394-zyqjx8",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcCostValue"
+            },
+            {
+              "id": "CEE-1779469080394-0ts7hf",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcTask"
+            }
+          ],
+          "subInformationUnits": []
+        },
+        {
+          "id": "iu-total-cost",
+          "name": "Total Cost per Window Type",
+          "dataType": "Numeric",
+          "isMandatory": true,
+          "definition": "Total estimated cost for all windows of the same type within the project scope, calculated as (Unit Supply Cost + Unit Installation Cost) &times; Window Count. Expressed in the stated currency. Excludes contingency unless stated otherwise.",
+          "definitionFigures": [],
+          "examples": "4080.00; 14400.00; 87600.00; 216000.00",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1779469080394-om4wqz",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcCostItem"
+            },
+            {
+              "id": "CEE-1779469080394-m7klxy",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcCostSchedule"
+            }
+          ],
+          "subInformationUnits": []
+        },
+        {
+          "id": "iu-currency",
+          "name": "Cost Currency",
+          "dataType": "String",
+          "isMandatory": true,
+          "definition": "ISO 4217 three-letter currency code applicable to all cost values in this Exchange Requirement.",
+          "definitionFigures": [],
+          "examples": "EUR; USD; GBP; KRW; CHF; AUD",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1779469080394-fi01jo",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcCurrencyRelationship"
+            }
+          ],
+          "subInformationUnits": []
+        },
+        {
+          "id": "iu-cost-ref-date",
+          "name": "Cost Reference Date",
+          "dataType": "Date/Time",
+          "isMandatory": true,
+          "definition": "The date on which the cost estimate is based, in ISO 8601 format (YYYY-MM-DD). Used for cost index adjustment when estimates prepared at different project stages are compared or updated.",
+          "definitionFigures": [],
+          "examples": "2026-01-01; 2026-06-01; 2027-03-01",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1779469080394-jhf1qe",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcCostSchedule.SubmittedOn"
+            }
+          ],
+          "subInformationUnits": []
+        },
+        {
+          "id": "iu-cost-method",
+          "name": "Cost Estimation Method",
+          "dataType": "String",
+          "isMandatory": true,
+          "definition": "Method used to derive the unit cost rates. Must be stated to allow reviewers to assess estimate reliability. Accepted values: Manufacturer Quote, Historical Data, Cost Database (specify name and edition), Elemental Rate, Approximate Elemental Rate.",
+          "definitionFigures": [],
+          "examples": "Manufacturer Quote; BCIS Historical Data; Spon's External Works 2026; Approximate Elemental Rate",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1779469080394-8sd25u",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcCostSchedule.PredefinedType"
+            }
+          ],
+          "subInformationUnits": []
+        },
+        {
+          "id": "iu-contingency",
+          "name": "Cost Contingency Percentage",
+          "dataType": "Numeric",
+          "isMandatory": false,
+          "definition": "Contingency allowance applied to the window cost estimate, expressed as a percentage (%) of the total cost before contingency. Reflects residual uncertainty in the estimate at the time of preparation. Typical values range from 5% (detailed design) to 20% (concept stage).",
+          "definitionFigures": [],
+          "examples": "5; 10; 15; 20",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1779469080395-xlxhn5",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcCostValue.AppliedValue"
+            }
+          ],
+          "subInformationUnits": []
+        }
+      ],
+      "subERs": []
+    },
+    "DataObjectReference_QTO": {
+      "id": "WIN-QTY-001",
+      "guid": "d0f4a6b8-c3e5-4d07-bf9a-4b2c0e8f6a32",
+      "shortTitle": "er_WindowQuantities",
+      "name": "er_WindowQuantities",
+      "description": "Quantity take-off data for windows required for cost estimation, including unit counts and areas per window type.",
+      "descriptionFigures": [],
+      "informationUnits": [
+        {
+          "id": "iu-win-count",
+          "name": "Window Count",
+          "dataType": "Numeric",
+          "isMandatory": true,
+          "definition": "Total number of window units of the same type within the scope of the cost estimation. Shall be provided as a positive integer.",
+          "definitionFigures": [],
+          "examples": "1; 12; 48; 120",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1779469080394-ur844j",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcQuantityCount"
+            },
+            {
+              "id": "CEE-1779469080394-arzj6d",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcElementQuantity"
+            }
+          ],
+          "subInformationUnits": []
+        },
+        {
+          "id": "iu-win-gross-area",
+          "name": "Gross Window Area",
+          "dataType": "Numeric",
+          "isMandatory": true,
+          "definition": "Overall area of a single window unit including frame, expressed in square metres (m&sup2;). Calculated as OverallWidth &times; OverallHeight (converted to metres). Used for wall opening deductions and overall supply cost.",
+          "definitionFigures": [],
+          "examples": "0.81; 1.26; 1.80; 2.52; 4.41",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1779469080394-cvsd29",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcQuantityArea"
+            },
+            {
+              "id": "CEE-1779469080394-fmfnlo",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcWindow"
+            }
+          ],
+          "subInformationUnits": []
+        },
+        {
+          "id": "iu-win-net-area",
+          "name": "Net Glazed Area",
+          "dataType": "Numeric",
+          "isMandatory": true,
+          "definition": "Clear glazed area of a single window unit excluding frame, expressed in square metres (m&sup2;). Used for glazing cost calculation and daylight performance checks.",
+          "definitionFigures": [],
+          "examples": "0.54; 0.90; 1.35; 1.98; 3.60",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1779469080394-y3sd3r",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcQuantityArea"
+            },
+            {
+              "id": "CEE-1779469080394-xljryc",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcWindowLiningProperties"
+            }
+          ],
+          "subInformationUnits": []
+        },
+        {
+          "id": "iu-win-perimeter",
+          "name": "Window Perimeter",
+          "dataType": "Numeric",
+          "isMandatory": false,
+          "definition": "Perimeter of the window opening in millimetres, calculated as 2 &times; (OverallWidth + OverallHeight). Used for sealant, membrane tape, and draught-proofing material quantities.",
+          "definitionFigures": [],
+          "examples": "3600; 4200; 5400; 6600; 9600",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1779469080394-1sb0fn",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcQuantityLength"
+            }
+          ],
+          "subInformationUnits": []
+        }
+      ],
+      "subERs": []
+    }
+  },
+  "erLibrary": [
+    {
+      "id": "WIN-PROP-001",
+      "guid": "c9e3f5a7-b2d4-4c06-ae8f-3a1b9d7e5f21",
+      "shortTitle": "er_WindowProperties",
+      "name": "er_WindowProperties",
+      "description": "Geometric and product properties of windows required for cost estimation, including operational type, dimensions, materials, and performance specifications.",
+      "descriptionFigures": [],
+      "informationUnits": [
+        {
+          "id": "iu-win-type",
+          "name": "Window Type",
+          "dataType": "String",
+          "isMandatory": true,
+          "definition": "Classification of the window by its operational mechanism (e.g., Fixed, Casement, Sliding, Tilt-and-Turn, Awning, Curtain Wall). Determines hardware requirements and installation complexity, both of which significantly affect unit cost.",
+          "definitionFigures": [],
+          "examples": "Fixed; Casement; Sliding; Tilt-and-Turn; Top-Hung Awning; Curtain Wall Panel",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1779469080394-bd9fd3",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcWindow"
+            },
+            {
+              "id": "CEE-1779469080394-ebyzy6",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcWindowType"
+            }
+          ],
+          "subInformationUnits": []
+        },
+        {
+          "id": "iu-win-width",
+          "name": "Window Width",
+          "dataType": "Numeric",
+          "isMandatory": true,
+          "definition": "Overall width of the window unit including frame, measured from outside face of frame to outside face of frame, in millimetres (mm).",
+          "definitionFigures": [],
+          "examples": "900; 1200; 1500; 1800; 2100",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1779469080394-644ma8",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcWindow.OverallWidth"
+            }
+          ],
+          "subInformationUnits": []
+        },
+        {
+          "id": "iu-win-height",
+          "name": "Window Height",
+          "dataType": "Numeric",
+          "isMandatory": true,
+          "definition": "Overall height of the window unit including frame, measured from outside face of sill to outside face of head, in millimetres (mm).",
+          "definitionFigures": [],
+          "examples": "900; 1050; 1200; 1500; 2100",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1779469080394-fxxph1",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcWindow.OverallHeight"
+            }
+          ],
+          "subInformationUnits": []
+        },
+        {
+          "id": "iu-frame-material",
+          "name": "Frame Material",
+          "dataType": "String",
+          "isMandatory": true,
+          "definition": "Material composition of the window frame and sash. Determines durability, maintenance requirements, and a major portion of the supply cost.",
+          "definitionFigures": [],
+          "examples": "uPVC; Aluminium; Timber; Steel; Aluminium-Timber composite; uPVC-Aluminium composite",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1779469080394-zc6c8q",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcWindowType.ConstructionType"
+            },
+            {
+              "id": "CEE-1779469080394-apuuux",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcMaterial"
+            }
+          ],
+          "subInformationUnits": []
+        },
+        {
+          "id": "iu-glazing-type",
+          "name": "Glazing Type",
+          "dataType": "String",
+          "isMandatory": true,
+          "definition": "Specification of the glazing configuration, including number of panes, coatings, and gas fills. Directly drives the glazing cost component of the window unit price.",
+          "definitionFigures": [],
+          "examples": "Single glazing; Double glazing - air filled; Double glazing - argon filled; Triple glazing - argon filled; Laminated safety glass; Toughened glass",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1779469080394-nij7fj",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcWindowPanelProperties.PanelOperation"
+            }
+          ],
+          "subInformationUnits": []
+        },
+        {
+          "id": "iu-u-value",
+          "name": "Thermal Transmittance (U-value)",
+          "dataType": "Numeric",
+          "isMandatory": true,
+          "definition": "Overall thermal transmittance of the complete window unit (frame and glazing combined), expressed in W/(m&sup2;K). Required for compliance verification with energy regulations and specification confirmation.",
+          "definitionFigures": [],
+          "examples": "5.6 (single glazing); 2.8 (standard double); 1.6 (double low-e); 0.8 (triple glazing)",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1779469080394-j4703c",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcWindowType.ThermalTransmittance"
+            }
+          ],
+          "subInformationUnits": []
+        },
+        {
+          "id": "iu-fire-rating",
+          "name": "Fire Rating",
+          "dataType": "String",
+          "isMandatory": false,
+          "definition": "Fire resistance classification of the window unit per EN 13501-2. Required for windows located in fire-compartment walls or escape routes. Significantly increases unit cost.",
+          "definitionFigures": [],
+          "examples": "None; EW 30; EW 60; EI 30; EI 60; EI 90",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1779469080394-3yfv5v",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcWindow"
+            }
+          ],
+          "subInformationUnits": []
+        },
+        {
+          "id": "iu-acoustic-rating",
+          "name": "Acoustic Rating (Rw)",
+          "dataType": "Numeric",
+          "isMandatory": false,
+          "definition": "Weighted sound reduction index of the window unit in decibels (dB) per ISO 717-1. Required for windows in noise-sensitive locations, e.g., adjacent to roads, railways, or industrial areas.",
+          "definitionFigures": [],
+          "examples": "28; 32; 36; 40; 44; 48",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1779469080394-s66tvv",
+              "basis": "IFC 4x3 ADD2",
+              "name": "IfcWindow"
+            }
+          ],
+          "subInformationUnits": []
+        }
+      ],
+      "subERs": []
+    }
+  ],
+  "savedAt": "2026-05-22T21:19:02.031Z"
+}

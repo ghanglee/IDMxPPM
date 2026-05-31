@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo, Component } from 'react';
 import './ERPanel.css';
-import { searchSchema, searchBsdd, getAvailableSchemas, isSchemaSearchable } from '../../utils/schemaSearch';
+import { searchSchema, searchSchemaGrouped, searchBsdd, fetchBsddClassProperties, getAvailableSchemas, isSchemaSearchable, RateLimitError } from '../../utils/schemaSearch';
+import { getBsddCacheState, initBsddCache } from '../../utils/bsddCache';
 import {
   DataObjectIcon,
   InfoUnitIcon,
@@ -247,8 +248,21 @@ const ERPanel = ({
   const [mappingSearchQuery, setMappingSearchQuery] = useState('');
   const [mappingSearchType, setMappingSearchType] = useState('exact');
   const [mappingSearchResults, setMappingSearchResults] = useState([]);
+  const [mappingSearchGroups, setMappingSearchGroups] = useState([]); // [{classCode, className, classUri, resultType, properties:[]}]
+  const [expandedGroups, setExpandedGroups] = useState(new Set()); // classUris currently expanded
+  const [mappingDrilldownClass, setMappingDrilldownClass] = useState(null); // { name, uri } when browsing class properties
+  const [mappingDrilldownFilter, setMappingDrilldownFilter] = useState('');
   const [mappingSearchLoading, setMappingSearchLoading] = useState(false);
+  const [mappingSearchStep, setMappingSearchStep] = useState(null); // 'classes' | 'properties' | null
   const [mappingSearchError, setMappingSearchError] = useState(null);
+  const [mappingSearchRateLimited, setMappingSearchRateLimited] = useState(false);
+  const [mappingSearchNote, setMappingSearchNote] = useState(null); // advisory hint (not an error)
+  const [bsddCacheInfo, setBsddCacheInfo] = useState(getBsddCacheState);
+  const [drilldownCountdown, setDrilldownCountdown] = useState(null); // seconds remaining until auto-retry
+  const drilldownRetryTimerRef = useRef(null); // { intervalId, timeoutId }
+  const drilldownRetryClassRef = useRef(null); // classResult to retry (drilldown path)
+  const rateLimitRetryFnRef = useRef(null); // generic retry callback (both drilldown and search paths)
+  const rateLimitRetryCountRef = useRef(0); // number of auto-retries attempted; reset on new search
   const [selectedSearchResult, setSelectedSearchResult] = useState(null); // Highlighted result (click to preview, Apply to confirm)
   const [searchClosedUnexpectedly, setSearchClosedUnexpectedly] = useState(false);
 
@@ -284,6 +298,14 @@ const ERPanel = ({
 
   // Snapshot of selectedItem.data when first selected (for dirty detection)
   const selectedItemSnapshotRef = useRef(null);
+
+  // Signal that a mapping was just applied via the search modal and selectedItem needs committing
+  const pendingMappingCommitRef = useRef(false);
+
+  // Always-current ref for erHierarchy — updated synchronously during render so event handlers
+  // never read a stale closure capture (avoids the "first open, can't add IU" race)
+  const erHierarchyRef = useRef(erHierarchy);
+  erHierarchyRef.current = erHierarchy;
 
   // Auto-expand the selected ER and its ancestors when it changes
   // This ensures the user can see the ER's content when first selecting it
@@ -381,9 +403,11 @@ const ERPanel = ({
     }
   }, [mappingScrollTrigger]);
 
-  // Auto-sync ER name to BPMN diagram after changes settle
+  // Auto-sync ER name to BPMN diagram after changes settle (legacy mode only)
+  // In ER-first mode, saves go through onUpdateER — this effect must NOT run or it will
+  // overwrite erHierarchy with stale erData from erDataMap (which lacks recently added IUs).
   useEffect(() => {
-    if (!erData || !onSave || !dataObject) {
+    if (isErFirstMode || !erData || !onSave || !dataObject) {
       return;
     }
 
@@ -410,7 +434,7 @@ const ERPanel = ({
         clearTimeout(saveTimerRef.current);
       }
     };
-  }, [erData, onSave, dataObject]);
+  }, [isErFirstMode, erData, onSave, dataObject]);
 
   // Track previous dataObject ID for legacy mode transitions
   const prevDataObjectIdForSelectionRef = useRef(null);
@@ -439,6 +463,55 @@ const ERPanel = ({
       selectedItemSnapshotRef.current = null; setSelectedItem(null);
     }
   }, [dataObject?.id, erData, isErFirstMode]);
+
+  // Sync selectedItem.data when erHierarchy changes (e.g. new project loaded or external update).
+  // If the selected ID no longer exists → clear. If it still exists and there are no uncommitted
+  // edits → refresh data from hierarchy so the detail panel always reflects stored values
+  // (e.g. mapping basis schema shows 'IFC 4x3 ADD2' instead of stale 'bSDD').
+  useEffect(() => {
+    if (!selectedItem || !isErFirstMode) return;
+    const idToFind = selectedItem.id;
+
+    // Walk hierarchy to find the node with matching id; return its data object and type
+    const findInHierarchy = (items) => {
+      for (const er of (items || [])) {
+        if (er.id === idToFind) {
+          const isTopLevel = erHierarchy.some(e => e.id === idToFind);
+          return { data: er, type: isTopLevel ? 'er' : 'subEr' };
+        }
+        for (const iu of (er.informationUnits || [])) {
+          if (iu.id === idToFind) return { data: iu, type: 'iu' };
+          const inSubIus = (subIus) => {
+            for (const s of subIus) {
+              if (s.id === idToFind) return { data: s, type: 'iu' };
+              const found = inSubIus(s.subInformationUnits || []);
+              if (found) return found;
+            }
+            return null;
+          };
+          const found = inSubIus(iu.subInformationUnits || []);
+          if (found) return found;
+        }
+        const found = findInHierarchy(er.subERs || []);
+        if (found) return found;
+      }
+      return null;
+    };
+
+    const found = findInHierarchy(erHierarchy);
+    if (!found) {
+      selectedItemSnapshotRef.current = null;
+      setSelectedItem(null);
+    } else if (found.data !== selectedItem.data) {
+      // Only refresh if there are no uncommitted edits (snapshot matches current data)
+      const hasUnsaved = selectedItemSnapshotRef.current !== null &&
+        JSON.stringify(selectedItem.data) !== selectedItemSnapshotRef.current;
+      if (!hasUnsaved) {
+        selectedItemSnapshotRef.current = JSON.stringify(found.data);
+        setSelectedItem(prev => ({ ...prev, data: found.data, type: found.type }));
+      }
+    }
+  }, [erHierarchy]);
 
   // Sync selectedItem when selectedErId changes (for ER-first mode)
   // This ONLY runs when selectedErId changes from external source (ContentPane or BPMN)
@@ -844,14 +917,9 @@ const ERPanel = ({
 
   const treeRows = useMemo(() => {
     if (isErFirstMode) {
-      // When an ER is selected, show its IUs and Sub-ERs
-      // ER hierarchy manipulation (move, indent, outdent) is done in ContentPane, not here
       if (selectedErId && selectedErData) {
-        // Show the selected ER's content: IUs at depth 0, Sub-ERs at depth 0
-        // Sub-ERs can be expanded to see their IUs and nested sub-ERs
         return flattenErIUsOnly(selectedErData, expandedNodes);
       }
-      // If no ER is selected, show empty (user must select from ER Hierarchy)
       return [];
     }
     return flattenERTree(erDataMap || {}, dataObject?.id, erData, expandedNodes);
@@ -997,6 +1065,15 @@ const ERPanel = ({
       });
     }
   }, [selectedItem, selectedIULocation, erHierarchy, onUpdateER]);
+
+  // After a mapping is applied via the search modal, commitCurrentEdit runs once
+  // selectedItem has been updated with the new mapping data.
+  useEffect(() => {
+    if (pendingMappingCommitRef.current) {
+      pendingMappingCommitRef.current = false;
+      commitCurrentEdit();
+    }
+  }, [selectedItem, commitCurrentEdit]);
 
   // Save detail panel edits and close the panel
   const handleDetailSave = useCallback(() => {
@@ -1176,28 +1253,24 @@ const ERPanel = ({
       subInformationUnits: []
     };
 
-    // Find ER and add IU
+    // Use the always-current ref to avoid stale closure when the panel first opens
     const findEr = (ers) => {
       for (const er of ers) {
         if (er.id === erId || er.guid === erId) {
           onUpdateER(erId, {
             informationUnits: [...(er.informationUnits || []), newIU]
           });
-          // Auto-expand to show new IU
           setExpandedNodes(prev => new Set([...prev, erId]));
-          // Select the newly created IU with its parent ER
           selectNewItem({ id: newIU.id, type: 'iu', data: newIU, erParent: erId });
           return true;
         }
-        if (er.subERs?.length > 0 && findEr(er.subERs)) {
-          return true;
-        }
+        if (er.subERs?.length > 0 && findEr(er.subERs)) return true;
       }
       return false;
     };
 
-    findEr(erHierarchy);
-  }, [isErFirstMode, onUpdateER, erHierarchy]);
+    findEr(erHierarchyRef.current);
+  }, [isErFirstMode, onUpdateER]);
 
   // Delete Information Unit in ER-first mode
   const handleDeleteIU = useCallback((iuId, erParentId) => {
@@ -1585,14 +1658,59 @@ const ERPanel = ({
     }
   }, []);
 
+  // Start a rate-limit countdown; calls rateLimitRetryFnRef.current when it expires.
+  // Declared before executeSearch and drillIntoClassProperties so both can reference it.
+  // Applies exponential backoff: attempt 1 → 60s, attempt 2 → 120s, then permanent error.
+  // Returns false if the retry limit is reached (caller should show a permanent error instead).
+  const MAX_RATE_LIMIT_RETRIES = 2;
+  const startRateLimitCountdown = useCallback((serverRetryAfterMs) => {
+    if (rateLimitRetryCountRef.current >= MAX_RATE_LIMIT_RETRIES) {
+      rateLimitRetryFnRef.current = null;
+      drilldownRetryClassRef.current = null;
+      setMappingSearchError('bSDD is still rate-limiting after two retries. Please wait a few minutes and try again manually.');
+      setMappingSearchLoading(false);
+      setDrilldownCountdown(null);
+      return false;
+    }
+    // Exponential backoff: 60s * 2^attempt, at least as long as the server requests
+    const backoffMs = Math.max(serverRetryAfterMs, 60000 * Math.pow(2, rateLimitRetryCountRef.current));
+    rateLimitRetryCountRef.current += 1;
+    const totalSec = Math.ceil(backoffMs / 1000);
+    if (drilldownRetryTimerRef.current) {
+      clearInterval(drilldownRetryTimerRef.current.intervalId);
+      clearTimeout(drilldownRetryTimerRef.current.timeoutId);
+      drilldownRetryTimerRef.current = null;
+    }
+    setDrilldownCountdown(totalSec);
+    let remaining = totalSec;
+    const intervalId = setInterval(() => {
+      remaining -= 1;
+      setDrilldownCountdown(remaining);
+      if (remaining <= 0) clearInterval(intervalId);
+    }, 1000);
+    const timeoutId = setTimeout(() => {
+      clearInterval(intervalId);
+      drilldownRetryTimerRef.current = null;
+      setDrilldownCountdown(null);
+      const retryFn = rateLimitRetryFnRef.current;
+      rateLimitRetryFnRef.current = null;
+      drilldownRetryClassRef.current = null;
+      retryFn?.();
+    }, backoffMs);
+    drilldownRetryTimerRef.current = { intervalId, timeoutId };
+    return true;
+  }, []);
+
   // Core search execution — captures query/schema/type at call time
-  const executeSearch = useCallback(async (query, schema, matchType) => {
+  const executeSearch = useCallback(async (query, schema, matchType, { isRetry = false } = {}) => {
     if (!query.trim()) {
       setMappingSearchResults([]);
       setMappingSearchError(null);
       setMappingSearchLoading(false);
       return;
     }
+
+    if (!isRetry) rateLimitRetryCountRef.current = 0;
 
     // Cancel previous in-flight request
     cancelSearch();
@@ -1605,7 +1723,9 @@ const ERPanel = ({
     const requestId = ++searchRequestIdRef.current;
 
     setMappingSearchLoading(true);
-    // Don't clear previous results — keeps them visible until new results arrive
+    // Clear groups immediately so stale groups from previous searches don't linger
+    setMappingSearchGroups([]);
+    setExpandedGroups(new Set());
     setMappingSearchError(null);
 
     try {
@@ -1615,18 +1735,74 @@ const ERPanel = ({
 
       if (schemaOption?.apiEnabled && schema === 'bSDD') {
         try {
-          results = await searchBsdd(query, matchType, abortController.signal);
+          const onStep = (step) => {
+            if (requestId === searchRequestIdRef.current) setMappingSearchStep(step);
+          };
+          const bsddResponse = await searchBsdd(query, matchType, abortController.signal, onStep);
+          results = bsddResponse.results || [];
+          const groups = bsddResponse.groups || [];
+          setMappingSearchGroups(groups);
+          setExpandedGroups(new Set(groups.map(g => g.classUri)));
+          setMappingSearchNote(bsddResponse.note || null);
+          if (bsddResponse.rateLimited) {
+            searchError = 'bSDD is rate-limiting requests. Please wait a moment and try again.';
+            setMappingSearchRateLimited(true);
+            results = [];
+          } else {
+            setMappingSearchRateLimited(false);
+          }
         } catch (apiError) {
           if (apiError.name === 'AbortError') {
             return; // Silently exit — request was cancelled by a newer search
+          }
+          if (apiError.name === 'RateLimitError') {
+            if (requestId !== searchRequestIdRef.current) return;
+            rateLimitRetryFnRef.current = () => executeSearch(query, schema, matchType, { isRetry: true });
+            const started = startRateLimitCountdown(apiError.retryAfterMs);
+            if (!started) return; // retry limit reached — permanent error already set
+            setMappingSearchLoading(false);
+            return;
           }
           console.error('bSDD API error:', apiError);
           searchError = `bSDD API error: ${apiError.message || 'Connection failed'}`;
           results = [];
         }
       } else if (schemaOption?.searchable) {
+        setMappingSearchNote(null);
         try {
-          results = searchSchema(schema, query, matchType);
+          const { results: groupedResults, groups: schemaGroups } = searchSchemaGrouped(schema, query, matchType);
+          if (schemaGroups.length > 0) {
+            setMappingSearchGroups(schemaGroups);
+            setExpandedGroups(new Set(schemaGroups.map(g => g.classUri)));
+            results = groupedResults;
+          } else {
+            // Flat results — group any property entries by entity·Pset category for cleaner display
+            const rawResults = groupedResults;
+            if (rawResults.some(r => r.resultType === 'property')) {
+              const propertyResults = rawResults.filter(r => r.resultType === 'property');
+              const groupMap = new Map();
+              for (const prop of propertyResults) {
+                const key = prop.category || 'IFC Properties';
+                if (!groupMap.has(key)) {
+                  const parts = key.split(' · ');
+                  groupMap.set(key, {
+                    classCode: parts[0] || key,
+                    className: parts[1] || '',
+                    classUri: key,
+                    resultType: 'propertySet',
+                    properties: []
+                  });
+                }
+                groupMap.get(key).properties.push(prop);
+              }
+              const propGroups = [...groupMap.values()];
+              setMappingSearchGroups(propGroups);
+              setExpandedGroups(new Set(propGroups.map(g => g.classUri)));
+              results = rawResults.filter(r => r.resultType !== 'property');
+            } else {
+              results = rawResults;
+            }
+          }
         } catch (err) {
           console.error('Local schema search error:', err);
           searchError = `Schema search error: ${err.message || 'Unknown error'}`;
@@ -1649,7 +1825,8 @@ const ERPanel = ({
               category: r.category || schema,
               uri: r.uri || '',
               score: typeof r.score === 'number' && !isNaN(r.score) ? r.score : 1,
-              matchType: r.matchType || 'exact'
+              matchType: r.matchType || 'exact',
+              resultType: r.resultType || ''
             }))
             .filter(r => r.name && r.name !== 'Unknown')
         : [];
@@ -1664,12 +1841,25 @@ const ERPanel = ({
       setMappingSearchResults([]);
       setMappingSearchError(`Search failed: ${error.message || 'Unknown error'}`);
     } finally {
-      // Only clear loading if this is still the latest request
       if (requestId === searchRequestIdRef.current) {
         setMappingSearchLoading(false);
+        setMappingSearchStep(null);
       }
     }
-  }, [cancelSearch]);
+  }, [cancelSearch, startRateLimitCountdown]);
+
+  // Normalize a basis string to the closest SCHEMA_OPTIONS value.
+  // Handles legacy strings like "IFC4x3 ADD2" → "IFC 4x3 ADD2" by comparing
+  // without whitespace and case-insensitively.
+  const normalizeSchema = useCallback((schema) => {
+    if (!schema) return 'bSDD';
+    if (SCHEMA_OPTIONS.find(s => s.value === schema)) return schema;
+    const stripped = schema.replace(/\s/g, '').toLowerCase();
+    if (stripped === 'ifc' || stripped === 'ifc4') return 'IFC 4x3 ADD2';
+    if (stripped === 'ifc2x3' || stripped === 'ifc2') return 'IFC 2x3';
+    const match = SCHEMA_OPTIONS.find(s => s.value.replace(/\s/g, '').toLowerCase() === stripped);
+    return match?.value || 'bSDD';
+  }, []);
 
   // Open mapping search modal
   // If mappingId is provided, we're updating an existing mapping; otherwise adding a new one
@@ -1678,76 +1868,134 @@ const ERPanel = ({
     cancelSearch(); // Cancel any in-flight request from a previous search
     setMappingSearchUnitId(unitId);
     setMappingSearchMappingId(mappingId);
-    setMappingSearchSchema(currentSchema || 'bSDD');
+    setMappingSearchSchema(normalizeSchema(currentSchema));
     setMappingSearchQuery(initialQuery);
     setMappingSearchResults([]);
+    setMappingSearchGroups([]);
+    setExpandedGroups(new Set());
     setMappingSearchError(null);
+    setMappingSearchNote(null);
     setMappingSearchLoading(false);
+    setMappingSearchStep(null);
+    setMappingSearchRateLimited(false);
     setSelectedSearchResult(null);
+    setMappingDrilldownClass(null);
+    setMappingDrilldownFilter('');
     setSearchClosedUnexpectedly(false);
     setShowMappingSearch(true);
-  }, [cancelSearch]);
+  }, [cancelSearch, normalizeSchema]);
+
+  // Clear any pending rate-limit countdown timers (declared before closeMappingSearch and executeSearch)
+  const clearDrilldownRetry = useCallback(() => {
+    if (drilldownRetryTimerRef.current) {
+      clearInterval(drilldownRetryTimerRef.current.intervalId);
+      clearTimeout(drilldownRetryTimerRef.current.timeoutId);
+      drilldownRetryTimerRef.current = null;
+    }
+    drilldownRetryClassRef.current = null;
+    rateLimitRetryFnRef.current = null;
+    rateLimitRetryCountRef.current = 0;
+    setDrilldownCountdown(null);
+  }, []);
 
   // Close mapping search and cancel in-flight requests
   const closeMappingSearch = useCallback(() => {
     cancelSearch();
+    clearDrilldownRetry();
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
       searchTimeoutRef.current = null;
     }
     setShowMappingSearch(false);
     setMappingSearchResults([]);
+    setMappingSearchGroups([]);
+    setExpandedGroups(new Set());
     setMappingSearchError(null);
+    setMappingSearchNote(null);
     setMappingSearchLoading(false);
     setSelectedSearchResult(null);
-  }, [cancelSearch]);
+    setMappingDrilldownClass(null);
+    setMappingDrilldownFilter('');
+  }, [cancelSearch, clearDrilldownRetry]);
 
-  // Debounced trigger: fires executeSearch 300ms after query/schema/type change
-  // IMPORTANT: Always cancel in-flight requests on every change to prevent stale
-  // responses from arriving mid-debounce and causing rapid state flips.
-  // Local schema searches run immediately (no debounce needed — they're synchronous).
+  const drillIntoClassProperties = useCallback(async (classResult) => {
+    if (!classResult?.uri) return;
+    clearDrilldownRetry();
+    cancelSearch();
+    const abortController = new AbortController();
+    searchAbortControllerRef.current = abortController;
+    const requestId = ++searchRequestIdRef.current;
+
+    setMappingDrilldownClass({ name: classResult.code || classResult.name, uri: classResult.uri });
+    setMappingDrilldownFilter('');
+    setMappingSearchLoading(true);
+    setMappingSearchResults([]);
+    setMappingSearchError(null);
+    setSelectedSearchResult(null);
+
+    try {
+      const props = await fetchBsddClassProperties(classResult.uri, classResult.code || classResult.name, abortController.signal);
+      if (requestId !== searchRequestIdRef.current) return;
+      setMappingSearchResults(props || []);
+      if (!props || props.length === 0) {
+        setMappingSearchError('No properties found for this class.');
+      }
+    } catch (error) {
+      if (error.name === 'AbortError' || requestId !== searchRequestIdRef.current) return;
+      if (error.name === 'RateLimitError') {
+        // bSDD rate-limited: start countdown and auto-retry when it expires
+        drilldownRetryClassRef.current = classResult;
+        rateLimitRetryFnRef.current = () => drillIntoClassProperties(classResult);
+        const started = startRateLimitCountdown(error.retryAfterMs);
+        setMappingSearchLoading(false);
+        if (!started) return; // retry limit reached — permanent error already set
+        return;
+      }
+      setMappingSearchError(`Failed to load properties: ${error.message}`);
+    } finally {
+      if (requestId === searchRequestIdRef.current) setMappingSearchLoading(false);
+    }
+  }, [cancelSearch, clearDrilldownRetry, startRateLimitCountdown]);
+
+  // Cancel any in-flight request and reset results when query/schema/type changes.
+  // Search is only triggered explicitly by the Search button or Enter key.
   useEffect(() => {
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
       searchTimeoutRef.current = null;
     }
-
-    // Cancel any in-flight API request immediately on every change
     cancelSearch();
 
     if (!showMappingSearch || !mappingSearchQuery.trim()) {
       setMappingSearchLoading(false);
+      setMappingSearchStep(null);
+      setMappingSearchRateLimited(false);
       setMappingSearchResults([]);
-      return;
+      setMappingDrilldownClass(null);
+      setMappingDrilldownFilter('');
+      setMappingSearchNote(null);
+      setMappingSearchGroups([]);
+      setExpandedGroups(new Set());
     }
+  }, [mappingSearchQuery, mappingSearchSchema, mappingSearchType, showMappingSearch, cancelSearch]);
 
-    // Check if current schema uses API (bSDD) or local data
-    const isApiSchema = mappingSearchSchema === 'bSDD';
-    // Short debounce for local schemas to coalesce rapid keystrokes;
-    // longer debounce for API schemas to avoid excessive network requests.
-    const delay = isApiSchema ? 300 : 150;
-
-    setMappingSearchLoading(true);
-    searchTimeoutRef.current = setTimeout(() => {
-      executeSearch(mappingSearchQuery, mappingSearchSchema, mappingSearchType);
-    }, delay);
-
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-  }, [mappingSearchQuery, mappingSearchSchema, mappingSearchType, showMappingSearch, cancelSearch, executeSearch]);
-
-  // Cleanup on unmount: cancel any in-flight requests
+  // Cleanup on unmount: cancel any in-flight requests and drilldown retry timers
   useEffect(() => {
     return () => {
       cancelSearch();
+      clearDrilldownRetry();
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [cancelSearch]);
+  }, [cancelSearch, clearDrilldownRetry]);
+
+  // Trigger bSDD cache init (background) whenever the search modal opens with bSDD selected
+  useEffect(() => {
+    if (showMappingSearch && mappingSearchSchema === 'bSDD') {
+      initBsddCache((info) => setBsddCacheInfo({ ...info })).catch(() => {});
+    }
+  }, [showMappingSearch, mappingSearchSchema]);
 
   // Manual search trigger (for Search button click and Enter key)
   const handleMappingSearch = useCallback(() => {
@@ -1764,11 +2012,26 @@ const ERPanel = ({
 
     const isClassification = ['UniFormat', 'OmniClass', 'MasterFormat'].includes(mappingSearchSchema);
 
+    // When searching via bSDD API, derive the actual schema from the result URI so that
+    // IFC elements are labelled "IFC 4x3 ADD2" rather than the generic "bSDD" bucket.
+    let effectiveBasis = mappingSearchSchema;
+    if (mappingSearchSchema === 'bSDD') {
+      const checkUri = result.uri || result._groupUri || '';
+      if (checkUri.includes('/buildingsmart/ifc/4.3')) effectiveBasis = 'IFC 4x3 ADD2';
+      else if (checkUri.includes('/buildingsmart/ifc/2x3')) effectiveBasis = 'IFC 2x3';
+    }
+
     // Build the mapping data from search result
     const mappingData = {
-      basis: mappingSearchSchema,
-      name: isClassification ? (result.code || result.name) : (result.name || result.code),
-      description: isClassification ? (result.name || result.description) : (result.description || ''),
+      basis: effectiveBasis,
+      name: isClassification
+        ? (result.code && result.name && result.code !== result.name
+            ? `${result.code} ${result.name}`
+            : result.code || result.name)
+        : (result._groupCode && result.resultType === 'property'
+            ? `${result._groupCode}.${result.name || result.code}`
+            : (result.name || result.code)),
+      description: isClassification ? (result.description || '') : (result.description || ''),
       uri: result.uri || '',
       category: result.category || ''
     };
@@ -1799,7 +2062,7 @@ const ERPanel = ({
       return { ...u, subInformationUnits: updateRecursive(u.subInformationUnits || []) };
     });
 
-    // ER-first mode: update only the buffer (selectedItem); committed on Save
+    // ER-first mode: update the buffer (selectedItem) then auto-commit to erHierarchy
     if (isErFirstMode && selectedItem?.id === mappingSearchUnitId) {
       setSelectedItem(prev => {
         if (isUpdating) {
@@ -1824,6 +2087,7 @@ const ERPanel = ({
           };
         }
       });
+      pendingMappingCommitRef.current = true;
     } else if (!isErFirstMode) {
       // Legacy mode
       onChange({ ...erData, informationUnits: updateRecursive(erData?.informationUnits || []) });
@@ -2283,7 +2547,7 @@ const ERPanel = ({
                 <div className="er-mapping-list">
                   {(unit.correspondingExternalElements || []).map(mapping => {
                     const schemaOption = SCHEMA_OPTIONS.find(s => s.value === mapping.basis);
-                    const isSearchable = schemaOption?.searchable && mapping.basis !== 'Other';
+                    const isSearchable = mapping.basis !== 'Other';
                     const isOther = mapping.basis === 'Other';
                     const isClassification = ['UniFormat', 'OmniClass', 'MasterFormat'].includes(mapping.basis);
 
@@ -2340,7 +2604,7 @@ const ERPanel = ({
                           <button
                             className="er-search-btn"
                             onClick={() => openMappingSearch(unit.id, mapping.basis, mapping.id, mapping.name || '')}
-                            title="Search schema"
+                            title={mapping.name ? "Change mapping" : "Search schema"}
                           >
                             <SearchIcon size={14} />
                           </button>
@@ -2922,7 +3186,7 @@ const ERPanel = ({
                       <div className="er-mapping-list">
                         {(selectedItem.data?.correspondingExternalElements || []).map(mapping => {
                           const schemaOption = SCHEMA_OPTIONS.find(s => s.value === mapping.basis);
-                          const isSearchable = schemaOption?.searchable && mapping.basis !== 'Other';
+                          const isSearchable = mapping.basis !== 'Other';
                           const isOther = mapping.basis === 'Other';
                           const isClassification = ['UniFormat', 'OmniClass', 'MasterFormat'].includes(mapping.basis);
 
@@ -3001,7 +3265,7 @@ const ERPanel = ({
                                 <button
                                   className="er-search-btn"
                                   onClick={() => openMappingSearch(selectedItem.id, mapping.basis, mapping.id, mapping.name || '')}
-                                  title="Search schema"
+                                  title={mapping.name ? "Change mapping" : "Search schema"}
                                 >
                                   <SearchIcon size={14} />
                                 </button>
@@ -3144,10 +3408,19 @@ const ERPanel = ({
                     >
                       {SCHEMA_OPTIONS.filter(opt => opt.searchable).map(opt => (
                         <option key={opt.value} value={opt.value}>
-                          {opt.label}{opt.apiEnabled ? ' (API)' : ''}
+                          {opt.label}{opt.value === 'bSDD' && bsddCacheInfo.state === 'ready' ? ' (cached)' : opt.apiEnabled ? ' (API)' : ''}
                         </option>
                       ))}
                     </select>
+                    {mappingSearchSchema === 'bSDD' && (
+                      <span className={`er-bsdd-cache-badge er-bsdd-cache-${bsddCacheInfo.state}`}>
+                        {bsddCacheInfo.state === 'loading' && (bsddCacheInfo.current > 0
+                          ? `Loading ${bsddCacheInfo.current}${bsddCacheInfo.total > 0 ? `/${bsddCacheInfo.total}` : ''}…`
+                          : (bsddCacheInfo.stage || 'Connecting…'))}
+                        {bsddCacheInfo.state === 'ready' && `✓ ${bsddCacheInfo.classCount} classes`}
+                        {bsddCacheInfo.state === 'error' && '⚠ using live API'}
+                      </span>
+                    )}
                   </div>
 
                   <div className="er-field er-field-inline">
@@ -3167,6 +3440,7 @@ const ERPanel = ({
                       </button>
                     </div>
                   </div>
+
                 </div>
 
                 <div className="er-search-input-row">
@@ -3186,6 +3460,13 @@ const ERPanel = ({
                   >
                     {mappingSearchLoading ? '...' : <><SearchIcon size={14} /> Search</>}
                   </button>
+                  {selectedSearchResult && (
+                    <span className="er-selection-hint">
+                      {selectedSearchResult._groupCode && selectedSearchResult.resultType !== 'class'
+                        ? `${selectedSearchResult._groupCode}.${selectedSearchResult.code || selectedSearchResult.name}`
+                        : (selectedSearchResult.code || selectedSearchResult.name)}
+                    </span>
+                  )}
                   <button
                     className="er-action-btn er-action-btn-primary"
                     onClick={handleApplySearchResult}
@@ -3197,13 +3478,29 @@ const ERPanel = ({
                 </div>
 
                 <div className="er-search-results">
-                  {mappingSearchLoading ? (
+                  {mappingSearchNote && !mappingSearchLoading && drilldownCountdown === null && (
+                    <div className="er-search-note">{mappingSearchNote}</div>
+                  )}
+                  {drilldownCountdown !== null ? (
+                    <div className="er-search-loading er-search-ratelimit-countdown">
+                      <span className="er-search-hourglass er-search-hourglass-spin">&#9203;</span>
+                      <span>bSDD rate limit reached. Retrying in <strong>{drilldownCountdown}s</strong>…</span>
+                      <button className="er-retry-btn" onClick={() => { const fn = rateLimitRetryFnRef.current; clearDrilldownRetry(); fn?.(); }}>Retry Now</button>
+                      <div className="er-search-ratelimit-note">Note: On first use, bSDD classes are downloaded and cached locally. Subsequent searches run instantly from the local cache.</div>
+                    </div>
+                  ) : mappingSearchLoading ? (
                     <div className="er-search-loading">
                       {mappingSearchSchema === 'bSDD' ? (
                         <>
                           <span className="er-search-hourglass">&#9203;</span>
-                          <span>Connecting to the bSDD server...</span>
-                          <span className="er-search-loading-hint">This may take a moment on the first search.</span>
+                          <span>
+                            {mappingSearchStep === 'properties'
+                              ? 'Loading class properties...'
+                              : 'Searching IFC classes...'}
+                          </span>
+                          {bsddCacheInfo.state !== 'ready' && (
+                            <span className="er-search-loading-hint">This may take a moment on the first search.</span>
+                          )}
                         </>
                       ) : (
                         <span>Searching...</span>
@@ -3212,8 +3509,11 @@ const ERPanel = ({
                   ) : mappingSearchError ? (
                     <div className="er-search-empty er-search-error">
                       <span>{mappingSearchError}</span>
+                      {mappingSearchRateLimited && (
+                        <button className="er-retry-btn" onClick={handleMappingSearch}>Try Again</button>
+                      )}
                     </div>
-                  ) : !Array.isArray(mappingSearchResults) || mappingSearchResults.length === 0 ? (
+                  ) : (mappingSearchGroups.length === 0 && (!Array.isArray(mappingSearchResults) || mappingSearchResults.length === 0)) ? (
                     <div className="er-search-empty">
                       {mappingSearchQuery.trim() ? (
                         <span>No results found. Try a different search term.</span>
@@ -3223,40 +3523,128 @@ const ERPanel = ({
                     </div>
                   ) : (
                     <div className="er-search-result-list">
-                      {mappingSearchResults.filter(r => r && r.name).map((result, idx) => {
-                        const isSelected = selectedSearchResult && (selectedSearchResult.code || selectedSearchResult.name) === (result.code || result.name) && idx === selectedSearchResult._idx;
-                        return (
-                        <div
-                          key={`${result.code || result.name}-${idx}`}
-                          className={`er-search-result-item ${isSelected ? 'er-search-result-selected' : ''}`}
-                          onClick={() => setSelectedSearchResult({ ...result, _idx: idx })}
-                          onDoubleClick={() => handleSelectMappingResult(result)}
-                        >
-                          <div className="er-search-result-header">
-                            <span className="er-search-result-name">{result.name}</span>
-                            {result.code && result.code !== result.name && (
-                              <span className="er-search-result-code">{result.code}</span>
-                            )}
-                            {result.score && result.matchType === 'semantic' && (
-                              <span className="er-search-result-score">
-                                {Math.round(result.score * 100)}%
-                              </span>
-                            )}
-                          </div>
-                          {isSelected && result.description ? (
-                            <p className="er-search-result-desc er-search-result-desc-expanded">{result.description}</p>
-                          ) : result.description ? (
-                            <p className="er-search-result-desc">{result.description}</p>
-                          ) : null}
-                          {isSelected && result.uri && (
-                            <span className="er-search-result-uri">{result.uri}</span>
+                      {mappingSearchGroups.length > 0 ? (
+                        mappingSearchGroups.map((group) => {
+                          const isExpanded = expandedGroups.has(group.classUri);
+                          const isClassSelected = selectedSearchResult?.resultType === 'class' && selectedSearchResult?.uri === group.classUri;
+                          return (
+                            <div key={group.classUri} className="er-search-group">
+                              <div className={`er-search-group-header ${isClassSelected ? 'er-search-result-selected' : ''}`}>
+                                <span
+                                  className="er-search-group-arrow"
+                                  onClick={(e) => { e.stopPropagation(); setExpandedGroups(prev => { const next = new Set(prev); if (next.has(group.classUri)) next.delete(group.classUri); else next.add(group.classUri); return next; }); }}
+                                >
+                                  {isExpanded ? '▼' : '▶'}
+                                </span>
+                                <span
+                                  className="er-search-group-name er-search-group-name-selectable"
+                                  onClick={() => setSelectedSearchResult({ name: group.classCode || group.className, code: group.classCode || '', description: '', category: 'bSDD (IFC 4.3)', uri: group.classUri, resultType: 'class', _groupUri: group.classUri, _groupCode: group.classCode || '' })}
+                                  onDoubleClick={() => handleSelectMappingResult({ name: group.classCode || group.className, code: group.classCode || '', description: '', category: 'bSDD (IFC 4.3)', uri: group.classUri, resultType: 'class', _groupCode: group.classCode || '' })}
+                                >
+                                  {group.classCode || group.className}
+                                  {group.classCode && group.classCode !== group.className && <span className="er-search-result-code">{group.className}</span>}
+                                </span>
+                                <span className="er-search-group-count">{group.properties.length} {group.properties.length === 1 ? 'property' : 'properties'}</span>
+                              </div>
+                              {isExpanded && group.properties.map((prop, propIdx) => {
+                                const isSelected = selectedSearchResult && selectedSearchResult.uri === prop.uri && selectedSearchResult._groupUri === group.classUri;
+                                return (
+                                  <div
+                                    key={`${group.classUri}-${prop.code || prop.name}-${propIdx}`}
+                                    className={`er-search-result-item er-search-result-child ${isSelected ? 'er-search-result-selected' : ''}`}
+                                    onClick={() => setSelectedSearchResult({ ...prop, _groupUri: group.classUri, _groupCode: group.classCode })}
+                                    onDoubleClick={() => handleSelectMappingResult({ ...prop, _groupCode: group.classCode })}
+                                  >
+                                    <div className="er-search-result-header">
+                                      <span className="er-search-result-name">{prop.name}</span>
+                                      {prop.code && prop.code !== prop.name && (
+                                        <span className="er-search-result-code">{prop.code}</span>
+                                      )}
+                                    </div>
+                                    {prop.description && (
+                                      <p className="er-search-result-desc">{prop.description}</p>
+                                    )}
+                                    {prop.category && (
+                                      <span className="er-search-result-category">{prop.category}</span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <>
+                          {mappingDrilldownClass && (
+                            <div className="er-drilldown-bar">
+                              <button className="er-drilldown-back" onClick={() => { setMappingDrilldownClass(null); setMappingDrilldownFilter(''); handleMappingSearch(); }}>← Back</button>
+                              <span className="er-drilldown-label">Properties of <strong>{mappingDrilldownClass.name}</strong></span>
+                              <input
+                                className="er-drilldown-filter"
+                                type="text"
+                                placeholder="Filter properties..."
+                                value={mappingDrilldownFilter}
+                                onChange={(e) => { setMappingDrilldownFilter(e.target.value); setSelectedSearchResult(null); }}
+                                autoFocus
+                              />
+                            </div>
                           )}
-                          {result.category && (
-                            <span className="er-search-result-category">{result.category}</span>
-                          )}
-                        </div>
-                        );
-                      })}
+                          {mappingSearchResults.filter(r => {
+                            if (!r || !r.name) return false;
+                            if (!mappingDrilldownFilter.trim()) return true;
+                            const f = mappingDrilldownFilter.toLowerCase();
+                            return r.name.toLowerCase().includes(f) || (r.code || '').toLowerCase().includes(f) || (r.description || '').toLowerCase().includes(f);
+                          }).map((result, idx) => {
+                            const isSelected = selectedSearchResult && (selectedSearchResult.code || selectedSearchResult.name) === (result.code || result.name) && idx === selectedSearchResult._idx;
+                            const isDrillable = (result.resultType === 'class' || result.resultType === 'propertySet') && result.uri && mappingSearchSchema === 'bSDD';
+                            return (
+                              <div
+                                key={`${result.code || result.name}-${idx}`}
+                                className={`er-search-result-item ${isSelected ? 'er-search-result-selected' : ''}`}
+                                onClick={() => setSelectedSearchResult({ ...result, _idx: idx, ...(mappingDrilldownClass ? { _groupCode: mappingDrilldownClass.name } : {}) })}
+                                onDoubleClick={() => handleSelectMappingResult(mappingDrilldownClass ? { ...result, _groupCode: mappingDrilldownClass.name } : result)}
+                              >
+                                <div className="er-search-result-header">
+                                  <span className="er-search-result-name">{result.name}</span>
+                                  {result.code && result.code !== result.name && (
+                                    <span className="er-search-result-code">{result.code}</span>
+                                  )}
+                                  {mappingSearchSchema === 'bSDD' && result.resultType && (
+                                    <span className={`er-result-type-badge er-result-type-${result.resultType}`}>
+                                      {result.resultType === 'class' ? 'Entity' : result.resultType === 'propertySet' ? 'Property Set' : 'Property'}
+                                    </span>
+                                  )}
+                                  {result.score && result.matchType === 'semantic' && (
+                                    <span className="er-search-result-score">
+                                      {Math.round(result.score * 100)}%
+                                    </span>
+                                  )}
+                                </div>
+                                {isSelected && result.description ? (
+                                  <p className="er-search-result-desc er-search-result-desc-expanded">{result.description}</p>
+                                ) : result.description ? (
+                                  <p className="er-search-result-desc">{result.description}</p>
+                                ) : null}
+                                {isSelected && result.uri && (
+                                  <span className="er-search-result-uri">{result.uri}</span>
+                                )}
+                                {result.category && (
+                                  <span className="er-search-result-category">{result.category}</span>
+                                )}
+                                {isSelected && isDrillable && (
+                                  <button
+                                    className="er-drilldown-btn"
+                                    onClick={(e) => { e.stopPropagation(); drillIntoClassProperties(result); }}
+                                    title={result.resultType === 'propertySet' ? 'Browse properties in this property set' : 'Browse properties of this entity'}
+                                  >
+                                    Browse properties →
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
@@ -3489,10 +3877,19 @@ const ERPanel = ({
                   >
                     {SCHEMA_OPTIONS.filter(opt => opt.searchable).map(opt => (
                       <option key={opt.value} value={opt.value}>
-                        {opt.label}{opt.apiEnabled ? ' (API)' : ''}
+                        {opt.label}{opt.value === 'bSDD' && bsddCacheInfo.state === 'ready' ? ' (cached)' : opt.apiEnabled ? ' (API)' : ''}
                       </option>
                     ))}
                   </select>
+                  {mappingSearchSchema === 'bSDD' && (
+                    <span className={`er-bsdd-cache-badge er-bsdd-cache-${bsddCacheInfo.state}`}>
+                      {bsddCacheInfo.state === 'loading' && (bsddCacheInfo.current > 0
+                        ? `Loading ${bsddCacheInfo.current}${bsddCacheInfo.total > 0 ? `/${bsddCacheInfo.total}` : ''}…`
+                        : (bsddCacheInfo.stage || 'Connecting…'))}
+                      {bsddCacheInfo.state === 'ready' && `✓ ${bsddCacheInfo.classCount} classes`}
+                      {bsddCacheInfo.state === 'error' && '⚠ using live API'}
+                    </span>
+                  )}
                 </div>
 
                 <div className="er-field er-field-inline">
@@ -3512,6 +3909,7 @@ const ERPanel = ({
                     </button>
                   </div>
                 </div>
+
               </div>
 
               <div className="er-search-input-row">
@@ -3531,6 +3929,13 @@ const ERPanel = ({
                 >
                   {mappingSearchLoading ? '...' : <><SearchIcon size={14} /> Search</>}
                 </button>
+                {selectedSearchResult && (
+                  <span className="er-selection-hint">
+                    {selectedSearchResult._groupCode && selectedSearchResult.resultType !== 'class'
+                      ? `${selectedSearchResult._groupCode}.${selectedSearchResult.code || selectedSearchResult.name}`
+                      : (selectedSearchResult.code || selectedSearchResult.name)}
+                  </span>
+                )}
                 <button
                   className="er-action-btn er-action-btn-primary"
                   onClick={handleApplySearchResult}
@@ -3542,13 +3947,26 @@ const ERPanel = ({
               </div>
 
               <div className="er-search-results">
-                {mappingSearchLoading ? (
+                {drilldownCountdown !== null ? (
+                  <div className="er-search-loading er-search-ratelimit-countdown">
+                    <span className="er-search-hourglass er-search-hourglass-spin">&#9203;</span>
+                    <span>bSDD rate limit reached. Retrying in <strong>{drilldownCountdown}s</strong>…</span>
+                    <button className="er-retry-btn" onClick={() => { const fn = rateLimitRetryFnRef.current; clearDrilldownRetry(); fn?.(); }}>Retry Now</button>
+                    <div className="er-search-ratelimit-note">Note: On first use, bSDD classes are downloaded and cached locally. Subsequent searches run instantly from the local cache.</div>
+                  </div>
+                ) : mappingSearchLoading ? (
                   <div className="er-search-loading">
                     {mappingSearchSchema === 'bSDD' ? (
                       <>
                         <span className="er-search-hourglass">&#9203;</span>
-                        <span>Connecting to the bSDD server...</span>
-                        <span className="er-search-loading-hint">This may take a moment on the first search.</span>
+                        <span>
+                          {mappingSearchStep === 'properties'
+                            ? 'Loading class properties...'
+                            : 'Searching IFC classes...'}
+                        </span>
+                        {bsddCacheInfo.state !== 'ready' && (
+                          <span className="er-search-loading-hint">This may take a moment on the first search.</span>
+                        )}
                       </>
                     ) : (
                       <span>Searching...</span>
@@ -3557,8 +3975,11 @@ const ERPanel = ({
                 ) : mappingSearchError ? (
                   <div className="er-search-empty er-search-error">
                     <span>{mappingSearchError}</span>
+                    {mappingSearchRateLimited && (
+                      <button className="er-retry-btn" onClick={handleMappingSearch}>Try Again</button>
+                    )}
                   </div>
-                ) : !Array.isArray(mappingSearchResults) || mappingSearchResults.length === 0 ? (
+                ) : (mappingSearchGroups.length === 0 && (!Array.isArray(mappingSearchResults) || mappingSearchResults.length === 0)) ? (
                   <div className="er-search-empty">
                     {mappingSearchQuery.trim() ? (
                       <span>No results found. Try a different search term.</span>
@@ -3568,40 +3989,128 @@ const ERPanel = ({
                   </div>
                 ) : (
                   <div className="er-search-result-list">
-                    {mappingSearchResults.filter(r => r && r.name).map((result, idx) => {
-                      const isSelected = selectedSearchResult && (selectedSearchResult.code || selectedSearchResult.name) === (result.code || result.name) && idx === selectedSearchResult._idx;
-                      return (
-                      <div
-                        key={`${result.code || result.name}-${idx}`}
-                        className={`er-search-result-item ${isSelected ? 'er-search-result-selected' : ''}`}
-                        onClick={() => setSelectedSearchResult({ ...result, _idx: idx })}
-                        onDoubleClick={() => handleSelectMappingResult(result)}
-                      >
-                        <div className="er-search-result-header">
-                          <span className="er-search-result-name">{result.name}</span>
-                          {result.code && result.code !== result.name && (
-                            <span className="er-search-result-code">{result.code}</span>
-                          )}
-                          {result.score && result.matchType === 'semantic' && (
-                            <span className="er-search-result-score">
-                              {Math.round(result.score * 100)}%
-                            </span>
-                          )}
-                        </div>
-                        {isSelected && result.description ? (
-                          <p className="er-search-result-desc er-search-result-desc-expanded">{result.description}</p>
-                        ) : result.description ? (
-                          <p className="er-search-result-desc">{result.description}</p>
-                        ) : null}
-                        {isSelected && result.uri && (
-                          <span className="er-search-result-uri">{result.uri}</span>
+                    {mappingSearchGroups.length > 0 ? (
+                      mappingSearchGroups.map((group) => {
+                        const isExpanded = expandedGroups.has(group.classUri);
+                        const isClassSelected = selectedSearchResult?.resultType === 'class' && selectedSearchResult?.uri === group.classUri;
+                        return (
+                          <div key={group.classUri} className="er-search-group">
+                            <div className={`er-search-group-header ${isClassSelected ? 'er-search-result-selected' : ''}`}>
+                              <span
+                                className="er-search-group-arrow"
+                                onClick={(e) => { e.stopPropagation(); setExpandedGroups(prev => { const next = new Set(prev); if (next.has(group.classUri)) next.delete(group.classUri); else next.add(group.classUri); return next; }); }}
+                              >
+                                {isExpanded ? '▼' : '▶'}
+                              </span>
+                              <span
+                                className="er-search-group-name er-search-group-name-selectable"
+                                onClick={() => setSelectedSearchResult({ name: group.classCode || group.className, code: group.classCode || '', description: '', category: 'bSDD (IFC 4.3)', uri: group.classUri, resultType: 'class', _groupUri: group.classUri, _groupCode: group.classCode || '' })}
+                                onDoubleClick={() => handleSelectMappingResult({ name: group.classCode || group.className, code: group.classCode || '', description: '', category: 'bSDD (IFC 4.3)', uri: group.classUri, resultType: 'class', _groupCode: group.classCode || '' })}
+                              >
+                                {group.classCode || group.className}
+                                {group.classCode && group.classCode !== group.className && <span className="er-search-result-code">{group.className}</span>}
+                              </span>
+                              <span className="er-search-group-count">{group.properties.length} {group.properties.length === 1 ? 'property' : 'properties'}</span>
+                            </div>
+                            {isExpanded && group.properties.map((prop, propIdx) => {
+                              const isSelected = selectedSearchResult && selectedSearchResult.uri === prop.uri && selectedSearchResult._groupUri === group.classUri;
+                              return (
+                                <div
+                                  key={`${group.classUri}-${prop.code || prop.name}-${propIdx}`}
+                                  className={`er-search-result-item er-search-result-child ${isSelected ? 'er-search-result-selected' : ''}`}
+                                  onClick={() => setSelectedSearchResult({ ...prop, _groupUri: group.classUri, _groupCode: group.classCode })}
+                                  onDoubleClick={() => handleSelectMappingResult({ ...prop, _groupCode: group.classCode })}
+                                >
+                                  <div className="er-search-result-header">
+                                    <span className="er-search-result-name">{prop.name}</span>
+                                    {prop.code && prop.code !== prop.name && (
+                                      <span className="er-search-result-code">{prop.code}</span>
+                                    )}
+                                  </div>
+                                  {prop.description && (
+                                    <p className="er-search-result-desc">{prop.description}</p>
+                                  )}
+                                  {prop.category && (
+                                    <span className="er-search-result-category">{prop.category}</span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <>
+                        {mappingDrilldownClass && (
+                          <div className="er-drilldown-bar">
+                            <button className="er-drilldown-back" onClick={() => { setMappingDrilldownClass(null); setMappingDrilldownFilter(''); handleMappingSearch(); }}>← Back</button>
+                            <span className="er-drilldown-label">Properties of <strong>{mappingDrilldownClass.name}</strong></span>
+                            <input
+                              className="er-drilldown-filter"
+                              type="text"
+                              placeholder="Filter properties..."
+                              value={mappingDrilldownFilter}
+                              onChange={(e) => { setMappingDrilldownFilter(e.target.value); setSelectedSearchResult(null); }}
+                              autoFocus
+                            />
+                          </div>
                         )}
-                        {result.category && (
-                          <span className="er-search-result-category">{result.category}</span>
-                        )}
-                      </div>
-                      );
-                    })}
+                        {mappingSearchResults.filter(r => {
+                          if (!r || !r.name) return false;
+                          if (!mappingDrilldownFilter.trim()) return true;
+                          const f = mappingDrilldownFilter.toLowerCase();
+                          return r.name.toLowerCase().includes(f) || (r.code || '').toLowerCase().includes(f) || (r.description || '').toLowerCase().includes(f);
+                        }).map((result, idx) => {
+                          const isSelected = selectedSearchResult && (selectedSearchResult.code || selectedSearchResult.name) === (result.code || result.name) && idx === selectedSearchResult._idx;
+                          const isDrillable = (result.resultType === 'class' || result.resultType === 'propertySet') && result.uri && mappingSearchSchema === 'bSDD';
+                          return (
+                            <div
+                              key={`${result.code || result.name}-${idx}`}
+                              className={`er-search-result-item ${isSelected ? 'er-search-result-selected' : ''}`}
+                              onClick={() => setSelectedSearchResult({ ...result, _idx: idx, ...(mappingDrilldownClass ? { _groupCode: mappingDrilldownClass.name } : {}) })}
+                              onDoubleClick={() => handleSelectMappingResult(mappingDrilldownClass ? { ...result, _groupCode: mappingDrilldownClass.name } : result)}
+                            >
+                              <div className="er-search-result-header">
+                                <span className="er-search-result-name">{result.name}</span>
+                                {result.code && result.code !== result.name && (
+                                  <span className="er-search-result-code">{result.code}</span>
+                                )}
+                                {mappingSearchSchema === 'bSDD' && result.resultType && (
+                                  <span className={`er-result-type-badge er-result-type-${result.resultType}`}>
+                                    {result.resultType === 'class' ? 'Entity' : result.resultType === 'propertySet' ? 'Property Set' : 'Property'}
+                                  </span>
+                                )}
+                                {result.score && result.matchType === 'semantic' && (
+                                  <span className="er-search-result-score">
+                                    {Math.round(result.score * 100)}%
+                                  </span>
+                                )}
+                              </div>
+                              {isSelected && result.description ? (
+                                <p className="er-search-result-desc er-search-result-desc-expanded">{result.description}</p>
+                              ) : result.description ? (
+                                <p className="er-search-result-desc">{result.description}</p>
+                              ) : null}
+                              {isSelected && result.uri && (
+                                <span className="er-search-result-uri">{result.uri}</span>
+                              )}
+                              {result.category && (
+                                <span className="er-search-result-category">{result.category}</span>
+                              )}
+                              {isSelected && isDrillable && (
+                                <button
+                                  className="er-drilldown-btn"
+                                  onClick={(e) => { e.stopPropagation(); drillIntoClassProperties(result); }}
+                                  title={result.resultType === 'propertySet' ? 'Browse properties in this property set' : 'Browse properties of this entity'}
+                                >
+                                  Browse properties →
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </>
+                    )}
                   </div>
                 )}
               </div>

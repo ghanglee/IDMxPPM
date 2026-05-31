@@ -15,27 +15,31 @@ import {
  */
 const DataObjectERSelectModal = ({
   isOpen,
-  dataObject,          // The new data object being created
-  erHierarchy = [],    // Full ER hierarchy
-  queueLength = 0,     // Number of data objects remaining in queue (for batch processing)
-  onSelectExistingER,  // Called when user selects existing ER
-  onCreateNewER,       // Called when user creates new ER
-  onClose              // Called when modal is closed/cancelled
+  dataObject,              // The data object being assigned
+  currentErId = null,      // ID of the already-linked ER (if changing an existing link)
+  erHierarchy = [],        // Full ER hierarchy
+  queueLength = 0,         // Number of data objects remaining in queue (for batch processing)
+  existingErNames = null,  // Set of existing ER names for duplicate validation
+  onSelectExistingER,      // Called when user selects existing ER
+  onCreateNewER,           // Called when user creates new ER
+  onClose                  // Called when modal is closed/cancelled
 }) => {
   const [mode, setMode] = useState('select'); // 'select' or 'create'
   const [selectedErId, setSelectedErId] = useState(null);
   const [newErName, setNewErName] = useState(dataObject?.name || '');
   const [expandedNodes, setExpandedNodes] = useState(new Set());
 
-  // Reset form state when data object changes (for processing multiple unassociated data objects)
+  const isChangingLink = Boolean(currentErId);
+
+  // Reset form state when data object changes
   useEffect(() => {
     if (dataObject) {
       setNewErName(dataObject.name || '');
-      setSelectedErId(null);
-      // If no existing ERs, switch to create mode
+      // Pre-select the currently linked ER when changing an existing link
+      setSelectedErId(currentErId || null);
       setMode(erHierarchy.length > 0 ? 'select' : 'create');
     }
-  }, [dataObject, erHierarchy.length]);
+  }, [dataObject, currentErId, erHierarchy.length]);
 
   // Flatten ER hierarchy for tree display
   const flattenHierarchy = useMemo(() => {
@@ -94,7 +98,10 @@ const DataObjectERSelectModal = ({
     }
   };
 
-  const canConfirm = (mode === 'select' && selectedErId) || (mode === 'create' && newErName.trim());
+  const isDuplicateName = mode === 'create' && newErName.trim() &&
+    existingErNames instanceof Set && existingErNames.has(newErName.trim());
+
+  const canConfirm = (mode === 'select' && selectedErId) || (mode === 'create' && newErName.trim() && !isDuplicateName);
 
   if (!isOpen) return null;
 
@@ -103,7 +110,7 @@ const DataObjectERSelectModal = ({
       <div className="do-er-modal" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="do-er-modal-header">
-          <h2>Assign Exchange Requirement</h2>
+          <h2>{isChangingLink ? 'Change Associated ER' : 'Assign Exchange Requirement'}</h2>
           {queueLength > 1 && (
             <span className="do-er-queue-badge">{queueLength} remaining</span>
           )}
@@ -190,10 +197,16 @@ const DataObjectERSelectModal = ({
                   type="text"
                   value={newErName}
                   onChange={(e) => setNewErName(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && newErName.trim() && handleConfirm()}
+                  onKeyDown={(e) => e.key === 'Enter' && newErName.trim() && !isDuplicateName && handleConfirm()}
                   placeholder="Enter Exchange Requirement name..."
+                  className={isDuplicateName ? 'do-er-input-error' : ''}
                   autoFocus
                 />
+                {isDuplicateName && (
+                  <span className="do-er-error-msg">
+                    An ER with this name already exists. Please use a different name.
+                  </span>
+                )}
               </div>
               <p className="do-er-hint">
                 A new Exchange Requirement will be created and the Data Object will be linked to it.

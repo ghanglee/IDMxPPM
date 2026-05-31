@@ -278,7 +278,7 @@ const ServerConnectionModal = ({
               </div>
 
               <p className="server-description">
-                Connect to an IDMxPPM server to browse and manage IDM specifications from a central database.
+                Connect to an xPPM server to browse and manage IDM specifications from a central database.
               </p>
 
               <div className="server-field">

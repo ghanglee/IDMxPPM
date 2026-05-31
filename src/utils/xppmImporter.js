@@ -1,5 +1,5 @@
 /**
- * xPPM Importer - Import legacy xPPM files into IDMxPPM neo-Seoul
+ * xPPM Importer - Import legacy xPPM files into xPPM neo-Seoul
  *
  * xPPM is a previous version of the IDM authoring tool.
  * This importer converts xPPM format (.xppm) to the neo-Seoul format.

@@ -1,5 +1,5 @@
 /**
- * API Client for IDMxPPM Server
+ * API Client for xPPM Server
  * Handles all communication with the central database server
  */
 

@@ -154,15 +154,15 @@ const VerticalMenuBar = ({
         </button>
       </div>
 
-      {/* Footer - IDMxPPM branding */}
+      {/* Footer - xPPM branding */}
       <div className="vertical-menu-footer">
         <button
           className="idmxppm-link"
           onClick={onAbout}
-          title="IDMxPPM is powered by BIG Yonsei (Building Informatics Group at Yonsei University, Seoul, Korea)."
+          title="xPPM neo-Seoul is powered by BIG Yonsei (Building Informatics Group at Yonsei University, Seoul, Korea)."
         >
-          <span>IDM</span>
-          <span>xPPM</span>
+          <span>x</span>
+          <span>PPM</span>
         </button>
       </div>
     </div>

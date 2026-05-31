@@ -705,6 +705,29 @@ const UseEntry = ({ uses = [], useClassification = null, onChange, onClassificat
     <div className="use-entry">
       <label>(Information) Use <span className="required">*</span></label>
 
+      {/* Selected uses — shown first for visibility */}
+      {uses.length > 0 ? (
+        <div className="use-list">
+          {uses.map((use, index) => (
+            <div key={index} className={`use-tag ${use.classificationId === 'user-defined' ? 'custom' : 'from-classification'}`}>
+              <span className="use-name-text">{use.name || `${use.verb} ${use.noun}`}</span>
+              {use.classificationName && use.classificationName !== 'User-defined' && (
+                <span className="use-classification-badge">{use.classificationName}</span>
+              )}
+              <button
+                type="button"
+                className="use-remove"
+                onClick={() => handleRemove(index)}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="pane-hint" style={{ marginTop: '4px' }}>No uses added yet. Select one from the dropdown below.</div>
+      )}
+
       {/* Classification type selector */}
       <div className="use-classification-row">
         <span className="use-classification-label">Use Classification:</span>
@@ -802,27 +825,6 @@ const UseEntry = ({ uses = [], useClassification = null, onChange, onClassificat
           >
             <AddIcon size={12} />
           </button>
-        </div>
-      )}
-
-      {/* List of added uses */}
-      {uses.length > 0 && (
-        <div className="use-list">
-          {uses.map((use, index) => (
-            <div key={index} className={`use-tag ${use.classificationId === 'user-defined' ? 'custom' : 'from-classification'}`}>
-              <span className="use-name-text">{use.name || `${use.verb} ${use.noun}`}</span>
-              {use.classificationName && use.classificationName !== 'User-defined' && (
-                <span className="use-classification-badge">{use.classificationName}</span>
-              )}
-              <button
-                type="button"
-                className="use-remove"
-                onClick={() => handleRemove(index)}
-              >
-                ×
-              </button>
-            </div>
-          ))}
         </div>
       )}
     </div>
@@ -952,6 +954,26 @@ const RegionSelector = ({ regions = [], options = [], onChange, label }) => {
   return (
     <div className="region-selector">
       <label>{label}</label>
+      {/* Selected regions — shown first for visibility */}
+      {regions.length > 0 ? (
+        <div className="region-tags">
+          {regions.map(region => (
+            <div key={region} className="region-tag">
+              <span>{getRegionLabel(region)}</span>
+              <button
+                type="button"
+                className="region-tag-remove"
+                onClick={() => handleRemoveRegion(region)}
+                title="Remove"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="pane-hint" style={{ marginTop: '4px' }}>No regions selected. Add at least one target region.</div>
+      )}
       <div className="region-selector-input">
         <select
           value=""
@@ -969,26 +991,6 @@ const RegionSelector = ({ regions = [], options = [], onChange, label }) => {
           ))}
         </select>
       </div>
-      {regions.length > 0 && (
-        <div className="region-tags">
-          {regions.map(region => (
-            <div key={region} className="region-tag">
-              <span>{getRegionLabel(region)}</span>
-              <button
-                type="button"
-                className="region-tag-remove"
-                onClick={() => handleRemoveRegion(region)}
-                title="Remove"
-              >
-                ×
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-      {regions.length === 0 && (
-        <div className="pane-hint" style={{ marginTop: '4px' }}>No regions selected. Add at least one target region.</div>
-      )}
     </div>
   );
 };

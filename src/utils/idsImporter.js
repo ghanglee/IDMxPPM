@@ -23,6 +23,13 @@ const IFC_DATA_TYPE_MAP = {
   'ifcplaneanglemeasure': 'Numeric',
   'ifcforcemeasure': 'Numeric',
   'ifcpressuremeasure': 'Numeric',
+  'ifclinearvelocitymeasure': 'Numeric',
+  'ifctimemeasure': 'Numeric',
+  'ifcaccelerationmeasure': 'Numeric',
+  'ifcmassdensitymeasure': 'Numeric',
+  'ifcpowermeasure': 'Numeric',
+  'ifctemperaturemeasure': 'Numeric',
+  'ifcthermodynamictemperaturemeasure': 'Numeric',
   'ifcboolean': 'Boolean',
   'ifclogical': 'Boolean',
   'ifcdatetime': 'Date/Time',
@@ -47,9 +54,6 @@ function generateUUID() {
   });
 }
 
-/**
- * Get text content of first child element with given localName
- */
 function normalizeWS(str) {
   return str ? str.replace(/[\r\n\t]+/g, ' ').replace(/ {2,}/g, ' ').trim() : '';
 }
@@ -64,9 +68,6 @@ function getChildText(parent, tagName) {
   return '';
 }
 
-/**
- * Get first child element with given localName
- */
 function getChild(parent, tagName) {
   if (!parent) return null;
   for (const child of parent.childNodes) {
@@ -77,9 +78,6 @@ function getChild(parent, tagName) {
   return null;
 }
 
-/**
- * Get all child elements with given localName
- */
 function getChildren(parent, tagName) {
   if (!parent) return [];
   const result = [];
@@ -98,40 +96,34 @@ function getChildren(parent, tagName) {
 function extractValue(valueEl) {
   if (!valueEl) return null;
 
-  // Simple value: <ids:simpleValue>...</ids:simpleValue>
   const simpleVal = getChildText(valueEl, 'simpleValue');
   if (simpleVal) {
     return { type: 'simple', value: simpleVal, description: '' };
   }
 
-  // xs:restriction patterns
   const restrictionEl = getChild(valueEl, 'restriction');
   if (restrictionEl) {
     const base = restrictionEl.getAttribute('base') || '';
     const parts = [];
     let description = '';
 
-    // xs:annotation > xs:documentation
     const annotationEl = getChild(restrictionEl, 'annotation');
     if (annotationEl) {
       description = getChildText(annotationEl, 'documentation') || '';
     }
 
-    // xs:pattern
     const patternEl = getChild(restrictionEl, 'pattern');
     if (patternEl) {
       const patternValue = patternEl.getAttribute('value') || '';
       return { type: 'pattern', value: `Pattern: ${patternValue}`, description };
     }
 
-    // xs:enumeration
     const enumerations = getChildren(restrictionEl, 'enumeration');
     if (enumerations.length > 0) {
       const values = enumerations.map(e => e.getAttribute('value') || '').filter(Boolean);
       return { type: 'enumeration', value: values.join(', '), description };
     }
 
-    // xs:minExclusive, xs:maxExclusive, xs:minInclusive, xs:maxInclusive
     const minExcl = getChild(restrictionEl, 'minExclusive');
     const maxExcl = getChild(restrictionEl, 'maxExclusive');
     const minIncl = getChild(restrictionEl, 'minInclusive');
@@ -141,7 +133,7 @@ function extractValue(valueEl) {
       if (minIncl) parts.push(`>= ${minIncl.getAttribute('value')}`);
       if (maxExcl) parts.push(`< ${maxExcl.getAttribute('value')}`);
       if (maxIncl) parts.push(`<= ${maxIncl.getAttribute('value')}`);
-      return { type: 'range', value: parts.join(' and '), description };
+      return { type: 'range', value: parts.join(' and '), base, description };
     }
 
     return { type: 'restriction', value: `Restriction (base: ${base})`, description };
@@ -150,23 +142,15 @@ function extractValue(valueEl) {
   return null;
 }
 
-/**
- * Map IFC data type string to IDM data type
- */
 function mapDataType(ifcDataType) {
   if (!ifcDataType) return 'String';
   const lower = ifcDataType.toLowerCase().trim();
   return IFC_DATA_TYPE_MAP[lower] || 'String';
 }
 
-/**
- * Map IFC version string to IDM external element basis
- */
 function mapIfcVersion(ifcVersion) {
   if (!ifcVersion) return 'IFC 4x3 ADD2';
-  // IDS can have multiple versions like "IFC2X3 IFC4"
   const versions = ifcVersion.trim().split(/\s+/);
-  // Use the latest/highest version
   for (const v of versions.reverse()) {
     if (IFC_VERSION_MAP[v]) return IFC_VERSION_MAP[v];
   }
@@ -178,12 +162,10 @@ function mapIfcVersion(ifcVersion) {
  */
 function normalizeEntityName(name) {
   if (!name) return '';
-  // Handle regex patterns like "IFCWALL|IFCWALLSTANDARDCASE"
   if (name.includes('|') || name.includes('.*') || name.includes('[')) {
-    return name; // Keep patterns as-is
+    return name;
   }
   if (name.startsWith('IFC') || name.startsWith('ifc')) {
-    // IFCWALL → IfcWall, IFCDOOR → IfcDoor
     return 'Ifc' + name.substring(3).toLowerCase().replace(/(?:^|\s)\S/g, (a) => a.toUpperCase())
       .replace(/standardcase/i, 'StandardCase')
       .replace(/elementassembly/i, 'ElementAssembly');
@@ -198,7 +180,6 @@ export function parseIdsXml(content) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(content, 'text/xml');
 
-  // Check for parse errors
   const parseError = doc.querySelector('parsererror');
   if (parseError) {
     throw new Error('Invalid XML: ' + parseError.textContent);
@@ -206,16 +187,16 @@ export function parseIdsXml(content) {
 
   const root = doc.documentElement;
 
-  // Parse info section
+  // Parse info section — including version (I-1) and copyright (I-2)
   const infoEl = getChild(root, 'info');
   const title = getChildText(infoEl, 'title') || 'IDS Import';
   const description = getChildText(infoEl, 'description') || '';
   const copyright = getChildText(infoEl, 'copyright') || '';
+  const version = getChildText(infoEl, 'version') || '';
   const date = getChildText(infoEl, 'date') || '';
   const milestone = getChildText(infoEl, 'milestone') || '';
   const author = getChildText(infoEl, 'author') || '';
 
-  // Parse specifications
   const specificationsEl = getChild(root, 'specifications');
   const specifications = specificationsEl ? getChildren(specificationsEl, 'specification') : [];
 
@@ -228,14 +209,16 @@ export function parseIdsXml(content) {
     const ifcVersion = specEl.getAttribute('ifcVersion') || '';
     const basis = mapIfcVersion(ifcVersion);
 
-    // Parse applicability to get entity type
     const applicabilityEl = getChild(specEl, 'applicability');
     let entityName = '';
-    let entityDescription = '';
+    let entityNames = [];           // all entity names from multi-entity restriction (I-4)
+    let applicabilityPredefinedType = ''; // stored structurally for faithful re-export (I-6)
     const applicabilityDetails = [];
+    let minOccurs = 0;
 
     if (applicabilityEl) {
-      // Entity
+      minOccurs = parseInt(applicabilityEl.getAttribute('minOccurs') || '0', 10);
+
       const entityEl = getChild(applicabilityEl, 'entity');
       if (entityEl) {
         const nameEl = getChild(entityEl, 'name');
@@ -243,23 +226,45 @@ export function parseIdsXml(content) {
           const simpleVal = getChildText(nameEl, 'simpleValue');
           if (simpleVal) {
             entityName = normalizeEntityName(simpleVal);
+            entityNames = [entityName];
           } else {
-            // May be a restriction (pattern)
+            // Handle restriction — pattern or multi-entity enumeration (I-4)
             const restrictionEl = getChild(nameEl, 'restriction');
             if (restrictionEl) {
               const patternEl = getChild(restrictionEl, 'pattern');
               if (patternEl) {
                 entityName = patternEl.getAttribute('value') || 'Multiple Entities';
+                entityNames = [entityName];
+              } else {
+                const enumEls = getChildren(restrictionEl, 'enumeration');
+                if (enumEls.length > 0) {
+                  entityNames = enumEls
+                    .map(e => normalizeEntityName(e.getAttribute('value') || ''))
+                    .filter(Boolean);
+                  entityName = entityNames[0] || '';
+                }
               }
             }
           }
         }
-        // Predefined type
+
+        // PredefinedType — store as structured string for round-trip (I-6)
         const predefinedTypeEl = getChild(entityEl, 'predefinedType');
         if (predefinedTypeEl) {
-          const ptVal = getChildText(predefinedTypeEl, 'simpleValue');
-          if (ptVal) {
-            applicabilityDetails.push(`PredefinedType: ${ptVal}`);
+          const ptSimple = getChildText(predefinedTypeEl, 'simpleValue');
+          if (ptSimple) {
+            applicabilityPredefinedType = ptSimple;
+            applicabilityDetails.push(`PredefinedType: ${ptSimple}`);
+          } else {
+            const ptRestr = getChild(predefinedTypeEl, 'restriction');
+            if (ptRestr) {
+              const ptEnums = getChildren(ptRestr, 'enumeration');
+              if (ptEnums.length > 0) {
+                const ptValues = ptEnums.map(e => e.getAttribute('value') || '').filter(Boolean);
+                applicabilityPredefinedType = ptValues.join(',');
+                applicabilityDetails.push(`PredefinedType: ${ptValues.join(', ')}`);
+              }
+            }
           }
         }
       }
@@ -296,10 +301,14 @@ export function parseIdsXml(content) {
       }
     }
 
-    // Build description for the parent IU
+    // Build human-readable description
     const descParts = [];
     if (specDesc) descParts.push(specDesc);
-    if (entityName) descParts.push(`Applies to: ${entityName}`);
+    if (entityNames.length > 1) {
+      descParts.push(`Applies to: ${entityNames.join(', ')}`);
+    } else if (entityName) {
+      descParts.push(`Applies to: ${entityName}`);
+    }
     if (ifcVersion) descParts.push(`IFC Version: ${ifcVersion}`);
     if (applicabilityDetails.length > 0) {
       descParts.push('Applicability: ' + applicabilityDetails.join('; '));
@@ -310,63 +319,42 @@ export function parseIdsXml(content) {
     const subInformationUnits = [];
 
     if (requirementsEl) {
-      // Property requirements → sub-IUs
       const propertyEls = getChildren(requirementsEl, 'property');
       for (const propEl of propertyEls) {
         const iu = parsePropertyRequirement(propEl, entityName, basis);
-        if (iu) {
-          subInformationUnits.push(iu);
-          totalIUs++;
-        }
+        if (iu) { subInformationUnits.push(iu); totalIUs++; }
       }
 
-      // Attribute requirements → sub-IUs
       const attributeEls = getChildren(requirementsEl, 'attribute');
       for (const attrEl of attributeEls) {
         const iu = parseAttributeRequirement(attrEl, entityName, basis);
-        if (iu) {
-          subInformationUnits.push(iu);
-          totalIUs++;
-        }
+        if (iu) { subInformationUnits.push(iu); totalIUs++; }
       }
 
-      // Classification requirements → sub-IUs
       const classificationEls = getChildren(requirementsEl, 'classification');
       for (const classEl of classificationEls) {
         const iu = parseClassificationRequirement(classEl, entityName, basis);
-        if (iu) {
-          subInformationUnits.push(iu);
-          totalIUs++;
-        }
+        if (iu) { subInformationUnits.push(iu); totalIUs++; }
       }
 
-      // Material requirements → sub-IUs
       const materialEls = getChildren(requirementsEl, 'material');
       for (const matEl of materialEls) {
         const iu = parseMaterialRequirement(matEl, entityName, basis);
-        if (iu) {
-          subInformationUnits.push(iu);
-          totalIUs++;
-        }
+        if (iu) { subInformationUnits.push(iu); totalIUs++; }
       }
 
-      // PartOf requirements → sub-IUs
       const partOfEls = getChildren(requirementsEl, 'partOf');
       for (const partOfEl of partOfEls) {
         const iu = parsePartOfRequirement(partOfEl, entityName, basis);
-        if (iu) {
-          subInformationUnits.push(iu);
-          totalIUs++;
-        }
+        if (iu) { subInformationUnits.push(iu); totalIUs++; }
       }
     }
 
-    // Create a parent IU with dataType "Structured" for each IDS specification
     rootInformationUnits.push({
       id: generateUUID(),
       name: specName || entityName,
       dataType: 'Structured',
-      isMandatory: true,
+      isMandatory: minOccurs > 0,
       definition: descParts.join('\n'),
       examples: '',
       constraints: '',
@@ -376,6 +364,12 @@ export function parseIdsXml(content) {
         name: entityName,
         description: '',
       }] : [],
+      // Structured applicability data preserved for faithful IDS re-export
+      _idsApplicability: {
+        entities: entityNames,
+        predefinedType: applicabilityPredefinedType,
+        minOccurs,
+      },
       subInformationUnits,
     });
   }
@@ -389,17 +383,18 @@ export function parseIdsXml(content) {
     subERs: [],
   };
 
-  // Build header data
+  // Build header data — preserve version (I-1) and copyright (I-2)
   const headerData = {
     title: title || description || '',
     fullTitle: title || description || '',
     shortTitle: title || description || '',
     status: 'WD',
-    version: '1.0',
+    version: version || '1.0',
     idmGuid: generateUUID(),
     ucGuid: generateUUID(),
     bcmGuid: generateUUID(),
-    copyright: '',
+    copyright: copyright || '',
+    idsDescription: description || '',
     language: 'EN',
     aimAndScope: description || title || '',
     aimScope: description || title || '',
@@ -409,7 +404,6 @@ export function parseIdsXml(content) {
     actorsList: [],
   };
 
-  // Add copyright holder as author (IDS <copyright> is typically an organization name)
   if (copyright) {
     headerData.authors.push({
       id: generateUUID(),
@@ -419,7 +413,6 @@ export function parseIdsXml(content) {
     });
   }
 
-  // Add author if present
   if (author) {
     headerData.authors.push({
       id: generateUUID(),
@@ -431,12 +424,10 @@ export function parseIdsXml(content) {
     });
   }
 
-  // Creation date
   if (date) {
     headerData.creationDate = date;
   }
 
-  // Parse milestone into target phases
   if (milestone) {
     const phases = milestone.toLowerCase();
     const iso22263 = {};
@@ -456,9 +447,7 @@ export function parseIdsXml(content) {
       'manufact': 'production',
     };
     for (const [keyword, phase] of Object.entries(phaseMap)) {
-      if (phases.includes(keyword)) {
-        iso22263[phase] = true;
-      }
+      if (phases.includes(keyword)) iso22263[phase] = true;
     }
     if (Object.keys(iso22263).length > 0) {
       headerData.targetPhases = { iso22263 };
@@ -483,16 +472,32 @@ function parsePropertyRequirement(propEl, entityName, basis) {
   const valueEl = getChild(propEl, 'value');
   const dataType = propEl.getAttribute('dataType') || '';
   const uri = propEl.getAttribute('uri') || '';
+  // Preserve three states: null = not specified in source, 'required', 'optional'
+  const cardinalityAttr = propEl.getAttribute('cardinality');
+  const cardinality = cardinalityAttr || 'required';
+  const instructions = propEl.getAttribute('instructions') || '';
 
-  const psetName = psetEl ? getChildText(psetEl, 'simpleValue') : '';
+  // Read pset — support both simpleValue and restriction/enumeration (multi-pset, I-5)
+  // Store all pset names so the exporter can reconstruct <xs:restriction> for multi-pset
+  let psetNames = [];
+  let psetName = psetEl ? getChildText(psetEl, 'simpleValue') : '';
+  if (psetName) {
+    psetNames = [psetName];
+  } else if (psetEl) {
+    const psetRestrEl = getChild(psetEl, 'restriction');
+    if (psetRestrEl) {
+      const enumEls = getChildren(psetRestrEl, 'enumeration');
+      psetNames = enumEls.map(e => e.getAttribute('value') || '').filter(Boolean);
+      psetName = psetNames[0] || '';
+    }
+  }
+
   const baseName = baseNameEl ? getChildText(baseNameEl, 'simpleValue') : '';
-
   if (!baseName && !psetName) return null;
 
   const iuName = baseName || psetName;
   const mappingName = psetName ? `${psetName}.${baseName}` : (entityName || baseName);
 
-  // Build constraints from value restrictions
   let constraints = '';
   let examples = '';
   if (valueEl) {
@@ -505,7 +510,9 @@ function parsePropertyRequirement(propEl, entityName, basis) {
       } else if (valueInfo.type === 'pattern') {
         constraints = valueInfo.value;
       } else if (valueInfo.type === 'range') {
-        constraints = `Range: ${valueInfo.value}`;
+        // Encode non-double base so buildValueXml can restore xs:integer etc.
+        const baseTag = valueInfo.base && valueInfo.base !== 'xs:double' ? ` (${valueInfo.base})` : '';
+        constraints = `Range${baseTag}: ${valueInfo.value}`;
       } else {
         constraints = valueInfo.value;
       }
@@ -515,22 +522,29 @@ function parsePropertyRequirement(propEl, entityName, basis) {
     }
   }
 
-  const mappings = [{
-    id: generateUUID(),
-    basis,
-    name: mappingName,
-    description: uri || '',
-  }];
+  // Build definition: instructions text first, then IFC type metadata for round-trip recovery
+  const defParts = [];
+  if (instructions) defParts.push(instructions);
+  if (dataType) defParts.push(`IFC Data Type: ${dataType}`);
+  const definition = defParts.join('\n');
 
   return {
     id: generateUUID(),
     name: iuName,
     dataType: mapDataType(dataType),
-    isMandatory: true,
-    definition: dataType ? `IFC Data Type: ${dataType}` : '',
+    isMandatory: cardinality !== 'optional',   // I-3: respect cardinality
+    definition,
     examples,
     constraints,
-    correspondingExternalElements: mappings,
+    correspondingExternalElements: [{
+      id: generateUUID(),
+      basis,
+      name: mappingName,
+      description: uri || '',
+    }],
+    _idsInstructions: instructions,           // original instructions text for faithful re-export
+    _idsPropertySets: psetNames,              // all pset names (enables multi-pset xs:restriction)
+    _idsCardinality: cardinalityAttr,         // null = not specified, 'required', or 'optional'
     subInformationUnits: [],
   };
 }
@@ -541,6 +555,9 @@ function parsePropertyRequirement(propEl, entityName, basis) {
 function parseAttributeRequirement(attrEl, entityName, basis) {
   const nameEl = getChild(attrEl, 'name');
   const valueEl = getChild(attrEl, 'value');
+  const cardinalityAttr = attrEl.getAttribute('cardinality');
+  const cardinality = cardinalityAttr || 'required';
+  const instructions = attrEl.getAttribute('instructions') || '';
 
   const attrName = nameEl ? getChildText(nameEl, 'simpleValue') : '';
   if (!attrName) return null;
@@ -557,7 +574,8 @@ function parseAttributeRequirement(attrEl, entityName, basis) {
       } else if (valueInfo.type === 'pattern') {
         constraints = valueInfo.value;
       } else if (valueInfo.type === 'range') {
-        constraints = `Range: ${valueInfo.value}`;
+        const baseTag = valueInfo.base && valueInfo.base !== 'xs:double' ? ` (${valueInfo.base})` : '';
+        constraints = `Range${baseTag}: ${valueInfo.value}`;
       }
       if (valueInfo.description) {
         constraints = constraints ? `${constraints}\n${valueInfo.description}` : valueInfo.description;
@@ -565,22 +583,23 @@ function parseAttributeRequirement(attrEl, entityName, basis) {
     }
   }
 
-  const mappings = [{
-    id: generateUUID(),
-    basis,
-    name: entityName ? `${entityName}.${attrName}` : attrName,
-    description: `IFC Attribute`,
-  }];
-
   return {
     id: generateUUID(),
     name: attrName,
     dataType: 'String',
-    isMandatory: true,
-    definition: `IFC attribute of ${entityName || 'entity'}`,
+    isMandatory: cardinality !== 'optional',   // I-3: respect cardinality
+    definition: instructions || `IFC attribute of ${entityName || 'entity'}`,
     examples,
     constraints,
-    correspondingExternalElements: mappings,
+    correspondingExternalElements: [{
+      id: generateUUID(),
+      basis,
+      // Include entity prefix in name so exporter can detect attribute vs property (E-2)
+      name: entityName ? `${entityName}.${attrName}` : attrName,
+      description: 'IFC Attribute',
+    }],
+    _idsInstructions: instructions,           // original instructions text for faithful re-export
+    _idsCardinality: cardinalityAttr,         // null = not specified, 'required', or 'optional'
     subInformationUnits: [],
   };
 }

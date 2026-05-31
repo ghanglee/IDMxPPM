@@ -42,6 +42,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Open user manual from local resources
   openManual: () => ipcRenderer.invoke('shell:openManual'),
 
+  // Persistent cache for bSDD data
+  cacheRead: (key) => ipcRenderer.invoke('cache:read', key),
+  cacheWrite: (key, data) => ipcRenderer.invoke('cache:write', key, data),
+
   // 플랫폼 정보
   platform: process.platform
 });

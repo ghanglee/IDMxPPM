@@ -1,7 +1,7 @@
 {
-  "name": "idmxppm-neo-seoul",
-  "version": "1.4.0",
-  "description": "IDMxPPM - Neo Seoul: Information Delivery Manual authoring tool based on the eXtended Process to Product Modeling method. Cross-platform IDM authoring tool for AEC industry - ISO 29481-1 & ISO 29481-3 compliant",
+  "name": "xppm-neo-seoul",
+  "version": "1.5.0",
+  "description": "xPPM neo-Seoul: Information Delivery Manual authoring tool based on the eXtended Process to Product Modeling method. Cross-platform IDM authoring tool for AEC industry - ISO 29481-1 & ISO 29481-3 compliant",
   "main": "electron/main.js",
   "author": "Building Informatics Group (BIG), Yonsei University",
   "license": "GPL-3.0-or-later",
@@ -42,8 +42,8 @@
     "wait-on": "^7.2.0"
   },
   "build": {
-    "appId": "kr.ac.yonsei.big.idmxppm-neo-seoul",
-    "productName": "IDMxPPM - Neo Seoul",
+    "appId": "kr.ac.yonsei.big.xppm-neo-seoul",
+    "productName": "xPPM neo-Seoul",
     "directories": {
       "output": "release"
     },
@@ -121,10 +121,10 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "IDMxPPM Neo Seoul"
+      "shortcutName": "xPPM neo-Seoul"
     },
     "dmg": {
-      "title": "IDMxPPM - Neo Seoul",
+      "title": "xPPM neo-Seoul",
       "contents": [
         {
           "x": 130,

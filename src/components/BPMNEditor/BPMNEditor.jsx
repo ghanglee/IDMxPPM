@@ -11,7 +11,7 @@ import {
   ExportSVGIcon,
   ExportBPMNIcon,
   ImportBPMNIcon,
-  ExportPNGIcon,
+
   AutoLayoutIcon,
   ChevronLeftIcon,
   ChevronRightIcon
@@ -64,6 +64,12 @@ const BPMNEditor = ({
   const modelerRef = useRef(null);
   const isImportingRef = useRef(false); // Track when importing to prevent modal during import
   const internalChangeRef = useRef(false); // Track internal commandStack changes to prevent re-import loop
+
+  // Stable refs so one-time event handlers always call the latest prop callbacks
+  const onDataObjectSelectRef = useRef(onDataObjectSelect);
+  const onTaskSelectRef = useRef(onTaskSelect);
+  const onNewDataObjectRef = useRef(onNewDataObject);
+  const onChangeRef = useRef(onChange);
   const [isReady, setIsReady] = useState(false);
   const [selectedElement, setSelectedElement] = useState(null);
   const [error, setError] = useState(null);
@@ -98,6 +104,12 @@ const BPMNEditor = ({
       resizeObserver.disconnect();
     };
   }, []);
+
+  // Keep callback refs current whenever props change
+  useEffect(() => { onDataObjectSelectRef.current = onDataObjectSelect; }, [onDataObjectSelect]);
+  useEffect(() => { onTaskSelectRef.current = onTaskSelect; }, [onTaskSelect]);
+  useEffect(() => { onNewDataObjectRef.current = onNewDataObject; }, [onNewDataObject]);
+  useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
 
   // Initialize bpmn-js modeler
   useEffect(() => {
@@ -182,21 +194,21 @@ const BPMNEditor = ({
         selected.type === 'bpmn:DataObject' ||
         selected.type === 'bpmn:DataStoreReference'
       )) {
-        if (onDataObjectSelect) {
+        if (onDataObjectSelectRef.current) {
           const businessObject = selected.businessObject;
-          onDataObjectSelect({
+          onDataObjectSelectRef.current({
             id: selected.id,
             type: selected.type,
             name: businessObject?.name || '',
             element: selected
           });
         }
-        if (onTaskSelect) onTaskSelect(null);
+        if (onTaskSelectRef.current) onTaskSelectRef.current(null);
       } else if (selected && DOCUMENTABLE_TYPES.has(selected.type)) {
-        if (onTaskSelect) {
+        if (onTaskSelectRef.current) {
           const businessObject = selected.businessObject;
           const docText = businessObject?.documentation?.[0]?.text || '';
-          onTaskSelect({
+          onTaskSelectRef.current({
             id: selected.id,
             type: selected.type,
             name: businessObject?.name || '',
@@ -205,7 +217,7 @@ const BPMNEditor = ({
           });
         }
       } else {
-        if (onTaskSelect) onTaskSelect(null);
+        if (onTaskSelectRef.current) onTaskSelectRef.current(null);
       }
     });
 
@@ -215,9 +227,9 @@ const BPMNEditor = ({
       if (element.type === 'bpmn:DataObjectReference' ||
           element.type === 'bpmn:DataObject' ||
           element.type === 'bpmn:DataStoreReference') {
-        if (onDataObjectSelect) {
+        if (onDataObjectSelectRef.current) {
           const businessObject = element.businessObject;
-          onDataObjectSelect({
+          onDataObjectSelectRef.current({
             id: element.id,
             type: element.type,
             name: businessObject?.name || '',
@@ -227,10 +239,10 @@ const BPMNEditor = ({
         }
         setTooltip({ visible: false, x: 0, y: 0, text: '' });
       } else if (DOCUMENTABLE_TYPES.has(element.type)) {
-        if (onTaskSelect) {
+        if (onTaskSelectRef.current) {
           const businessObject = element.businessObject;
           const docText = businessObject?.documentation?.[0]?.text || '';
-          onTaskSelect({
+          onTaskSelectRef.current({
             id: element.id,
             type: element.type,
             name: businessObject?.name || '',
@@ -309,7 +321,7 @@ const BPMNEditor = ({
       // Only trigger for Data Objects created from palette (not during import)
       if (isImportingRef.current) return; // Skip during import
 
-      if (onNewDataObject && (
+      if (onNewDataObjectRef.current && (
         element.type === 'bpmn:DataObjectReference' ||
         element.type === 'bpmn:DataObject' ||
         element.type === 'bpmn:DataStoreReference'
@@ -317,7 +329,7 @@ const BPMNEditor = ({
         // Small delay to ensure the element is fully added
         setTimeout(() => {
           const businessObject = element.businessObject;
-          onNewDataObject({
+          onNewDataObjectRef.current({
             id: element.id,
             type: element.type,
             name: businessObject?.name || '',
@@ -329,11 +341,11 @@ const BPMNEditor = ({
 
     // Diagram changed
     eventBus.on('commandStack.changed', async () => {
-      if (onChange) {
+      if (onChangeRef.current) {
         try {
           internalChangeRef.current = true; // Flag to prevent re-import loop
           const { xml: newXml } = await modeler.saveXML({ format: true });
-          onChange(newXml);
+          onChangeRef.current(newXml);
         } catch (err) {
           console.error('Failed to export BPMN XML:', err);
         }
@@ -557,70 +569,7 @@ const BPMNEditor = ({
     }
   }, []);
 
-  // Export PNG
-  const exportPNG = useCallback(async () => {
-    if (!modelerRef.current) return;
 
-    try {
-      const { svg } = await modelerRef.current.saveSVG();
-
-      // Create canvas and convert SVG to PNG
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      const img = new Image();
-
-      // Convert SVG to base64 data URL
-      const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
-      const url = URL.createObjectURL(svgBlob);
-
-      img.onload = async () => {
-        // Set canvas dimensions with 2x scale for better quality
-        const scale = 2;
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
-
-        // Fill white background
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // Draw image
-        ctx.scale(scale, scale);
-        ctx.drawImage(img, 0, 0);
-
-        // Get PNG data
-        canvas.toBlob(async (blob) => {
-          if (window.electronAPI) {
-            // Convert blob to base64 for Electron
-            const reader = new FileReader();
-            reader.onload = async () => {
-              const base64 = reader.result.split(',')[1];
-              await window.electronAPI.saveFile({
-                content: base64,
-                defaultName: 'process-map.png',
-                encoding: 'base64',
-                filters: [{ name: 'PNG Image', extensions: ['png'] }]
-              });
-            };
-            reader.readAsDataURL(blob);
-          } else {
-            // Browser fallback
-            const downloadUrl = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = downloadUrl;
-            a.download = 'process-map.png';
-            a.click();
-            URL.revokeObjectURL(downloadUrl);
-          }
-        }, 'image/png');
-
-        URL.revokeObjectURL(url);
-      };
-
-      img.src = url;
-    } catch (err) {
-      console.error('Export PNG failed:', err);
-    }
-  }, []);
 
   // Zoom controls
   const handleZoomIn = useCallback(() => {
@@ -979,10 +928,6 @@ const BPMNEditor = ({
           <button className="footer-btn footer-btn-export" onClick={exportBPMN} title="Export BPMN XML">
             <ExportBPMNIcon size={18} />
             <span>BPMN</span>
-          </button>
-          <button className="footer-btn footer-btn-export" onClick={exportPNG} title="Export PNG Image">
-            <ExportPNGIcon size={18} />
-            <span>PNG</span>
           </button>
         </div>
 

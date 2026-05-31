@@ -13,7 +13,7 @@ function createWindow() {
     height: 900,
     minWidth: 1024,
     minHeight: 700,
-    title: 'IDMxPPM - Neo Seoul',
+    title: 'xPPM neo-Seoul',
     icon: path.join(__dirname, '../public/icon.png'),
     webPreferences: {
       nodeIntegration: false,
@@ -69,7 +69,7 @@ function createWindow() {
           click: () => mainWindow.webContents.send('menu-export-bpmn')
         },
         {
-          label: 'Export idmXML...',
+          label: 'Export Project As...',
           click: () => mainWindow.webContents.send('menu-export-idmxml')
         },
         { type: 'separator' },
@@ -80,6 +80,7 @@ function createWindow() {
         { type: 'separator' },
         {
           label: 'Connect to Server...',
+          enabled: false,
           click: () => mainWindow.webContents.send('menu-server-connect')
         },
         { type: 'separator' },
@@ -135,12 +136,12 @@ function createWindow() {
       label: 'Help',
       submenu: [
         {
-          label: 'About IDMxPPM - Neo Seoul',
+          label: 'About xPPM neo-Seoul',
           click: () => {
             dialog.showMessageBox({
               type: 'info',
-              title: 'About IDMxPPM - Neo Seoul',
-              message: 'IDMxPPM - Neo Seoul v1.0.0',
+              title: 'About xPPM neo-Seoul',
+              message: 'xPPM neo-Seoul v1.5.0',
               detail: 'Information Delivery Manual authoring tool based on the eXtended Process to Product Modeling method.\n\nISO 29481-1 & ISO 29481-3 (idmXML) Compliant\n\nDeveloped by Building Informatics Group (BIG)\nYonsei University, Seoul, Korea\n\nhttps://big.yonsei.ac.kr'
             });
           }
@@ -149,7 +150,7 @@ function createWindow() {
         {
           label: 'ISO 29481-1 Reference',
           click: () => {
-            require('electron').shell.openExternal('https://www.iso.org/standard/74389.html');
+            require('electron').shell.openExternal('https://www.iso.org/standard/88515.html');
           }
         },
         {
@@ -191,14 +192,14 @@ function createWindow() {
 // 프로젝트 열기 (.json, .idm, .xml for idmXML, .bpmn, .zip, .xppm)
 async function handleOpenProject() {
   const result = await dialog.showOpenDialog({
-    title: 'Open IDMxPPM Project',
+    title: 'Open xPPM Project',
     filters: [
-      { name: 'IDMxPPM Project (.idm)', extensions: ['idm', 'json'] },
-      { name: 'idmXML (.xml)', extensions: ['xml'] },
+      { name: 'IDM Project (.idm)', extensions: ['idm', 'json'] },
+      { name: 'idmXML 2.0 (.xml)', extensions: ['xml'] },
+      { name: 'idmXML 1.0 (.zip)', extensions: ['zip', 'idmx'] },
       { name: 'LOIN XML (.xml)', extensions: ['xml'] },
       { name: 'IDS (.ids)', extensions: ['ids'] },
       { name: 'mvdXML (.mvdxml, .xml)', extensions: ['mvdxml', 'xml'] },
-      { name: 'ZIP Bundle (.zip)', extensions: ['zip', 'idmx'] },
       { name: 'xPPM Legacy (.xppm)', extensions: ['xppm'] },
       { name: 'BPMN Diagram (.bpmn)', extensions: ['bpmn'] },
       { name: 'Reviewed HTML (.html)', extensions: ['html', 'htm'] },
@@ -483,7 +484,7 @@ ipcMain.handle('shell:openExternal', async (event, url) => {
 
 // Open user manual HTML file from local resources
 ipcMain.handle('shell:openManual', async () => {
-  const manualRelPath = 'user_manuals/V1.4.0/IDMxPPM-Tutorials.html';
+  const manualRelPath = 'user_manuals/V1.5.0/xPPM-Tutorials.html';
   const filePath = isDev
     ? path.join(__dirname, '..', manualRelPath)
     : path.join(process.resourcesPath, manualRelPath);
@@ -498,10 +499,11 @@ ipcMain.handle('dialog:importER', handleImportER);
 // 프로젝트 저장
 ipcMain.handle('dialog:saveProject', async (event, { content, defaultName }) => {
   const result = await dialog.showSaveDialog({
-    title: 'Save IDMxPPM Project',
-    defaultPath: defaultName || 'idm-project.json',
+    title: 'Save xPPM Project',
+    defaultPath: defaultName || 'idm-project.idm',
     filters: [
-      { name: 'IDMxPPM Project', extensions: ['json'] }
+      { name: 'xPPM Project', extensions: ['idm'] },
+      { name: 'All Files', extensions: ['*'] }
     ]
   });
 
@@ -529,7 +531,8 @@ ipcMain.handle('dialog:exportBPMN', async (event, { content, defaultName }) => {
     defaultPath: defaultName || 'process-map.bpmn',
     filters: [
       { name: 'BPMN Files', extensions: ['bpmn'] },
-      { name: 'XML Files', extensions: ['xml'] }
+      { name: 'XML Files', extensions: ['xml'] },
+      { name: 'All Files', extensions: ['*'] }
     ]
   });
 
@@ -546,7 +549,8 @@ ipcMain.handle('dialog:exportSVG', async (event, { content, defaultName }) => {
     title: 'Export SVG',
     defaultPath: defaultName || 'process-map.svg',
     filters: [
-      { name: 'SVG Files', extensions: ['svg'] }
+      { name: 'SVG Files', extensions: ['svg'] },
+      { name: 'All Files', extensions: ['*'] }
     ]
   });
 
@@ -560,8 +564,8 @@ ipcMain.handle('dialog:exportSVG', async (event, { content, defaultName }) => {
 // ER 내보내기 (erXML/JSON)
 ipcMain.handle('dialog:exportER', async (event, { content, defaultName, format }) => {
   const filters = format === 'json'
-    ? [{ name: 'JSON Files', extensions: ['json'] }]
-    : [{ name: 'ER XML Files', extensions: ['erxml', 'xml'] }];
+    ? [{ name: 'JSON Files', extensions: ['json'] }, { name: 'All Files', extensions: ['*'] }]
+    : [{ name: 'ER XML Files', extensions: ['erxml', 'xml'] }, { name: 'All Files', extensions: ['*'] }];
 
   const result = await dialog.showSaveDialog({
     title: 'Export Exchange Requirement',
@@ -585,6 +589,7 @@ ipcMain.handle('dialog:exportIdmXML', async (event, { content, defaultName }) =>
       { name: 'idmXML Files', extensions: ['xml'] },
       { name: 'All Files', extensions: ['*'] }
     ]
+
   });
 
   if (!result.canceled && result.filePath) {
@@ -596,17 +601,18 @@ ipcMain.handle('dialog:exportIdmXML', async (event, { content, defaultName }) =>
 
 // Show save location dialog (returns path only)
 ipcMain.handle('dialog:showSaveLocation', async (event, { defaultName, format }) => {
+  const all = { name: 'All Files', extensions: ['*'] };
   const filters = {
-    'idm': [{ name: 'IDM Project', extensions: ['idm'] }],
-    'idmxml': [{ name: 'idmXML Files', extensions: ['xml'] }],
-    'idmxml-v2': [{ name: 'idmXML 2.0 Files', extensions: ['xml'] }],
-    'idmxml-v1': [{ name: 'idmXML 1.0 Files', extensions: ['xml'] }],
-    'html': [{ name: 'HTML Files', extensions: ['html'] }],
-    'zip': [{ name: 'ZIP Archives', extensions: ['zip'] }],
-    'bpmn': [{ name: 'BPMN Files', extensions: ['bpmn'] }],
-    'ids': [{ name: 'IDS Files', extensions: ['ids'] }],
-    'loin': [{ name: 'LOIN XML Files', extensions: ['xml'] }],
-    'mvd': [{ name: 'mvdXML Files', extensions: ['mvdxml', 'xml'] }]
+    'idm':      [{ name: 'IDM Project',       extensions: ['idm'] },            all],
+    'idmxml':   [{ name: 'idmXML Files',      extensions: ['xml'] },            all],
+    'idmxml-v2':[{ name: 'idmXML 2.0 Files',  extensions: ['xml'] },            all],
+    'idmxml-v1':[{ name: 'idmXML 1.0 Files',  extensions: ['xml'] },            all],
+    'html':     [{ name: 'HTML Files',         extensions: ['html'] },           all],
+    'zip':      [{ name: 'idmXML 1.0 ZIP',      extensions: ['zip'] },            all],
+    'bpmn':     [{ name: 'BPMN Files',         extensions: ['bpmn'] },           all],
+    'ids':      [{ name: 'IDS Files',          extensions: ['ids'] },            all],
+    'loin':     [{ name: 'LOIN XML Files',     extensions: ['xml'] },            all],
+    'mvd':      [{ name: 'mvdXML Files',       extensions: ['mvdxml', 'xml'] },  all]
   };
 
   const result = await dialog.showSaveDialog({
@@ -635,6 +641,22 @@ ipcMain.handle('dialog:saveToPath', async (event, { content, filePath, isBinary 
   } catch (error) {
     return { success: false, error: error.message };
   }
+});
+
+// Persistent key-value cache for bSDD data
+ipcMain.handle('cache:read', async (event, key) => {
+  try {
+    const cacheFile = path.join(app.getPath('userData'), `${key}.json`);
+    if (!fs.existsSync(cacheFile)) return null;
+    return JSON.parse(fs.readFileSync(cacheFile, 'utf-8'));
+  } catch (e) { console.error('[cache:read]', key, e.message); return null; }
+});
+
+ipcMain.handle('cache:write', async (event, key, data) => {
+  try {
+    fs.writeFileSync(path.join(app.getPath('userData'), `${key}.json`), JSON.stringify(data), 'utf-8');
+    return true;
+  } catch (e) { console.error('[cache:write]', key, e.message); return false; }
 });
 
 // 앱 이벤트
