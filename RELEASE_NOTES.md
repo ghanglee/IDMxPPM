@@ -42,7 +42,7 @@
 
 ### Documentation
 
-- Added V1.5.0 User Manual with Tutorial 23 (idmXML 1.0 export)
+- Added V1.5.0 User Manual with Tutorial 23 (What's New in v1.5.0: idmXML 1.0 export, bSDD fixes, bug fixes)
 
 ---
 
