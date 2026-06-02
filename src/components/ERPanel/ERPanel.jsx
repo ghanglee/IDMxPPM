@@ -270,6 +270,7 @@ const ERPanel = ({
   const searchAbortControllerRef = useRef(null);
   // Request counter to guard against stale responses
   const searchRequestIdRef = useRef(0);
+  const mappingSearchIuNameRef = useRef('');
 
   // Sub-ER selection modal state
   const [showSubERModal, setShowSubERModal] = useState(false);
@@ -1474,6 +1475,76 @@ const ERPanel = ({
     updateErRecursive(erHierarchy);
   }, [isErFirstMode, onUpdateER, selectedIULocation, erHierarchy]);
 
+  // ========== IU Reorder / Indent / Outdent — Legacy Mode ==========
+
+  const moveLegacyIUUp = useCallback((unitId, subERId) => {
+    if (!onChange || !erData) return;
+    const moveUp = (ius) => {
+      const idx = ius.findIndex(u => u.id === unitId);
+      if (idx > 0) {
+        const n = [...ius]; [n[idx - 1], n[idx]] = [n[idx], n[idx - 1]]; return n;
+      }
+      return ius.map(u => ({ ...u, subInformationUnits: u.subInformationUnits?.length ? moveUp(u.subInformationUnits) : [] }));
+    };
+    if (subERId) onChange({ ...erData, subERs: (erData.subERs || []).map(s => s.id === subERId ? { ...s, informationUnits: moveUp(s.informationUnits || []) } : s) });
+    else onChange({ ...erData, informationUnits: moveUp(erData.informationUnits || []) });
+  }, [onChange, erData]);
+
+  const moveLegacyIUDown = useCallback((unitId, subERId) => {
+    if (!onChange || !erData) return;
+    const moveDown = (ius) => {
+      const idx = ius.findIndex(u => u.id === unitId);
+      if (idx >= 0 && idx < ius.length - 1) {
+        const n = [...ius]; [n[idx], n[idx + 1]] = [n[idx + 1], n[idx]]; return n;
+      }
+      return ius.map(u => ({ ...u, subInformationUnits: u.subInformationUnits?.length ? moveDown(u.subInformationUnits) : [] }));
+    };
+    if (subERId) onChange({ ...erData, subERs: (erData.subERs || []).map(s => s.id === subERId ? { ...s, informationUnits: moveDown(s.informationUnits || []) } : s) });
+    else onChange({ ...erData, informationUnits: moveDown(erData.informationUnits || []) });
+  }, [onChange, erData]);
+
+  const indentLegacyIU = useCallback((unitId, subERId) => {
+    if (!onChange || !erData) return;
+    const indent = (ius) => {
+      const idx = ius.findIndex(u => u.id === unitId);
+      if (idx > 0) {
+        const iuToMove = ius[idx];
+        return ius.filter(u => u.id !== unitId).map((u, i) =>
+          i === idx - 1 ? { ...u, subInformationUnits: [...(u.subInformationUnits || []), iuToMove] } : u
+        );
+      }
+      return ius.map(u => ({ ...u, subInformationUnits: u.subInformationUnits?.length ? indent(u.subInformationUnits) : [] }));
+    };
+    if (subERId) onChange({ ...erData, subERs: (erData.subERs || []).map(s => s.id === subERId ? { ...s, informationUnits: indent(s.informationUnits || []) } : s) });
+    else onChange({ ...erData, informationUnits: indent(erData.informationUnits || []) });
+  }, [onChange, erData]);
+
+  const outdentLegacyIU = useCallback((unitId, subERId) => {
+    if (!onChange || !erData) return;
+    const outdent = (ius) => {
+      for (let i = 0; i < ius.length; i++) {
+        const subs = ius[i].subInformationUnits || [];
+        const ci = subs.findIndex(s => s.id === unitId);
+        if (ci >= 0) {
+          const child = subs[ci];
+          const newSubs = subs.filter(s => s.id !== unitId);
+          return [
+            ...ius.slice(0, i).concat({ ...ius[i], subInformationUnits: newSubs }),
+            child,
+            ...ius.slice(i + 1)
+          ];
+        }
+        if (subs.length > 0) {
+          const result = outdent(subs);
+          if (result !== subs) return ius.map((u, j) => j === i ? { ...u, subInformationUnits: result } : u);
+        }
+      }
+      return ius;
+    };
+    if (subERId) onChange({ ...erData, subERs: (erData.subERs || []).map(s => s.id === subERId ? { ...s, informationUnits: outdent(s.informationUnits || []) } : s) });
+    else onChange({ ...erData, informationUnits: outdent(erData.informationUnits || []) });
+  }, [onChange, erData]);
+
   // ========== CRUD Operations ==========
 
   const handleSave = useCallback(() => {
@@ -1863,13 +1934,16 @@ const ERPanel = ({
 
   // Open mapping search modal
   // If mappingId is provided, we're updating an existing mapping; otherwise adding a new one
-  // If initialQuery is provided, pre-populate the search box with it
-  const openMappingSearch = useCallback((unitId, currentSchema, mappingId = null, initialQuery = '') => {
-    cancelSearch(); // Cancel any in-flight request from a previous search
+  const openMappingSearch = useCallback((unitId, currentSchema, mappingId = null) => {
+    cancelSearch();
+
+    const iuData = selectedItem?.id === unitId ? selectedItem.data : null;
+    mappingSearchIuNameRef.current = iuData?.name || '';
+
     setMappingSearchUnitId(unitId);
     setMappingSearchMappingId(mappingId);
     setMappingSearchSchema(normalizeSchema(currentSchema));
-    setMappingSearchQuery(initialQuery);
+    setMappingSearchQuery(iuData?.name || '');
     setMappingSearchResults([]);
     setMappingSearchGroups([]);
     setExpandedGroups(new Set());
@@ -1883,7 +1957,7 @@ const ERPanel = ({
     setMappingDrilldownFilter('');
     setSearchClosedUnexpectedly(false);
     setShowMappingSearch(true);
-  }, [cancelSearch, normalizeSchema]);
+  }, [cancelSearch, normalizeSchema, selectedItem]);
 
   // Clear any pending rate-limit countdown timers (declared before closeMappingSearch and executeSearch)
   const clearDrilldownRetry = useCallback(() => {
@@ -2028,8 +2102,14 @@ const ERPanel = ({
         ? (result.code && result.name && result.code !== result.name
             ? `${result.code} ${result.name}`
             : result.code || result.name)
-        : (result._groupCode && result.resultType === 'property'
-            ? `${result._groupCode}.${result.name || result.code}`
+        : (result.resultType === 'property'
+            ? (() => {
+                const parts = result.category ? result.category.split(' · ') : [];
+                const entity = result._groupCode || parts[0] || '';
+                const pset = parts[1] && (parts[1].startsWith('Pset_') || parts[1].startsWith('Qto_')) ? parts[1] : '';
+                const prop = result.name || result.code;
+                return entity && pset ? `${entity}.${pset}.${prop}` : entity ? `${entity}.${prop}` : prop;
+              })()
             : (result.name || result.code)),
       description: isClassification ? (result.description || '') : (result.description || ''),
       uri: result.uri || '',
@@ -2401,7 +2481,7 @@ const ERPanel = ({
 
   // ========== Card-Based Information Unit Renderer ==========
 
-  const renderInformationUnitCard = (unit, depth = 0, subERId = null) => {
+  const renderInformationUnitCard = (unit, depth = 0, subERId = null, index = 0, siblingsLength = 1, hasParentIU = false) => {
     const isExpanded = expandedNodes.has(unit.id);
     const hasSubUnits = unit.subInformationUnits && unit.subInformationUnits.length > 0;
 
@@ -2416,6 +2496,10 @@ const ERPanel = ({
           <span className={`er-card-badge ${unit.isMandatory ? 'mandatory' : 'optional'}`}>
             {unit.isMandatory ? 'Required' : 'Optional'}
           </span>
+          <button className="er-card-delete" onClick={(e) => { e.stopPropagation(); moveLegacyIUUp(unit.id, subERId); }} disabled={index === 0} title="Move Up">↑</button>
+          <button className="er-card-delete" onClick={(e) => { e.stopPropagation(); moveLegacyIUDown(unit.id, subERId); }} disabled={index === siblingsLength - 1} title="Move Down">↓</button>
+          <button className="er-card-delete" onClick={(e) => { e.stopPropagation(); indentLegacyIU(unit.id, subERId); }} disabled={index === 0} title="Indent (Make Sub-IU)">&gt;</button>
+          <button className="er-card-delete" onClick={(e) => { e.stopPropagation(); outdentLegacyIU(unit.id, subERId); }} disabled={!hasParentIU} title="Outdent (Promote)">&lt;</button>
           <button
             className="er-card-delete"
             onClick={(e) => { e.stopPropagation(); removeUnit(unit.id, subERId); }}
@@ -2587,7 +2671,7 @@ const ERPanel = ({
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' && isSearchable) {
                                 e.preventDefault();
-                                openMappingSearch(unit.id, mapping.basis, mapping.id, mapping.name || '');
+                                openMappingSearch(unit.id, mapping.basis, mapping.id);
                               }
                             }}
                             placeholder={isOther ? "Element name" : (isSearchable ? "Click search or enter manually" : "Enter element name")}
@@ -2603,7 +2687,7 @@ const ERPanel = ({
                         {isSearchable && (
                           <button
                             className="er-search-btn"
-                            onClick={() => openMappingSearch(unit.id, mapping.basis, mapping.id, mapping.name || '')}
+                            onClick={() => openMappingSearch(unit.id, mapping.basis, mapping.id)}
                             title={mapping.name ? "Change mapping" : "Search schema"}
                           >
                             <SearchIcon size={14} />
@@ -2623,7 +2707,7 @@ const ERPanel = ({
                 <div className="er-card-sub-units-header">
                   <label>Sub Information Units</label>
                 </div>
-                {unit.subInformationUnits.map(subUnit => renderInformationUnitCard(subUnit, depth + 1, subERId))}
+                {unit.subInformationUnits.map((subUnit, i) => renderInformationUnitCard(subUnit, depth + 1, subERId, i, unit.subInformationUnits.length, true))}
               </div>
             )}
 
@@ -2717,7 +2801,7 @@ const ERPanel = ({
                 <div className="er-card-section-header">
                   <label>Information Units ({subER.informationUnits.length})</label>
                 </div>
-                {subER.informationUnits.map(iu => renderInformationUnitCard(iu, 0, subER.id))}
+                {subER.informationUnits.map((iu, i) => renderInformationUnitCard(iu, 0, subER.id, i, subER.informationUnits.length, false))}
               </div>
             )}
 
@@ -3248,7 +3332,7 @@ const ERPanel = ({
                                   onKeyDown={(e) => {
                                     if (e.key === 'Enter' && isSearchable) {
                                       e.preventDefault();
-                                      openMappingSearch(selectedItem.id, mapping.basis, mapping.id, mapping.name || '');
+                                      openMappingSearch(selectedItem.id, mapping.basis, mapping.id);
                                     }
                                   }}
                                   placeholder={isOther ? "Element name" : (isSearchable ? "Click search or enter manually" : "Enter element name")}
@@ -3264,7 +3348,7 @@ const ERPanel = ({
                               {isSearchable && (
                                 <button
                                   className="er-search-btn"
-                                  onClick={() => openMappingSearch(selectedItem.id, mapping.basis, mapping.id, mapping.name || '')}
+                                  onClick={() => openMappingSearch(selectedItem.id, mapping.basis, mapping.id)}
                                   title={mapping.name ? "Change mapping" : "Search schema"}
                                 >
                                   <SearchIcon size={14} />
@@ -3403,6 +3487,7 @@ const ERPanel = ({
                       onChange={(e) => {
                         setMappingSearchSchema(e.target.value);
                         setMappingSearchResults([]);
+                        setMappingSearchQuery(mappingSearchIuNameRef.current || '');
                       }}
                       className="er-select er-select-schema-search"
                     >
@@ -3462,9 +3547,15 @@ const ERPanel = ({
                   </button>
                   {selectedSearchResult && (
                     <span className="er-selection-hint">
-                      {selectedSearchResult._groupCode && selectedSearchResult.resultType !== 'class'
-                        ? `${selectedSearchResult._groupCode}.${selectedSearchResult.code || selectedSearchResult.name}`
-                        : (selectedSearchResult.code || selectedSearchResult.name)}
+                      {(() => {
+                        const r = selectedSearchResult;
+                        if (r.resultType !== 'property') return r.code || r.name;
+                        const parts = r.category ? r.category.split(' · ') : [];
+                        const entity = r._groupCode || parts[0] || '';
+                        const pset = parts[1] && (parts[1].startsWith('Pset_') || parts[1].startsWith('Qto_')) ? parts[1] : '';
+                        const prop = r.name || r.code;
+                        return entity && pset ? `${entity}.${pset}.${prop}` : entity ? `${entity}.${prop}` : prop;
+                      })()}
                     </span>
                   )}
                   <button
@@ -3776,7 +3867,7 @@ const ERPanel = ({
               <span className="er-hint">Click "+ IU" in the toolbar to add one</span>
             </div>
           ) : (
-            erData.informationUnits.map(iu => renderInformationUnitCard(iu, 0, null))
+            erData.informationUnits.map((iu, i) => renderInformationUnitCard(iu, 0, null, i, erData.informationUnits.length, false))
           )}
         </div>
 
@@ -3872,6 +3963,7 @@ const ERPanel = ({
                     onChange={(e) => {
                       setMappingSearchSchema(e.target.value);
                       setMappingSearchResults([]);
+                      setMappingSearchQuery(mappingSearchIuNameRef.current || '');
                     }}
                     className="er-select er-select-schema-search"
                   >
@@ -3931,9 +4023,15 @@ const ERPanel = ({
                 </button>
                 {selectedSearchResult && (
                   <span className="er-selection-hint">
-                    {selectedSearchResult._groupCode && selectedSearchResult.resultType !== 'class'
-                      ? `${selectedSearchResult._groupCode}.${selectedSearchResult.code || selectedSearchResult.name}`
-                      : (selectedSearchResult.code || selectedSearchResult.name)}
+                    {(() => {
+                      const r = selectedSearchResult;
+                      if (r.resultType !== 'property') return r.code || r.name;
+                      const parts = r.category ? r.category.split(' · ') : [];
+                      const entity = r._groupCode || parts[0] || '';
+                      const pset = parts[1] && (parts[1].startsWith('Pset_') || parts[1].startsWith('Qto_')) ? parts[1] : '';
+                      const prop = r.name || r.code;
+                      return entity && pset ? `${entity}.${pset}.${prop}` : entity ? `${entity}.${prop}` : prop;
+                    })()}
                   </span>
                 )}
                 <button

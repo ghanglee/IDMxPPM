@@ -2,7 +2,39 @@
   "permissions": {
     "allow": [
       "Bash(git remote set-url:*)",
-      "Bash(git -C /Users/ghanglee/IDMxPPM-neo-Seoul status)"
+      "Bash(git -C /Users/ghanglee/IDMxPPM-neo-Seoul status)",
+      "Bash(kill %1)",
+      "Bash(env)",
+      "Bash(env -u ELECTRON_RUN_AS_NODE /Users/ghanglee/IDMxPPM-neo-Seoul/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron .)",
+      "Bash(npm run dev > /tmp/vite_dev.log 2>&1 & *)",
+      "Bash(npx playwright *)",
+      "Bash(cp -r /Users/ghanglee/IDMxPPM-neo-Seoul/user_manuals/V1.4.0 /Users/ghanglee/IDMxPPM-neo-Seoul/user_manuals/V1.5.0 *)",
+      "Bash(perl -pi -e ' *)",
+      "Bash(git -C /Users/ghanglee/IDMxPPM-neo-Seoul commit -m ' *)",
+      "Bash(git -C /Users/ghanglee/IDMxPPM-neo-Seoul stash push --include-untracked -m \"WIP: v2.0 LLM assistant features\")",
+      "Bash(git -C /Users/ghanglee/IDMxPPM-neo-Seoul add electron/main.js src/App.jsx)",
+      "Bash(git -C /Users/ghanglee/IDMxPPM-neo-Seoul stash pop)",
+      "Bash(git -C /Users/ghanglee/IDMxPPM-neo-Seoul checkout .claude/settings.json)",
+      "Bash(git -C /Users/ghanglee/IDMxPPM-neo-Seoul stash drop)",
+      "Bash(git -C /Users/ghanglee/IDMxPPM-neo-Seoul log --oneline origin/main)",
+      "Bash(git -C /Users/ghanglee/IDMxPPM-neo-Seoul branch -a)",
+      "Bash(git -C /Users/ghanglee/IDMxPPM-neo-Seoul remote -v)",
+      "Bash(git -C /Users/ghanglee/IDMxPPM-neo-Seoul add electron/main.js electron/preload.js src/App.jsx src/components/VerticalMenuBar/ src/components/icons/index.jsx src/components/LLMConnectModal/)",
+      "Bash(git -C /Users/ghanglee/IDMxPPM-neo-Seoul checkout main)",
+      "Bash(git -C /Users/ghanglee/IDMxPPM-neo-Seoul restore .)",
+      "Bash(git -C /Users/ghanglee/IDMxPPM-neo-Seoul rm -r --cached system_architecture/)",
+      "Bash(git -C /Users/ghanglee/IDMxPPM-neo-Seoul add .gitignore)",
+      "Bash(gh release create v1.5.0 --title 'xPPM neo-Seoul v1.5.0' --notes ' *)",
+      "Bash(git -C /Users/ghanglee/IDMxPPM-neo-Seoul checkout dev-v2)",
+      "Bash(git -C /Users/ghanglee/IDMxPPM-neo-Seoul merge main --no-edit)",
+      "Bash(git rm *)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "WebFetch(domain:platform.openai.com)",
+      "WebFetch(domain:developers.openai.com)"
+    ],
+    "additionalDirectories": [
+      "/tmp",
+      "/Users/ghanglee/IDMxPPM-neo-Seoul/public"
     ]
   }
 }

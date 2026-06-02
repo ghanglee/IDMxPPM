@@ -498,7 +498,7 @@ ipcMain.handle('shell:openExternal', async (event, url) => {
 
 // Open user manual HTML file from local resources
 ipcMain.handle('shell:openManual', async () => {
-  const manualRelPath = 'user_manuals/V1.5.0/xPPM-Tutorials.html';
+  const manualRelPath = 'user_manuals/V1.5.0/IDMxPPM-Tutorials.html';
   const filePath = isDev
     ? path.join(__dirname, '..', manualRelPath)
     : path.join(process.resourcesPath, manualRelPath);

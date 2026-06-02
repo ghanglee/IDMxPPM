@@ -57,7 +57,8 @@ const normalizeSchemaItem = (item, schemaName = 'Unknown') => {
     category: item.category || schemaName,
     uri: item.uri || '',
     score: item.score || 1,
-    matchType: item.matchType || 'exact'
+    matchType: item.matchType || 'exact',
+    resultType: item.resultType || ''
   };
 };
 
@@ -294,13 +295,24 @@ export const searchSchema = (schema, query, matchType = 'exact', limit = 20) => 
       // Handles composite names ("door pane" → IfcDoorPaneProperties) and
       // plural forms ("walls" → IfcWall, "properties" → IfcProperty*).
       const queryWords = queryLower.split(/\s+/).filter(w => w.length > 0);
+      const hasSpecialChars = queryWords.some(w => /[^a-z0-9]/.test(w));
+      const sigWords = hasSpecialChars
+        ? queryWords.map(w => w.replace(/[^a-z0-9]/g, '')).filter(w => w.length > 1)
+        : null;
       results = data.filter(item => {
         if (!item) return false;
         const name = (item.name || '').toLowerCase();
         const code = (item.code || '').toLowerCase();
         const description = (item.description || '').toLowerCase();
-        if (name.includes(queryLower) || code.includes(queryLower) || description.includes(queryLower)) return true;
-        return matchesByParts(item.name || '', queryWords) || matchesByParts(item.code || '', queryWords);
+        const category = (item.category || '').toLowerCase();
+        if (name.includes(queryLower) || code.includes(queryLower) || description.includes(queryLower) || category.includes(queryLower)) return true;
+        if (matchesByParts(item.name || '', queryWords) || matchesByParts(item.code || '', queryWords) || matchesByParts(item.category || '', queryWords)) return true;
+        // Query has special chars (e.g. "(U-value)"): retry with stripped words against stripped text
+        if (sigWords?.length > 0) {
+          const flat = t => t.replace(/[^a-z0-9]/g, '');
+          if (sigWords.every(w => flat(name).includes(w) || flat(description).includes(w) || flat(category).includes(w))) return true;
+        }
+        return false;
       }).map(item => normalizeSchemaItem({
         ...item,
         score: 1,

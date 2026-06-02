@@ -183,8 +183,10 @@ function processIUMappings(iu, entityCandidates, facets) {
         const left = element.substring(0, dotIdx);
         const right = element.substring(dotIdx + 1);
 
-        if (isIfcAttribute) {
-          // "IfcSpace.Name" — left is IFC class, right is attribute name
+        // Treat as IFC attribute when explicitly flagged OR when left is an IFC entity class
+        // (Ifc-prefixed names are entity classes; Pset_/Qto_-prefixed names are property sets)
+        if (isIfcAttribute || left.startsWith('Ifc') || left.startsWith('IFC')) {
+          // "IfcWindowPanelProperties.PanelOperation" — left is IFC class, right is attribute name
           entityCandidates.add(toIdsEntityName(left));
           facets.push({
             type: 'attribute',

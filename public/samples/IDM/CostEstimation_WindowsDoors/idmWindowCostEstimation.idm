@@ -317,7 +317,7 @@
               "name": "Window Count",
               "dataType": "Numeric",
               "isMandatory": true,
-              "definition": "Total number of window units of the same type within the scope of the cost estimation. Shall be provided as a positive integer.",
+              "definition": "Total number of window units of the same type within the scope of the cost estimation. Shall be provided as a positive integer.\nIFC Data Type: IFCCOUNTMEASURE",
               "definitionFigures": [],
               "examples": "1; 12; 48; 120",
               "exampleImages": [],
@@ -325,12 +325,8 @@
                 {
                   "id": "CEE-1779469080394-ur844j",
                   "basis": "IFC 4x3 ADD2",
-                  "name": "IfcQuantityCount"
-                },
-                {
-                  "id": "CEE-1779469080394-arzj6d",
-                  "basis": "IFC 4x3 ADD2",
-                  "name": "IfcElementQuantity"
+                  "element": "Qto_WindowBaseQuantities.Count",
+                  "description": ""
                 }
               ],
               "subInformationUnits": []
@@ -340,7 +336,7 @@
               "name": "Gross Window Area",
               "dataType": "Numeric",
               "isMandatory": true,
-              "definition": "Overall area of a single window unit including frame, expressed in square metres (m&sup2;). Calculated as OverallWidth &times; OverallHeight (converted to metres). Used for wall opening deductions and overall supply cost.",
+              "definition": "Overall area of a single window unit including frame, expressed in square metres (m&sup2;). Calculated as OverallWidth &times; OverallHeight (converted to metres). Used for wall opening deductions and overall supply cost.\nIFC Data Type: IFCAREAMEASURE",
               "definitionFigures": [],
               "examples": "0.81; 1.26; 1.80; 2.52; 4.41",
               "exampleImages": [],
@@ -348,12 +344,8 @@
                 {
                   "id": "CEE-1779469080394-cvsd29",
                   "basis": "IFC 4x3 ADD2",
-                  "name": "IfcQuantityArea"
-                },
-                {
-                  "id": "CEE-1779469080394-fmfnlo",
-                  "basis": "IFC 4x3 ADD2",
-                  "name": "IfcWindow"
+                  "element": "Qto_WindowBaseQuantities.GrossArea",
+                  "description": ""
                 }
               ],
               "subInformationUnits": []
@@ -363,7 +355,7 @@
               "name": "Net Glazed Area",
               "dataType": "Numeric",
               "isMandatory": true,
-              "definition": "Clear glazed area of a single window unit excluding frame, expressed in square metres (m&sup2;). Used for glazing cost calculation and daylight performance checks.",
+              "definition": "Clear glazed area of a single window unit excluding frame, expressed in square metres (m&sup2;). Used for glazing cost calculation and daylight performance checks.\nIFC Data Type: IFCAREAMEASURE",
               "definitionFigures": [],
               "examples": "0.54; 0.90; 1.35; 1.98; 3.60",
               "exampleImages": [],
@@ -371,12 +363,8 @@
                 {
                   "id": "CEE-1779469080394-y3sd3r",
                   "basis": "IFC 4x3 ADD2",
-                  "name": "IfcQuantityArea"
-                },
-                {
-                  "id": "CEE-1779469080394-xljryc",
-                  "basis": "IFC 4x3 ADD2",
-                  "name": "IfcWindowLiningProperties"
+                  "element": "Qto_WindowBaseQuantities.NetArea",
+                  "description": ""
                 }
               ],
               "subInformationUnits": []
@@ -386,7 +374,7 @@
               "name": "Window Perimeter",
               "dataType": "Numeric",
               "isMandatory": false,
-              "definition": "Perimeter of the window opening in millimetres, calculated as 2 &times; (OverallWidth + OverallHeight). Used for sealant, membrane tape, and draught-proofing material quantities.",
+              "definition": "Perimeter of the window opening in millimetres, calculated as 2 &times; (OverallWidth + OverallHeight). Used for sealant, membrane tape, and draught-proofing material quantities.\nIFC Data Type: IFCLENGTHMEASURE",
               "definitionFigures": [],
               "examples": "3600; 4200; 5400; 6600; 9600",
               "exampleImages": [],
@@ -394,7 +382,8 @@
                 {
                   "id": "CEE-1779469080394-1sb0fn",
                   "basis": "IFC 4x3 ADD2",
-                  "name": "IfcQuantityLength"
+                  "element": "Qto_WindowBaseQuantities.Perimeter",
+                  "description": ""
                 }
               ],
               "subInformationUnits": []

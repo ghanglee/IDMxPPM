@@ -5290,10 +5290,7 @@ const App = () => {
                          exportFormat === 'idmxml-v2' ? '.xml' :
                          exportFormat === 'html' ? '.html' :
                          exportFormat === 'zip' ? '.zip' :
-                         exportFormat === 'bpmn' ? '.bpmn' :
-                         exportFormat === 'ids' ? '.ids' :
-                         exportFormat === 'loin' ? '.xml' :
-                         exportFormat === 'mvd' ? (exportOptions.mvdExtension === 'xml' ? '.xml' : '.mvdxml') : ''}
+                         exportFormat === 'bpmn' ? '.bpmn' : ''}
                       </span>
                     </div>
                     {window.electronAPI?.showSaveLocation && (
@@ -5405,80 +5402,6 @@ const App = () => {
                     <div className="export-format-content">
                       <span className="export-format-title">BPMN Only (.bpmn)</span>
                       {exportFormat === 'bpmn' && <span className="export-format-desc">Process map diagram only</span>}
-                    </div>
-                  </div>
-
-                  {/* IDS + inline sub-options */}
-                  <div className={`export-format-option ${exportFormat === 'ids' ? 'selected' : ''}`} data-format="ids" onClick={() => setExportFormat('ids')}>
-                    <input type="radio" name="exportFormat" value="ids" checked={exportFormat === 'ids'} onChange={(e) => setExportFormat(e.target.value)} />
-                    <div className="export-format-content">
-                      <span className="export-format-title">IDS (.ids)</span>
-                      {exportFormat === 'ids' && (
-                        <>
-                          <span className="export-format-desc">buildingSMART Information Delivery Specification for IFC validation</span>
-                          <div className="export-suboptions" onClick={(e) => e.stopPropagation()}>
-                            <p className="export-option-label">Target IFC Version:</p>
-                            <select
-                              value={exportOptions.idsIfcVersion}
-                              onChange={(e) => setExportOptions(prev => ({ ...prev, idsIfcVersion: e.target.value }))}
-                              className="export-ids-select"
-                            >
-                              <option value="IFC2X3">IFC 2X3</option>
-                              <option value="IFC4X3_ADD2">IFC 4X3 ADD2 (recommended)</option>
-                            </select>
-                            <p style={{ fontSize: '11px', color: 'var(--text-tertiary, #888)', margin: '4px 0 0 0' }}>
-                              IDS exports only IFC-mappable requirements. Information Units need external element mappings (e.g., Pset_WallCommon.FireRating) to be included.
-                            </p>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* LOIN */}
-                  <div className={`export-format-option ${exportFormat === 'loin' ? 'selected' : ''}`} data-format="loin" onClick={() => setExportFormat('loin')}>
-                    <input type="radio" name="exportFormat" value="loin" checked={exportFormat === 'loin'} onChange={(e) => setExportFormat(e.target.value)} />
-                    <div className="export-format-content">
-                      <span className="export-format-title">LOIN (.xml)</span>
-                      {exportFormat === 'loin' && (
-                        <>
-                          <span className="export-format-desc">Level of Information Need (EN 17412 / ISO 7817-1)</span>
-                          <div className="export-suboptions" onClick={(e) => e.stopPropagation()}>
-                            <p style={{ fontSize: '11px', color: 'var(--text-tertiary, #888)', margin: '4px 0 0 0' }}>
-                              Maps IDM actors, project phases, and Information Units to LOIN object type specifications. IUs are grouped by their external element mappings (IFC, CityGML, bSDD, UniFormat, etc.). IUs without any external element mappings will be excluded.
-                            </p>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* mvdXML */}
-                  <div className={`export-format-option ${exportFormat === 'mvd' ? 'selected' : ''}`} data-format="mvd" onClick={() => setExportFormat('mvd')}>
-                    <input type="radio" name="exportFormat" value="mvd" checked={exportFormat === 'mvd'} onChange={(e) => setExportFormat(e.target.value)} />
-                    <div className="export-format-content">
-                      <span className="export-format-title">mvdXML ({exportOptions.mvdExtension === 'xml' ? '.xml' : '.mvdxml'})</span>
-                      {exportFormat === 'mvd' && (
-                        <>
-                          <span className="export-format-desc">buildingSMART Model View Definition (mvdXML 1.1)</span>
-                          <div className="export-suboptions" onClick={(e) => e.stopPropagation()}>
-                            <p className="export-option-label">File extension:</p>
-                            <div className="export-xslt-options">
-                              <label className="export-xslt-option">
-                                <input type="radio" name="mvdExtension" value="mvdxml" checked={exportOptions.mvdExtension !== 'xml'} onChange={() => setExportOptions(prev => ({ ...prev, mvdExtension: 'mvdxml' }))} />
-                                <span>.mvdxml</span>
-                              </label>
-                              <label className="export-xslt-option">
-                                <input type="radio" name="mvdExtension" value="xml" checked={exportOptions.mvdExtension === 'xml'} onChange={() => setExportOptions(prev => ({ ...prev, mvdExtension: 'xml' }))} />
-                                <span>.xml</span>
-                              </label>
-                            </div>
-                            <p style={{ fontSize: '11px', color: 'var(--text-tertiary, #888)', margin: '4px 0 0 0' }}>
-                              Each ER becomes an ExchangeRequirement; Information Units with IFC mappings become Concepts grouped by entity type. IUs without IFC mappings are excluded. Uses generic Property/Attribute/Entity ConceptTemplates — values are captured in Concept Definitions.
-                            </p>
-                          </div>
-                        </>
-                      )}
                     </div>
                   </div>
 
