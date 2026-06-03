@@ -1,5 +1,6 @@
 /**
  * mvdXML 1.1 / 1.2 Importer
+ * Aligned with idmXSD 2.0 ↔ mvdXML 1.2 Mapping v5.
  *
  * Supports both mvdXML 1.1 (namespace: http://buildingsmart-tech.org/mvdXML/mvdXML1-1)
  * and mvdXML 1.2 (namespace: http://buildingsmart-tech.org/mvd/XML/1.2).
@@ -146,7 +147,10 @@ function indexTemplates(mvdRoot) {
 function parseTemplateRuleParams(params) {
   if (!params) return {};
   const out = {};
-  const re = /(\w+)(?:\[(\w+)\])?\s*(?:=reg'((?:[^']|'')*)'|=\s*'((?:[^']|'')*)'|([><=!]+)\s*'((?:[^']|'')*)'|([><=!]+)\s*([\d.]+))/g;
+  // Groups: 1=key, 2=qualifier, 3=regex-value (=reg'…'), 4=quoted-value (='…'),
+  //         5=unquoted-keyword (=TRUE/FALSE/NOTDEFINED per mvdXML boolean literals),
+  //         6=op-for-quoted, 7=comparison-quoted-value, 8=op-for-numeric, 9=numeric-value
+  const re = /(\w+)(?:\[(\w+)\])?\s*(?:=reg'((?:[^']|'')*)'|=\s*'((?:[^']|'')*)'|=\s*([A-Z][A-Z0-9_]*)|([><=!]+)\s*'((?:[^']|'')*)'|([><=!]+)\s*([\d.]+))/g;
   let m;
   while ((m = re.exec(params)) !== null) {
     const key       = m[1];
@@ -154,8 +158,9 @@ function parseTemplateRuleParams(params) {
     let value, op = '=', isRegex = false;
     if (m[3] !== undefined)      { value = m[3]; isRegex = true; }
     else if (m[4] !== undefined) { value = m[4]; }
-    else if (m[6] !== undefined) { value = m[6]; op = m[5].trim(); }
-    else if (m[8] !== undefined) { value = m[8]; op = m[7].trim(); }
+    else if (m[5] !== undefined) { value = m[5]; }        // unquoted: TRUE, FALSE, NOTDEFINED
+    else if (m[7] !== undefined) { value = m[7]; op = m[6].trim(); }
+    else if (m[9] !== undefined) { value = m[9]; op = m[8].trim(); }
     else                         { value = ''; }
     out[key] = { value: value.replace(/''/g, "'"), op, isRegex, qualifier };
   }

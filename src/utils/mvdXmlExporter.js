@@ -2,16 +2,22 @@
  * mvdXML 1.2 Exporter
  * Generates proper ConceptTemplate → ConceptRoot → Concept structure
  * from IDM erHierarchy data, compliant with the buildingSMART mvdXML 1.2 schema.
+ * Aligned with idmXSD 2.0 ↔ mvdXML 1.2 Mapping v5.
  *
  * Design:
- *  - One shared "Property Set Value" ConceptTemplate (stable UUID) for Pset.Property mappings.
- *    Its Rules encode the full IFC traversal: IsDefinedBy → IfcRelDefinesByProperties
- *    → IfcPropertySet(PsetName) → HasProperties → IfcPropertySingleValue(PropName, PropValue).
+ *  - One shared "Property Set Value" ConceptTemplate (TPL_PSET_UUID) for Pset_*.Property mappings.
+ *    Rules: IsDefinedBy → IfcRelDefinesByProperties → IfcPropertySet → HasProperties
+ *    → IfcPropertySingleValue (RuleIDs: PsetName, PropName, PropValue).
+ *  - One shared "Element Quantity Value" ConceptTemplate (TPL_QTO_UUID) for Qto_*.Quantity mappings.
+ *    Rules: IsDefinedBy → IfcRelDefinesByProperties → IfcElementQuantity → HasQuantities
+ *    → IfcQuantityLength/Area/Volume/Count/Weight (same RuleIDs: PsetName, PropName, PropValue).
  *  - One ConceptTemplate per unique attribute name for Entity.Attribute mappings,
  *    each with an AttributeRule that hardcodes the attribute name.
  *  - Entity-only IU mappings become the ConceptRoot applicableRootEntity (no Concept needed).
  *  - ALL ERs appear in <ExchangeRequirements>, not only those with IU mappings.
- *  - TemplateRules use the [Value]= qualifier syntax used by standard mvdXML tools.
+ *  - subEr levels 2+ are flattened to their nearest level-1 ancestor's ExchangeRequirement UUID
+ *    (v5 mapping: sub-ER hierarchy → flat ExchangeRequirement list, hierarchy loss is intentional).
+ *  - TemplateRules use qualifier syntax: [Value]='…' for strings, [Exists]=TRUE for booleans.
  *  - Concept <Body> contains the IU definition followed by an optional "DataType: X" line
  *    so round-trips can reconstruct the data type.
  *
@@ -26,8 +32,9 @@
 
 const NS = 'https://standards.buildingsmart.org/MVD/RELEASE/mvdXML/v1-2/';
 
-// Stable UUID for the single shared property-set traversal template.
-const TPL_PSET_UUID = 'b1000001-c0de-4000-8000-000000000001';
+// Stable UUIDs for the two shared traversal templates.
+const TPL_PSET_UUID = 'b1000001-c0de-4000-8000-000000000001'; // Pset_* → IfcPropertySingleValue
+const TPL_QTO_UUID  = 'b1000002-c0de-4000-8000-000000000002'; // Qto_*  → IfcElementQuantity
 
 // ─── utilities ───────────────────────────────────────────────────────────────
 
@@ -115,14 +122,20 @@ function classifyMapping(m, inheritedEntity) {
     const left = element.slice(0, dot);
     const right = element.slice(dot + 1);
     if (!left || !right) return null;
-    if (/^Pset_|^Qto_/i.test(left)) {
+    if (/^Pset_/i.test(left)) {
       return { kind: 'pset', entity: inheritedEntity || 'IfcObject', pset: left, prop: right, attr: null };
+    }
+    if (/^Qto_/i.test(left)) {
+      return { kind: 'qto',  entity: inheritedEntity || 'IfcObject', pset: left, prop: right, attr: null };
     }
     return { kind: 'attr', entity: canonEntity(left) || inheritedEntity || 'IfcObject', attr: right, pset: null, prop: null };
   }
 
-  if (/^Pset_|^Qto_/i.test(element)) {
+  if (/^Pset_/i.test(element)) {
     return { kind: 'pset', entity: inheritedEntity || 'IfcObject', pset: element, prop: null, attr: null };
+  }
+  if (/^Qto_/i.test(element)) {
+    return { kind: 'qto',  entity: inheritedEntity || 'IfcObject', pset: element, prop: null, attr: null };
   }
   if (/^ifc/i.test(element)) {
     return { kind: 'entity', entity: canonEntity(element), pset: null, prop: null, attr: null };
@@ -213,6 +226,65 @@ ${renderDefinitions('Asserts that a named property exists within a named propert
 `;
 }
 
+function renderQtoTemplate(schema) {
+  return `  <ConceptTemplate uuid="${TPL_QTO_UUID}" name="Element Quantity Value" applicableSchema="${schema}" applicableEntity="IfcObject">
+${renderDefinitions('Asserts that a named quantity exists within a named quantity set attached to the entity via IsDefinedBy → IfcRelDefinesByProperties → IfcElementQuantity → HasQuantities → IfcQuantityLength/Area/Volume/Count/Weight.', '    ')}    <Rules>
+      <AttributeRule AttributeName="IsDefinedBy">
+        <EntityRules>
+          <EntityRule EntityName="IfcRelDefinesByProperties">
+            <AttributeRules>
+              <AttributeRule AttributeName="RelatingPropertyDefinition">
+                <EntityRules>
+                  <EntityRule EntityName="IfcElementQuantity">
+                    <AttributeRules>
+                      <AttributeRule RuleID="PsetName" AttributeName="Name"/>
+                      <AttributeRule AttributeName="HasQuantities">
+                        <EntityRules>
+                          <EntityRule EntityName="IfcQuantityLength">
+                            <AttributeRules>
+                              <AttributeRule RuleID="PropName" AttributeName="Name"/>
+                              <AttributeRule RuleID="PropValue" AttributeName="LengthValue"/>
+                            </AttributeRules>
+                          </EntityRule>
+                          <EntityRule EntityName="IfcQuantityArea">
+                            <AttributeRules>
+                              <AttributeRule RuleID="PropName" AttributeName="Name"/>
+                              <AttributeRule RuleID="PropValue" AttributeName="AreaValue"/>
+                            </AttributeRules>
+                          </EntityRule>
+                          <EntityRule EntityName="IfcQuantityVolume">
+                            <AttributeRules>
+                              <AttributeRule RuleID="PropName" AttributeName="Name"/>
+                              <AttributeRule RuleID="PropValue" AttributeName="VolumeValue"/>
+                            </AttributeRules>
+                          </EntityRule>
+                          <EntityRule EntityName="IfcQuantityCount">
+                            <AttributeRules>
+                              <AttributeRule RuleID="PropName" AttributeName="Name"/>
+                              <AttributeRule RuleID="PropValue" AttributeName="CountValue"/>
+                            </AttributeRules>
+                          </EntityRule>
+                          <EntityRule EntityName="IfcQuantityWeight">
+                            <AttributeRules>
+                              <AttributeRule RuleID="PropName" AttributeName="Name"/>
+                              <AttributeRule RuleID="PropValue" AttributeName="WeightValue"/>
+                            </AttributeRules>
+                          </EntityRule>
+                        </EntityRules>
+                      </AttributeRule>
+                    </AttributeRules>
+                  </EntityRule>
+                </EntityRules>
+              </AttributeRule>
+            </AttributeRules>
+          </EntityRule>
+        </EntityRules>
+      </AttributeRule>
+    </Rules>
+  </ConceptTemplate>
+`;
+}
+
 function renderAttrTemplate(uuid, attrName, schema) {
   return `  <ConceptTemplate uuid="${uuid}" name="${escXml(attrName)} Attribute" applicableSchema="${schema}" applicableEntity="IfcRoot">
 ${renderDefinitions(`Asserts the presence of the ${attrName} attribute on the applicable IFC entity.`, '    ')}    <Rules>
@@ -234,7 +306,7 @@ function iuToParams(iu) {
   const ifcExt = exts.find(m => isIfcBasis(m.basis || m.schema || m.standard));
   if (!ifcExt) return null;
   const d = classifyMapping(ifcExt, null);
-  if (!d || d.kind !== 'pset') return null;
+  if (!d || (d.kind !== 'pset' && d.kind !== 'qto')) return null;
   const rules = [];
   if (d.pset) rules.push(`PsetName[Value]='${d.pset.replace(/'/g, "''")}'`);
   if (d.prop)  rules.push(`PropName[Value]='${d.prop.replace(/'/g, "''")}'`);
@@ -348,7 +420,9 @@ function renderConcept(c) {
   const req = c.isMandatory ? 'mandatory' : 'recommended';
   xml += `            <Requirements>\n              <Requirement applicability="both" requirement="${req}" exchangeRequirement="${c.erUuid}"/>\n            </Requirements>\n`;
 
-  if (c.kind === 'pset') {
+  if (c.kind === 'pset' || c.kind === 'qto') {
+    // Both Pset and Qto use the same PsetName/PropName/PropValue RuleID convention;
+    // the difference is which ConceptTemplate (TPL_PSET_UUID vs TPL_QTO_UUID) is referenced.
     const parts = [];
     if (c.pset) parts.push(`PsetName[Value]='${c.pset.replace(/'/g, "''")}'`);
     if (c.prop) parts.push(`PropName[Value]='${c.prop.replace(/'/g, "''")}'`);
@@ -429,12 +503,13 @@ export function generateMvdXml({ headerData = {}, erHierarchy = [] }) {
 
   // ── Templates ──
   // Determine which template kinds are needed before rendering
-  let needsPset = false;
+  let needsPset = false, needsQto = false;
   walkErs(erHierarchy, (er) => {
     walkIus(er.informationUnits, null, (iu, inheritedEntity) => {
       for (const m of iu.correspondingExternalElements || iu.correspondingExternalElement || []) {
         const d = classifyMapping(m, inheritedEntity);
         if (d && d.kind === 'pset') needsPset = true;
+        if (d && d.kind === 'qto')  needsQto  = true;
       }
     });
   });
@@ -442,9 +517,10 @@ export function generateMvdXml({ headerData = {}, erHierarchy = [] }) {
   if (headerData._mvdTemplatesSection) {
     // Re-emit original ConceptTemplates verbatim for round-trip fidelity
     xml += headerData._mvdTemplatesSection.trim() + '\n';
-  } else if (needsPset || attrTemplates.size > 0) {
+  } else if (needsPset || needsQto || attrTemplates.size > 0) {
     xml += `  <Templates>\n`;
     if (needsPset) xml += renderPsetTemplate(schema);
+    if (needsQto)  xml += renderQtoTemplate(schema);
     for (const [attrName, uuid] of attrTemplates) {
       xml += renderAttrTemplate(uuid, attrName, schema);
     }
@@ -582,7 +658,8 @@ export function generateMvdXml({ headerData = {}, erHierarchy = [] }) {
           if (d.kind === 'entity' && hasChildren) continue;
           if (!d.entity) continue;
           let tplUuid = null;
-          if (d.kind === 'pset') tplUuid = TPL_PSET_UUID;
+          if (d.kind === 'pset')      tplUuid = TPL_PSET_UUID;
+          else if (d.kind === 'qto')  tplUuid = TPL_QTO_UUID;
           else if (d.kind === 'attr') tplUuid = attrTemplates.get(d.attr);
           if (!tplUuid) continue;
           if (!byEntity.has(d.entity)) byEntity.set(d.entity, []);
