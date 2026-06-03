@@ -36,6 +36,17 @@ const NS = 'https://standards.buildingsmart.org/MVD/RELEASE/mvdXML/v1-2/';
 const TPL_PSET_UUID = 'b1000001-c0de-4000-8000-000000000001'; // Pset_* → IfcPropertySingleValue
 const TPL_QTO_UUID  = 'b1000002-c0de-4000-8000-000000000002'; // Qto_*  → IfcElementQuantity
 
+// IFC typed property sets (subtypes of IfcPreDefinedPropertySet in IFC4/4x3;
+// IfcPropertySetDefinition subtypes in IFC2x3). These are reached via the same
+// IsDefinedBy → IfcRelDefinesByProperties path as Pset_*/Qto_*, but the RelatingPropertyDefinition
+// resolves to a concrete named entity (not IfcPropertySet/IfcElementQuantity).
+// They must NOT be bound as ConceptRoot/@applicableRootEntity (they are not IfcRoot-based).
+const TYPED_PSET_ENTITIES = new Set([
+  'IfcWindowLiningProperties', 'IfcWindowPanelProperties',
+  'IfcDoorLiningProperties',   'IfcDoorPanelProperties',
+  'IfcReinforcementDefinitionProperties', 'IfcPermeableCoveringProperties',
+]);
+
 // ─── utilities ───────────────────────────────────────────────────────────────
 
 function escXml(s) {
@@ -128,6 +139,12 @@ function classifyMapping(m, inheritedEntity) {
     if (/^Qto_/i.test(left)) {
       return { kind: 'qto',  entity: inheritedEntity || 'IfcObject', pset: left, prop: right, attr: null };
     }
+    // Typed property set (IfcPreDefinedPropertySet subtypes): navigate to it via IsDefinedBy,
+    // not as a direct ConceptRoot entity. Use the inherited host entity as the ConceptRoot.
+    if (TYPED_PSET_ENTITIES.has(left)) {
+      return { kind: 'typed-pset', entity: inheritedEntity || 'IfcObject',
+               typedPsetEntity: left, attr: right, pset: null, prop: null };
+    }
     return { kind: 'attr', entity: canonEntity(left) || inheritedEntity || 'IfcObject', attr: right, pset: null, prop: null };
   }
 
@@ -175,6 +192,28 @@ function collectAttrTemplates(erHierarchy) {
         const d = classifyMapping(m, inheritedEntity);
         if (d && d.kind === 'attr' && d.attr && !map.has(d.attr)) {
           map.set(d.attr, genUuid());
+        }
+      }
+    });
+  });
+  return map;
+}
+
+/**
+ * Returns Map<'TypedPsetEntity.AttrName', {uuid, typedPsetEntity, attrName}> for every
+ * unique typed-property-set attribute referenced in the IU mappings.
+ */
+function collectTypedPsetTemplates(erHierarchy) {
+  const map = new Map();
+  walkErs(erHierarchy, (er) => {
+    walkIus(er.informationUnits, null, (iu, inheritedEntity) => {
+      for (const m of iu.correspondingExternalElements || iu.correspondingExternalElement || []) {
+        const d = classifyMapping(m, inheritedEntity);
+        if (d && d.kind === 'typed-pset') {
+          const key = `${d.typedPsetEntity}.${d.attr}`;
+          if (!map.has(key)) {
+            map.set(key, { uuid: genUuid(), typedPsetEntity: d.typedPsetEntity, attrName: d.attr });
+          }
         }
       }
     });
@@ -272,6 +311,31 @@ ${renderDefinitions('Asserts that a named quantity exists within a named quantit
                           </EntityRule>
                         </EntityRules>
                       </AttributeRule>
+                    </AttributeRules>
+                  </EntityRule>
+                </EntityRules>
+              </AttributeRule>
+            </AttributeRules>
+          </EntityRule>
+        </EntityRules>
+      </AttributeRule>
+    </Rules>
+  </ConceptTemplate>
+`;
+}
+
+function renderTypedPsetTemplate(uuid, typedPsetEntity, attrName, schema) {
+  return `  <ConceptTemplate uuid="${uuid}" name="${escXml(typedPsetEntity + ' ' + attrName)}" applicableSchema="${schema}" applicableEntity="IfcObject">
+${renderDefinitions(`Asserts the ${attrName} attribute on an ${typedPsetEntity} typed property set attached via IsDefinedBy → IfcRelDefinesByProperties → ${typedPsetEntity} → ${attrName}.`, '    ')}    <Rules>
+      <AttributeRule AttributeName="IsDefinedBy">
+        <EntityRules>
+          <EntityRule EntityName="IfcRelDefinesByProperties">
+            <AttributeRules>
+              <AttributeRule AttributeName="RelatingPropertyDefinition">
+                <EntityRules>
+                  <EntityRule EntityName="${escXml(typedPsetEntity)}">
+                    <AttributeRules>
+                      <AttributeRule RuleID="AttrValue" AttributeName="${escXml(attrName)}"/>
                     </AttributeRules>
                   </EntityRule>
                 </EntityRules>
@@ -436,6 +500,18 @@ function renderConcept(c) {
       xml += `            <TemplateRule Parameters="${escXml(parts.join(' and '))}"/>\n`;
     }
   }
+  if (c.kind === 'typed-pset') {
+    // AttrValue RuleID — emit a TemplateRule only when there's a known value constraint or example.
+    const cm = c.iu.constraints
+      ? c.iu.constraints.trim().match(/^([><=!]{1,2})\s*(.+)$/)
+      : null;
+    if (cm) {
+      xml += `            <TemplateRule Parameters="${escXml(`AttrValue[Value] ${cm[1]} '${cm[2].trim().replace(/'/g, "''")}'`)}"/>\n`;
+    } else if (c.iu.examples) {
+      xml += `            <TemplateRule Parameters="${escXml(`AttrValue[Value]='${c.iu.examples.replace(/'/g, "''")}'`)}"/>\n`;
+    }
+    // No constraint: template structure alone asserts existence of the attribute; no rule needed.
+  }
   // attr kind: attribute name is baked into the ConceptTemplate's AttributeRule; no rule needed.
 
   xml += `          </Concept>\n`;
@@ -471,7 +547,8 @@ export function generateMvdXml({ headerData = {}, erHierarchy = [] }) {
 
   const allErs = collectAllErs(erHierarchy);
   const erUuidMap = new Map(allErs.map(({ er, uuid }) => [er.id, uuid]));
-  const attrTemplates = collectAttrTemplates(erHierarchy);
+  const attrTemplates       = collectAttrTemplates(erHierarchy);
+  const typedPsetTemplates  = collectTypedPsetTemplates(erHierarchy);
 
   const mvdUuid = toUuid(headerData.idmGuid);
   const viewUuid = toUuid(headerData.ucGuid || headerData.bcmGuid);
@@ -517,10 +594,13 @@ export function generateMvdXml({ headerData = {}, erHierarchy = [] }) {
   if (headerData._mvdTemplatesSection) {
     // Re-emit original ConceptTemplates verbatim for round-trip fidelity
     xml += headerData._mvdTemplatesSection.trim() + '\n';
-  } else if (needsPset || needsQto || attrTemplates.size > 0) {
+  } else if (needsPset || needsQto || attrTemplates.size > 0 || typedPsetTemplates.size > 0) {
     xml += `  <Templates>\n`;
     if (needsPset) xml += renderPsetTemplate(schema);
     if (needsQto)  xml += renderQtoTemplate(schema);
+    for (const { uuid, typedPsetEntity, attrName } of typedPsetTemplates.values()) {
+      xml += renderTypedPsetTemplate(uuid, typedPsetEntity, attrName, schema);
+    }
     for (const [attrName, uuid] of attrTemplates) {
       xml += renderAttrTemplate(uuid, attrName, schema);
     }
@@ -658,14 +738,16 @@ export function generateMvdXml({ headerData = {}, erHierarchy = [] }) {
           if (d.kind === 'entity' && hasChildren) continue;
           if (!d.entity) continue;
           let tplUuid = null;
-          if (d.kind === 'pset')      tplUuid = TPL_PSET_UUID;
-          else if (d.kind === 'qto')  tplUuid = TPL_QTO_UUID;
-          else if (d.kind === 'attr') tplUuid = attrTemplates.get(d.attr);
+          if (d.kind === 'pset')           tplUuid = TPL_PSET_UUID;
+          else if (d.kind === 'qto')       tplUuid = TPL_QTO_UUID;
+          else if (d.kind === 'typed-pset') tplUuid = typedPsetTemplates.get(`${d.typedPsetEntity}.${d.attr}`)?.uuid;
+          else if (d.kind === 'attr')      tplUuid = attrTemplates.get(d.attr);
           if (!tplUuid) continue;
           if (!byEntity.has(d.entity)) byEntity.set(d.entity, []);
           byEntity.get(d.entity).push({
             iu, erUuid, isMandatory: iu.isMandatory !== false,
             kind: d.kind, pset: d.pset, prop: d.prop, attr: d.attr, entity: d.entity, tplUuid,
+            typedPsetEntity: d.typedPsetEntity || null,
           });
           conceptCount++;
         }
