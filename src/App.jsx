@@ -26,11 +26,13 @@ import { readFileAsText } from './utils/pdfExporter';
 import { defaultIdmXslt } from './utils/defaultIdmXslt';
 import { generateStandaloneHtml } from './utils/htmlExporter';
 import { generateIdsXml } from './utils/idsExporter';
+import { validateIdsXml, formatValidationReport } from './utils/idsValidator';
 import { generateLoinXml } from './utils/loinExporter';
 import { isLoinXml, parseLoinXml } from './utils/loinImporter';
 import { isIdsXml, parseIdsXml } from './utils/idsImporter';
 import { generateMvdXml } from './utils/mvdXmlExporter';
 import { isMvdXml, parseMvdXml } from './utils/mvdXmlImporter';
+import { validateMvdXml } from './utils/mvdXmlValidator';
 import { importXppm } from './utils/xppmImporter';
 import { normalizePath, basename as fpBasename, bpmnCandidates, imageCandidates } from './utils/filePathUtils.js';
 import {
@@ -2892,7 +2894,19 @@ const App = () => {
         const isXppmContent = isIdmTag && !isV2;
 
         if (isMvdContent) {
-          // mvdXML detected — route to mvdXML importer
+          // mvdXML detected — validate then route to mvdXML importer
+          const mvdValidation = validateMvdXml(content);
+          if (!mvdValidation.valid) {
+            const proceed = window.confirm(
+              `mvdXML ${mvdValidation.version} validation errors found in "${file.name}":\n\n` +
+              mvdValidation.errors.map(e => '• ' + e).join('\n') +
+              (mvdValidation.warnings.length > 0 ? '\n\nWarnings:\n' + mvdValidation.warnings.map(w => '• ' + w).join('\n') : '') +
+              '\n\nImport anyway?'
+            );
+            if (!proceed) return;
+          } else if (mvdValidation.warnings.length > 0) {
+            console.warn('mvdXML import warnings:', mvdValidation.warnings);
+          }
           try {
             isLoadingProjectRef.current = true;
             const mvdData = parseMvdXml(content);
@@ -2968,7 +2982,19 @@ const App = () => {
             isLoadingProjectRef.current = false;
           }
         } else if (isIdsContent) {
-          // IDS XML detected — route to IDS importer
+          // IDS XML detected — validate then route to IDS importer
+          const idsValidation = validateIdsXml(content);
+          if (!idsValidation.valid) {
+            const proceed = window.confirm(
+              `IDS validation errors found in "${file.name}":\n\n` +
+              idsValidation.errors.map(e => '• ' + e).join('\n') +
+              (idsValidation.warnings.length > 0 ? '\n\nWarnings:\n' + idsValidation.warnings.map(w => '• ' + w).join('\n') : '') +
+              '\n\nImport anyway?'
+            );
+            if (!proceed) return;
+          } else if (idsValidation.warnings.length > 0) {
+            console.warn('IDS import warnings:', idsValidation.warnings);
+          }
           try {
             isLoadingProjectRef.current = true;
             const idsData = parseIdsXml(content);
@@ -3182,7 +3208,19 @@ const App = () => {
           setHasActiveProject(true);
         }
       } else if (fileName.endsWith('.mvdxml')) {
-        // Parse as mvdXML file
+        // Validate then parse as mvdXML file
+        const mvdValidation = validateMvdXml(content);
+        if (!mvdValidation.valid) {
+          const proceed = window.confirm(
+            `mvdXML ${mvdValidation.version} validation errors found in "${fileName}":\n\n` +
+            mvdValidation.errors.map(e => '• ' + e).join('\n') +
+            (mvdValidation.warnings.length > 0 ? '\n\nWarnings:\n' + mvdValidation.warnings.map(w => '• ' + w).join('\n') : '') +
+            '\n\nImport anyway?'
+          );
+          if (!proceed) return;
+        } else if (mvdValidation.warnings.length > 0) {
+          console.warn('mvdXML import warnings:', mvdValidation.warnings);
+        }
         try {
           isLoadingProjectRef.current = true;
           const mvdData = parseMvdXml(content);
@@ -3220,7 +3258,19 @@ const App = () => {
           isLoadingProjectRef.current = false;
         }
       } else if (fileName.endsWith('.ids')) {
-        // Parse as IDS file
+        // Validate then parse as IDS file
+        const idsValidation = validateIdsXml(content);
+        if (!idsValidation.valid) {
+          const proceed = window.confirm(
+            `IDS validation errors found in "${fileName}":\n\n` +
+            idsValidation.errors.map(e => '• ' + e).join('\n') +
+            (idsValidation.warnings.length > 0 ? '\n\nWarnings:\n' + idsValidation.warnings.map(w => '• ' + w).join('\n') : '') +
+            '\n\nImport anyway?'
+          );
+          if (!proceed) return;
+        } else if (idsValidation.warnings.length > 0) {
+          console.warn('IDS import warnings:', idsValidation.warnings);
+        }
         try {
           isLoadingProjectRef.current = true;
           const idsData = parseIdsXml(content);
@@ -4204,6 +4254,16 @@ const App = () => {
             console.info(`IDS export: ${idsResult.specCount} specification(s) generated, ${idsResult.skippedCount} ER(s) skipped (no IFC mappings)`);
           }
 
+          // Validate the generated XML before saving
+          const idsValidation = validateIdsXml(idsResult.xml);
+          if (!idsValidation.valid) {
+            alert('IDS export validation FAILED.\n\nThe generated file has schema errors:\n\n' +
+              idsValidation.errors.map(e => '• ' + e).join('\n') +
+              '\n\nPlease report this issue. The file will still be saved.');
+          } else if (idsValidation.warnings.length > 0) {
+            console.warn('IDS export warnings:', idsValidation.warnings);
+          }
+
           await saveFile(idsResult.xml, `${fileName}.ids`, 'application/xml');
           break;
         }
@@ -4236,7 +4296,7 @@ const App = () => {
         }
 
         case 'mvd': {
-          // mvdXML 1.1 (buildingSMART Model View Definition)
+          // mvdXML 1.2 (buildingSMART Model View Definition)
           const mvdResult = generateMvdXml({ headerData, erHierarchy });
 
           if (mvdResult.conceptCount === 0) {
@@ -4247,6 +4307,16 @@ const App = () => {
 
           if (mvdResult.skippedIUs > 0) {
             console.info(`mvdXML export: ${mvdResult.conceptCount} concept(s), ${mvdResult.rootCount} root entity/entities, ${mvdResult.skippedIUs} IU(s) skipped (no IFC mappings)`);
+          }
+
+          // Validate the generated file against mvdXML 1.2 schema rules
+          const mvdExportValidation = validateMvdXml(mvdResult.xml);
+          if (!mvdExportValidation.valid) {
+            alert('mvdXML 1.2 export validation FAILED.\n\nThe generated file has schema errors:\n\n' +
+              mvdExportValidation.errors.map(e => '• ' + e).join('\n') +
+              '\n\nThe file will still be saved but may not be accepted by mvdXML 1.2 compliant tools.');
+          } else if (mvdExportValidation.warnings.length > 0) {
+            console.warn('mvdXML export warnings:', mvdExportValidation.warnings);
           }
 
           const mvdExt = exportOptions.mvdExtension === 'xml' ? 'xml' : 'mvdxml';
@@ -4632,7 +4702,19 @@ const App = () => {
           isLoadingProjectRef.current = false;
         }
       } else if (data.type === 'ids') {
-        // Handle IDS import
+        // Validate then handle IDS import
+        const idsValidation = validateIdsXml(data.content);
+        if (!idsValidation.valid) {
+          const proceed = window.confirm(
+            `IDS validation errors found in "${data.filePath || 'ids-import.ids'}":\n\n` +
+            idsValidation.errors.map(e => '• ' + e).join('\n') +
+            (idsValidation.warnings.length > 0 ? '\n\nWarnings:\n' + idsValidation.warnings.map(w => '• ' + w).join('\n') : '') +
+            '\n\nImport anyway?'
+          );
+          if (!proceed) return;
+        } else if (idsValidation.warnings.length > 0) {
+          console.warn('IDS import warnings:', idsValidation.warnings);
+        }
         try {
           isLoadingProjectRef.current = true;
           const idsData = parseIdsXml(data.content);
@@ -4670,7 +4752,19 @@ const App = () => {
           isLoadingProjectRef.current = false;
         }
       } else if (data.type === 'mvdxml') {
-        // Handle mvdXML import
+        // Handle mvdXML import — validate first
+        const mvdValidation = validateMvdXml(data.content);
+        if (!mvdValidation.valid) {
+          const proceed = window.confirm(
+            `mvdXML ${mvdValidation.version} validation errors found in "${data.filePath || 'mvdxml-import.mvdxml'}":\n\n` +
+            mvdValidation.errors.map(e => '• ' + e).join('\n') +
+            (mvdValidation.warnings.length > 0 ? '\n\nWarnings:\n' + mvdValidation.warnings.map(w => '• ' + w).join('\n') : '') +
+            '\n\nImport anyway?'
+          );
+          if (!proceed) return;
+        } else if (mvdValidation.warnings.length > 0) {
+          console.warn('mvdXML import warnings:', mvdValidation.warnings);
+        }
         try {
           isLoadingProjectRef.current = true;
           const mvdData = parseMvdXml(data.content);
@@ -5290,7 +5384,10 @@ const App = () => {
                          exportFormat === 'idmxml-v2' ? '.xml' :
                          exportFormat === 'html' ? '.html' :
                          exportFormat === 'zip' ? '.zip' :
-                         exportFormat === 'bpmn' ? '.bpmn' : ''}
+                         exportFormat === 'ids' ? '.ids' :
+                         exportFormat === 'bpmn' ? '.bpmn' :
+                         exportFormat === 'mvd' ? (exportOptions.mvdExtension === 'xml' ? '.xml' : '.mvdxml') :
+                         exportFormat === 'loin' ? '.xml' : ''}
                       </span>
                     </div>
                     {window.electronAPI?.showSaveLocation && (
@@ -5402,6 +5499,61 @@ const App = () => {
                     <div className="export-format-content">
                       <span className="export-format-title">BPMN Only (.bpmn)</span>
                       {exportFormat === 'bpmn' && <span className="export-format-desc">Process map diagram only</span>}
+                    </div>
+                  </div>
+
+                  {/* IDS + inline sub-options */}
+                  <div className={`export-format-option ${exportFormat === 'ids' ? 'selected' : ''}`} data-format="ids" onClick={() => setExportFormat('ids')}>
+                    <input type="radio" name="exportFormat" value="ids" checked={exportFormat === 'ids'} onChange={(e) => setExportFormat(e.target.value)} />
+                    <div className="export-format-content">
+                      <span className="export-format-title">IDS (.ids)</span>
+                      {exportFormat === 'ids' && (
+                        <>
+                          <span className="export-format-desc">buildingSMART Information Delivery Specification for IFC validation</span>
+                          <div className="export-suboptions" onClick={(e) => e.stopPropagation()}>
+                            <p className="export-option-label">Target IFC Version:</p>
+                            <select
+                              value={exportOptions.idsIfcVersion}
+                              onChange={(e) => setExportOptions(prev => ({ ...prev, idsIfcVersion: e.target.value }))}
+                              className="export-ids-select"
+                            >
+                              <option value="IFC2X3">IFC 2X3</option>
+                              <option value="IFC4">IFC 4</option>
+                              <option value="IFC4X3_ADD2">IFC 4X3 ADD2 (recommended)</option>
+                            </select>
+                            <p style={{ fontSize: '11px', color: 'var(--text-tertiary, #888)', margin: '4px 0 0 0' }}>
+                              IDS exports only IFC-mappable requirements. Information Units need external element mappings (e.g., Pset_WallCommon.FireRating) to be included. The exported file is validated against the IDS XSD schema before saving.
+                            </p>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* mvdXML 1.2 + inline sub-options */}
+                  <div className={`export-format-option ${exportFormat === 'mvd' ? 'selected' : ''}`} data-format="mvd" onClick={() => setExportFormat('mvd')}>
+                    <input type="radio" name="exportFormat" value="mvd" checked={exportFormat === 'mvd'} onChange={(e) => setExportFormat(e.target.value)} />
+                    <div className="export-format-content">
+                      <span className="export-format-title">mvdXML 1.2 (.mvdxml)</span>
+                      {exportFormat === 'mvd' && (
+                        <>
+                          <span className="export-format-desc">buildingSMART Model View Definition — mvdXML Version 1.2</span>
+                          <div className="export-suboptions" onClick={(e) => e.stopPropagation()}>
+                            <p className="export-option-label">File extension:</p>
+                            <select
+                              value={exportOptions.mvdExtension}
+                              onChange={(e) => setExportOptions(prev => ({ ...prev, mvdExtension: e.target.value }))}
+                              className="export-ids-select"
+                            >
+                              <option value="mvdxml">.mvdxml (recommended)</option>
+                              <option value="xml">.xml</option>
+                            </select>
+                            <p style={{ fontSize: '11px', color: 'var(--text-tertiary, #888)', margin: '4px 0 0 0' }}>
+                              Exports IFC-mappable requirements as ConceptTemplates and Concepts. Requires Information Units with IFC external element mappings. The exported file is validated against the mvdXML 1.2 schema before saving.
+                            </p>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
 

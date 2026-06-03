@@ -39,6 +39,20 @@ const FilePickerModal = ({ isOpen, onClose, onFileSelected }) => {
       description: 'Legacy xPPM format import'
     },
     {
+      id: 'mvdxml',
+      name: 'mvdXML 1.2',
+      extension: '.mvdxml',
+      accept: '.mvdxml,.xml',
+      description: 'Model View Definition — mvdXML Version 1.2 (buildingSMART)'
+    },
+    {
+      id: 'ids',
+      name: 'IDS',
+      extension: '.ids',
+      accept: '.ids,.xml',
+      description: 'Information Delivery Specification (buildingSMART)'
+    },
+    {
       id: 'bpmn',
       name: 'BPMN Diagram',
       extension: '.bpmn',
@@ -56,7 +70,7 @@ const FilePickerModal = ({ isOpen, onClose, onFileSelected }) => {
       id: 'all',
       name: 'All Supported Formats',
       extension: '.*',
-      accept: '.idm,.json,.xml,.zip,.idmx,.xppm,.bpmn,.html,.htm',
+      accept: '.idm,.json,.xml,.ids,.mvdxml,.zip,.idmx,.xppm,.bpmn,.html,.htm',
       description: 'Show all supported file types'
     }
   ];
@@ -125,6 +139,16 @@ const FilePickerModal = ({ isOpen, onClose, onFileSelected }) => {
                   {format.id === 'xppm' && (
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 9V3.5L18.5 9H13zM9.5 13l2 3-2 3H11l1.25-2 1.25 2h1.5l-2-3 2-3H13.5l-1 1.5L11.5 13H9.5z"/>
+                    </svg>
+                  )}
+                  {format.id === 'mvdxml' && (
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 7V3.5L18.5 9H13zM9 12h6v1.5H9V12zm3 3.5l-3 1.5v-1.2l2-1-2-1V13.3l3 1.5v.7zm3 1.5h-2v-1.5h2V17z"/>
+                    </svg>
+                  )}
+                  {format.id === 'ids' && (
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 7V3.5L18.5 9H13zM9 13h6v1.5H9V13zm0 3h6v1.5H9V16zm0-6h2v1.5H9V10z"/>
                     </svg>
                   )}
                   {format.id === 'bpmn' && (

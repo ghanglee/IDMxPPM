@@ -1,7 +1,14 @@
 /**
- * IDS (Information Delivery Specification) Exporter
- * Generates IDS v1.0 XML from IDM Exchange Requirements
+ * IDS v1.0 Exporter
+ * Generates IDS XML from IDM Exchange Requirements, compliant with the
+ * buildingSMART IDS v1.0 schema.
+ *
  * Schema: http://standards.buildingsmart.org/IDS/1.0/ids.xsd
+ *
+ * Round-trip notes:
+ *   author email recovered from author.uri; author.givenName checked as fallback
+ *   for hand-authored projects and files imported before the uri-storage fix.
+ *   IFC entity names are uppercased (IFCWALL) per IDS XSD requirement.
  */
 
 // Fallback map: IDM generic data types → IFC defined types
@@ -360,9 +367,10 @@ export function generateIdsXml({ headerData, erHierarchy, ifcVersion = 'IFC4X3_A
   const allERs = collectAllERs(erHierarchy || []);
 
   const authorEmail = (() => {
-    if (headerData.authors && headerData.authors.length > 0) {
-      const first = headerData.authors[0];
-      if (first.uri && first.uri.includes('@')) return first.uri;
+    for (const a of headerData.authors || []) {
+      if (a.uri && a.uri.includes('@')) return a.uri;
+      // Fallback: older imports stored email in givenName before the uri-storage fix
+      if (a.givenName && a.givenName.includes('@')) return a.givenName;
     }
     return '';
   })();

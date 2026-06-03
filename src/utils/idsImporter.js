@@ -1,8 +1,15 @@
 /**
- * IDS (Information Delivery Specification) Importer
- * Parses IDS XML (buildingSMART) and converts to IDM project data
+ * IDS v1.0 Importer
+ * Parses IDS XML (buildingSMART) and converts to IDM project data.
+ * Compliant with the IDS v1.0 schema (ids.xsd).
+ *
  * Reference: https://github.com/buildingSMART/IDS
- * Schema: http://standards.buildingsmart.org/IDS/1.0/ids.xsd
+ * Schema:    http://standards.buildingsmart.org/IDS/1.0/ids.xsd
+ *
+ * Round-trip notes:
+ *   <info>/<author> is an email address — stored in author.uri for faithful re-export.
+ *   Structured IU applicability (_idsApplicability) preserves entity/predefinedType for export.
+ *   _idsCardinality: null = not present in source (omit on export), string = explicit value.
  */
 
 // Map IFC data type names to IDM data types
@@ -414,12 +421,13 @@ export function parseIdsXml(content) {
   }
 
   if (author) {
+    // IDS <author> is an email address. Store in uri so idsExporter can recover it.
     headerData.authors.push({
       id: generateUUID(),
       type: 'person',
-      givenName: author,
+      givenName: author.includes('@') ? '' : author,
       familyName: '',
-      uri: '',
+      uri: author,
       affiliation: copyright || '',
     });
   }
@@ -454,12 +462,17 @@ export function parseIdsXml(content) {
     }
   }
 
+  // Detect IDS schema version from xsi:schemaLocation (e.g. ".../IDS/1.0/ids.xsd")
+  const versionMatch = content.match(/IDS\/(\d+\.\d+)\/ids\.xsd/i);
+  const idsVersion = versionMatch ? versionMatch[1] : '1.0';
+
   return {
     headerData,
     erHierarchy: [rootER],
     bpmnXml: null,
     totalSpecifications: rootInformationUnits.length,
     totalIUs,
+    idsVersion,
   };
 }
 

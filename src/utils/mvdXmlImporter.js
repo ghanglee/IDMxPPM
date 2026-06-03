@@ -1,5 +1,8 @@
 /**
- * mvdXML 1.1 Importer
+ * mvdXML 1.1 / 1.2 Importer
+ *
+ * Supports both mvdXML 1.1 (namespace: http://buildingsmart-tech.org/mvdXML/mvdXML1-1)
+ * and mvdXML 1.2 (namespace: http://buildingsmart-tech.org/mvd/XML/1.2).
  *
  * Mapping:
  *   mvdXML/@uuid                → idmGuid
@@ -8,6 +11,11 @@
  *   ConceptRoot + Concept       → Sub-Sub-ER with applicableRootEntity as ext.elem
  *   Each leaf <TemplateRule>    → separate informationUnit (AND = independent requirement)
  *   Template Rules tree         → RuleID → IFC-path map for external element resolution
+ *
+ * mvdXML 1.2 additions handled:
+ *   TemplateRule/@Order         → stored as _mvdOrder for round-trip
+ *   TemplateRule/@Usage         → stored as _mvdUsage for round-trip
+ *   Nested ModelViews           → merged with parent ModelView's concept roots
  */
 
 const SCHEMA_TO_BASIS = {
@@ -210,24 +218,32 @@ function buildRuleIdPathMap(rulesEl, contextEntity, templateMap, visited, depth)
         }
       }
 
-      // Inline referenced sub-template
+      // Inline referenced sub-template.
+      // Draft9: EntityRule has a direct <Template ref="..."/> child (simplified from References/Template).
+      // Earlier schemas: EntityRule has <References><Template ref="..."/></References>.
+      // Collect candidate Template elements from both locations for cross-version compatibility.
+      const refTemplateEls = [];
+      const directTplEl = getChild(entityRule, 'Template');
+      if (directTplEl) refTemplateEls.push(directTplEl);
       const refsEl = getChild(entityRule, 'References');
       if (refsEl) {
         const refNodes = refsEl.childNodes;
         for (let k = 0; k < refNodes.length; k++) {
-          const tplRef = refNodes[k];
-          if (tplRef.nodeType !== 1 || tplRef.localName !== 'Template') continue;
-          const refUuid = tplRef.getAttribute('ref') || '';
-          if (!refUuid || visited.has(refUuid)) continue;
-          const tplInfo = templateMap.get(refUuid);
-          if (!tplInfo || !tplInfo.el) continue;
-          const newVisited = new Set(visited);
-          newVisited.add(refUuid);
-          const subRulesEl = getChild(tplInfo.el, 'Rules');
-          if (subRulesEl) {
-            const sub = buildRuleIdPathMap(subRulesEl, entityName, templateMap, newVisited, depth + 1);
-            Object.assign(pathMap, sub);
-          }
+          const n = refNodes[k];
+          if (n.nodeType === 1 && n.localName === 'Template') refTemplateEls.push(n);
+        }
+      }
+      for (const tplRefEl of refTemplateEls) {
+        const refUuid = tplRefEl.getAttribute('ref') || '';
+        if (!refUuid || visited.has(refUuid)) continue;
+        const tplInfo = templateMap.get(refUuid);
+        if (!tplInfo || !tplInfo.el) continue;
+        const newVisited = new Set(visited);
+        newVisited.add(refUuid);
+        const subRulesEl = getChild(tplInfo.el, 'Rules');
+        if (subRulesEl) {
+          const sub = buildRuleIdPathMap(subRulesEl, entityName, templateMap, newVisited, depth + 1);
+          Object.assign(pathMap, sub);
         }
       }
     }
@@ -443,10 +459,11 @@ function normalizeDataType(dt) {
 // ─── main import ──────────────────────────────────────────────────────────────
 
 /**
- * Parse an mvdXML 1.1 document and convert to IDM project data.
+ * Parse an mvdXML 1.1 or 1.2 document and convert to IDM project data.
+ * Both versions use the same DOM structure; the namespace is namespace-safe (localName-based).
  *
  * @param {string} content - raw XML string
- * @returns {{ headerData, erHierarchy, bpmnXml, totalERs, totalConcepts, totalIUs }}
+ * @returns {{ headerData, erHierarchy, bpmnXml, totalERs, totalConcepts, totalIUs, mvdVersion }}
  */
 export function parseMvdXml(content) {
   const parser = new DOMParser();
@@ -469,6 +486,14 @@ export function parseMvdXml(content) {
   if (!root || root.localName !== 'mvdXML') {
     throw new Error('Not an mvdXML document: root element is <' + (root ? root.localName : 'null') + '>');
   }
+
+  // Detect namespace version
+  const rootNs = root.namespaceURI || '';
+  const mvdSchemaVersion =
+    rootNs.includes('standards.buildingsmart.org/MVD/RELEASE/mvdXML/v1-2') ? '1.2'  // Draft9+
+    : rootNs.includes('/mvd/XML/1.2') ? '1.2'                                        // Draft1-8
+    : rootNs.includes('mvdXML1-1')    ? '1.1'
+    : 'unknown';
 
   const mvdName      = root.getAttribute('name')      || 'mvdXML Import';
   const mvdCopyright = root.getAttribute('copyright') || '';
@@ -516,13 +541,44 @@ export function parseMvdXml(content) {
   }
   const firstErUuid = erMetadata.length > 0 ? erMetadata[0].uuid : null;
 
-  // ── Walk ConceptRoots → build one ER per ConceptRoot ──
+  // ── Walk ConceptRoots → create IUs (not ERs) for entities and their properties ──
+  //
+  // mvdXML structure → IDM mapping:
+  //   ExchangeRequirement  → ER  (the actual exchange scenario)
+  //   ConceptRoot entity   → IU  with entity external element, inside the ER
+  //   Concept              → IU  child of entity IU (groups template rules)
+  //   TemplateRule         → IU  child of concept IU (leaf: property/attribute)
+
   const rootsEl      = getChild(modelView, 'Roots');
   const conceptRoots = rootsEl ? getChildren(rootsEl, 'ConceptRoot') : [];
 
   let totalConcepts = 0;
   let totalIUs = 0;
-  const conceptRootERs = [];
+
+  // Build one ER object per ExchangeRequirement.
+  // Prepend "Applicability: X." so the exporter's extractApplicability() can round-trip it.
+  const exchangeErObjects = erMetadata.map(meta => {
+    const applNote = (meta.applicability && meta.applicability !== 'both')
+      ? `Applicability: ${meta.applicability}.\n` : '';
+    return {
+      id:   genUuid(),
+      guid: meta.uuid,
+      name: meta.name,
+      description: (applNote + (meta.body || '')).trim(),
+      informationUnits: [],
+      subERs: [],
+      correspondingExternalElements: [],
+    };
+  });
+  const erObjByUuid = new Map(exchangeErObjects.map(er => [er.guid, er]));
+
+  // When a Concept references no known ER (or the file has no ExchangeRequirements at all),
+  // fall back to the first ER or create a synthetic one.
+  const fallbackEr = exchangeErObjects.length > 0
+    ? exchangeErObjects[0]
+    : { id: genUuid(), guid: genUuid(), name: viewName || mvdName,
+        description: viewBody || '', informationUnits: [], subERs: [],
+        correspondingExternalElements: [] };
 
   for (let ri = 0; ri < conceptRoots.length; ri++) {
     const rootEl     = conceptRoots[ri];
@@ -532,9 +588,11 @@ export function parseMvdXml(content) {
     const rootUuid   = rootEl.getAttribute('uuid') || genUuid();
     const rootBody   = getDefinitionBody(rootEl);
 
-    const conceptsWrap  = getChild(rootEl, 'Concepts');
-    const concepts      = conceptsWrap ? getChildren(conceptsWrap, 'Concept') : [];
-    const conceptSubERs = [];
+    const conceptsWrap = getChild(rootEl, 'Concepts');
+    const concepts     = conceptsWrap ? getChildren(conceptsWrap, 'Concept') : [];
+
+    // Collect concept-level IUs grouped by the ExchangeRequirement they reference
+    const conceptIUsByEr = new Map(); // erUuid → [IU]
 
     for (let ci = 0; ci < concepts.length; ci++) {
       const conceptEl   = concepts[ci];
@@ -547,18 +605,42 @@ export function parseMvdXml(content) {
       const tplRef   = tplRefEl ? (tplRefEl.getAttribute('ref') || '') : '';
       const tplInfo  = tplRef ? templateMap.get(tplRef) : null;
 
-      // Hierarchical IU list: nested TemplateRules → subInformationUnits of preceding leaf
+      // TemplateRules → leaf IUs (property/attribute external elements)
       const tplRulesEl = getChild(conceptEl, 'TemplateRules');
-      const ius = buildIusFromTemplateRules(tplRulesEl, rootEntity, basis, templateMap, tplRef);
-      totalIUs += ius.length;
+      let leafIUs = buildIusFromTemplateRules(tplRulesEl, rootEntity, basis, templateMap, tplRef);
+      totalIUs += leafIUs.length;
 
-      // Raw TemplateRules XML for verbatim re-emission on export
-      let _mvdTemplateRulesXml = null;
-      if (tplRulesEl) {
-        try {
-          const raw = new XMLSerializer().serializeToString(tplRulesEl);
-          _mvdTemplateRulesXml = raw.replace(/ xmlns(?::\w+)?="[^"]*"/g, '');
-        } catch (_) { /* ignore — export falls back to IU reconstruction */ }
+      // No TemplateRules and no leaf IUs: this is likely an attribute concept where the
+      // attribute name is baked into the ConceptTemplate's AttributeRule (no parameters
+      // are needed). Recover the external element directly from the template structure.
+      // A simple attribute template has exactly one top-level AttributeRule with no
+      // nested EntityRules; skip complex templates (pset traversal, etc.) which do have them.
+      if (leafIUs.length === 0 && !tplRulesEl && tplInfo && tplInfo.el) {
+        const tplRulesBlock = getChild(tplInfo.el, 'Rules');
+        if (tplRulesBlock) {
+          const topAttrRules = getChildren(tplRulesBlock, 'AttributeRule');
+          if (topAttrRules.length === 1 && !getChild(topAttrRules[0], 'EntityRules')) {
+            const attrName = topAttrRules[0].getAttribute('AttributeName') || '';
+            if (attrName && rootEntity) {
+              leafIUs = [{
+                id: genUuid(),
+                name: attrName,
+                dataType: 'String',
+                isMandatory: true,
+                definition: '',
+                examples: '',
+                constraints: '',
+                correspondingExternalElements: [{
+                  id: genUuid(), basis,
+                  name: `${rootEntity}.${attrName}`,
+                  description: 'IFC Attribute',
+                }],
+                subInformationUnits: [],
+              }];
+              totalIUs++;
+            }
+          }
+        }
       }
 
       const reqsEl = getChild(conceptEl, 'Requirements');
@@ -566,8 +648,7 @@ export function parseMvdXml(content) {
       const isMandatory = reqs.length === 0 ||
         reqs.some(r => (r.getAttribute('requirement') || '').toLowerCase() === 'mandatory');
 
-      // Which ExchangeRequirement and applicability apply to this Concept?
-      let exchangeReqUuid = firstErUuid;
+      let exchangeReqUuid = firstErUuid || fallbackEr.guid;
       let applicability   = 'both';
       for (let k = 0; k < reqs.length; k++) {
         const erUuid = reqs[k].getAttribute('exchangeRequirement') || '';
@@ -579,47 +660,78 @@ export function parseMvdXml(content) {
       const effectiveBody = conceptBody || (tplInfo && tplInfo.body) || '';
       const { definition: conceptDef } = parseBodyMetadata(effectiveBody);
 
-      conceptSubERs.push({
-        id:   genUuid(),
-        guid: conceptEl.getAttribute('uuid') || genUuid(),
-        name: conceptName || rootEntity,
-        description: conceptDef,
-        _mvdTemplateRef:             tplRef || null,
-        _mvdTopOperator:             tplRulesEl ? (tplRulesEl.getAttribute('operator') || 'and') : null,
-        _mvdTemplateRulesXml:        _mvdTemplateRulesXml || null,
-        _mvdExchangeRequirementUuid: exchangeReqUuid,
-        _mvdApplicability:           applicability,
-        isMandatory,
-        informationUnits: ius,
-        subERs:           [],
-        correspondingExternalElements: [],
-      });
+      // When a Concept produces exactly one leaf IU, collapse them into a single IU:
+      // the concept name is the meaningful label; the leaf holds the IFC mapping.
+      // Definitions from both levels are merged; raw TemplateRule params are preserved
+      // on _mvdParams so the exporter can reconstruct the Parameters string.
+      // When there are multiple leaves, keep the Concept as a Structured parent IU.
+      let conceptIU;
+      if (leafIUs.length === 1) {
+        const only = leafIUs[0];
+        conceptIU = {
+          id:   genUuid(),
+          guid: conceptEl.getAttribute('uuid') || genUuid(),
+          name: conceptName || only.name || rootEntity,
+          dataType: only.dataType || 'String',
+          isMandatory,
+          definition:  conceptDef || '',
+          examples:    only.examples || '',
+          constraints: only.constraints || '',
+          correspondingExternalElements: only.correspondingExternalElements || [],
+          subInformationUnits: only.subInformationUnits || [],
+          _mvdParams: only._mvdParams || null,
+        };
+      } else {
+        conceptIU = {
+          id:   genUuid(),
+          guid: conceptEl.getAttribute('uuid') || genUuid(),
+          name: conceptName || rootEntity,
+          dataType: 'Structured',
+          isMandatory,
+          definition:  conceptDef || '',
+          examples:    '',
+          constraints: '',
+          correspondingExternalElements: [],
+          subInformationUnits: leafIUs,
+        };
+      }
+
+      if (!conceptIUsByEr.has(exchangeReqUuid)) conceptIUsByEr.set(exchangeReqUuid, []);
+      conceptIUsByEr.get(exchangeReqUuid).push(conceptIU);
     }
 
-    // ConceptRoot ER: entity ext.elm identifies it as a ConceptRoot for the exporter
-    conceptRootERs.push({
-      id:   genUuid(),
-      guid: rootUuid,
-      name: `er_${rootName}`,
-      description: rootBody,
-      informationUnits: [],
-      subERs: conceptSubERs,
-      correspondingExternalElements: rootEntity
-        ? [{ id: genUuid(), basis, name: rootEntity, description: 'IFC Entity' }]
-        : [],
-    });
+    // For each ER referenced by this ConceptRoot, create one entity IU
+    for (const [erUuid, conceptIUs] of conceptIUsByEr) {
+      const er = erObjByUuid.get(erUuid) || fallbackEr;
+
+      er.informationUnits.push({
+        id:   genUuid(),
+        guid: rootUuid,
+        name: rootName,
+        dataType: 'Structured',
+        isMandatory: conceptIUs.some(c => c.isMandatory),
+        definition:  rootBody || '',
+        examples:    '',
+        constraints: '',
+        correspondingExternalElements: rootEntity
+          ? [{ id: genUuid(), basis, name: rootEntity, description: 'IFC Entity' }]
+          : [],
+        subInformationUnits: conceptIUs,
+      });
+    }
   }
 
-  // Single ConceptRoot → it is the root ER directly.
-  // Multiple ConceptRoots → wrap under a ModelView ER.
-  const rootER = conceptRootERs.length === 1
-    ? conceptRootERs[0]
+  // Build the ER hierarchy: single ER becomes the root, multiple get wrapped under ModelView ER
+  const topLevelERs = exchangeErObjects.length > 0 ? exchangeErObjects : [fallbackEr];
+  const rootER = topLevelERs.length === 1
+    ? topLevelERs[0]
     : {
         id:   genUuid(),
-        name: `er_${viewName || mvdName}`,
+        guid: viewUuid || genUuid(),
+        name: viewName || mvdName,
         description: viewBody || '',
         informationUnits: [],
-        subERs: conceptRootERs,
+        subERs: topLevelERs,
         correspondingExternalElements: [],
       };
 
@@ -656,8 +768,8 @@ export function parseMvdXml(content) {
     summary:     viewBody || mvdName,
     authors,
     actorsList:  [],
-    _mvdTemplatesSection:     _mvdTemplatesSection || null,
-    _mvdExchangeRequirements: erMetadata,
+    _mvdTemplatesSection:     null,
+    _mvdExchangeRequirements: [],
   };
 
   return {
@@ -667,11 +779,16 @@ export function parseMvdXml(content) {
     totalERs:      erMetadata.length,
     totalConcepts,
     totalIUs,
+    mvdVersion:    mvdSchemaVersion,
   };
 }
 
-/** Detect whether XML content is an mvdXML file. */
+/**
+ * Detect whether XML content is an mvdXML file (any version: 1.1, 1.2 Draft1-8, 1.2 Draft9+).
+ */
 export function isMvdXml(content) {
   if (!content) return false;
-  return /<mvdXML[\s>]/.test(content) || /buildingsmart-tech\.org\/mvd(?:XML)?\//.test(content);
+  return /<mvdXML[\s>]/.test(content) ||
+    /buildingsmart(?:-tech)?\.org\/mvd(?:XML)?\//.test(content) ||
+    /standards\.buildingsmart\.org\/MVD\/RELEASE\/mvdXML/.test(content);
 }

@@ -1,7 +1,7 @@
 /**
- * mvdXML 1.1 Exporter
+ * mvdXML 1.2 Exporter
  * Generates proper ConceptTemplate → ConceptRoot → Concept structure
- * from IDM erHierarchy data.
+ * from IDM erHierarchy data, compliant with the buildingSMART mvdXML 1.2 schema.
  *
  * Design:
  *  - One shared "Property Set Value" ConceptTemplate (stable UUID) for Pset.Property mappings.
@@ -14,9 +14,17 @@
  *  - TemplateRules use the [Value]= qualifier syntax used by standard mvdXML tools.
  *  - Concept <Body> contains the IU definition followed by an optional "DataType: X" line
  *    so round-trips can reconstruct the data type.
+ *
+ * Namespace: https://standards.buildingsmart.org/MVD/RELEASE/mvdXML/v1-2/
+ * Schema:    mvdXML 1.2 Draft9 (02.07.2021)
+ *
+ * Draft9 constraints applied:
+ *  - TemplateRules/@operator no longer accepts "not"
+ *  - TemplateRules requires ≥2 child rules; a lone rule is a bare <TemplateRule> under <Concept>
+ *  - Concept sequence: Definitions?, Template+, Requirements?, (TemplateRules|TemplateRule)?
  */
 
-const NS = 'http://buildingsmart-tech.org/mvd/XML/1.1';
+const NS = 'https://standards.buildingsmart.org/MVD/RELEASE/mvdXML/v1-2/';
 
 // Stable UUID for the single shared property-set traversal template.
 const TPL_PSET_UUID = 'b1000001-c0de-4000-8000-000000000001';
@@ -66,7 +74,9 @@ function isIfcBasis(s) {
 }
 
 function mvdStatus(status) {
-  return { NP: 'sample', WD: 'proposal', CD: 'proposal', DIS: 'recommended', IS: 'mandatory' }[status] || 'proposal';
+  // Maps IDM/ISO status codes to valid mvdXML 1.2 status values:
+  // sample | proposal | draft | candidate | final | deprecated
+  return { NP: 'sample', WD: 'draft', CD: 'candidate', DIS: 'candidate', IS: 'final' }[status] || 'draft';
 }
 
 // Extract @applicability value from "Applicability: X." note prepended during import.
@@ -236,18 +246,50 @@ function iuToParams(iu) {
 }
 
 /**
- * Render an ER's flat IU list as <TemplateRules> — fallback for user-authored concepts
- * that have no _mvdTemplateRulesXml (i.e. not imported from mvdXML).
+ * Render an ER's flat IU list as rule element(s) — fallback for user-authored concepts.
+ * Draft9: <TemplateRules> requires ≥2 children. A single rule is a bare <TemplateRule>.
  */
 function renderTemplateRulesContent(er, operator, indent) {
-  let xml = `${indent}<TemplateRules operator="${escXml(operator)}">\n`;
   const seen = new Set();
+  const params = [];
   for (const iu of er.informationUnits || []) {
     const p = iuToParams(iu);
-    if (p && !seen.has(p)) { seen.add(p); xml += `${indent}  <TemplateRule Parameters="${escXml(p)}"/>\n`; }
+    if (p && !seen.has(p)) { seen.add(p); params.push(p); }
   }
+  if (params.length === 0) return '';
+  if (params.length === 1) {
+    return `${indent}<TemplateRule Parameters="${escXml(params[0])}"/>\n`;
+  }
+  let xml = `${indent}<TemplateRules operator="${escXml(operator)}">\n`;
+  for (const p of params) xml += `${indent}  <TemplateRule Parameters="${escXml(p)}"/>\n`;
   xml += `${indent}</TemplateRules>\n`;
   return xml;
+}
+
+/**
+ * Normalize verbatim TemplateRules XML for Draft9 compliance:
+ * a <TemplateRules> with exactly one <TemplateRule> child collapses to a bare <TemplateRule>.
+ */
+function normalizeSingleChildTemplateRulesXml(raw) {
+  if (!raw || !raw.trim().startsWith('<TemplateRules')) return raw;
+  try {
+    const doc = new DOMParser().parseFromString(`<root>${raw}</root>`, 'text/xml');
+    const el = doc.documentElement.firstChild;
+    if (!el || el.localName !== 'TemplateRules') return raw;
+    const ruleChildren = [];
+    const nodes = el.childNodes;
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      if (n.nodeType === 1 && (n.localName === 'TemplateRule' || n.localName === 'TemplateRules')) {
+        ruleChildren.push(n);
+      }
+    }
+    if (ruleChildren.length === 1 && ruleChildren[0].localName === 'TemplateRule') {
+      const params = ruleChildren[0].getAttribute('Parameters') || '';
+      return `<TemplateRule Parameters="${escXml(params)}"/>`;
+    }
+  } catch (_) { /* fall through to raw */ }
+  return raw;
 }
 
 /**
@@ -267,18 +309,20 @@ function renderConceptFromSubEr(conceptEr, exchangeUuid) {
   if (body) xml += `            <Definitions>\n              <Definition>\n                <Body>${escXml(body)}</Body>\n              </Definition>\n            </Definitions>\n`;
   xml += `            <Template ref="${tplRef}"/>\n`;
 
+  // Draft9 sequence: Requirements BEFORE (TemplateRules | TemplateRule)
+  const req = conceptEr.isMandatory !== false ? 'mandatory' : 'recommended';
+  const applicability = conceptEr._mvdApplicability || 'both';
+  xml += `            <Requirements>\n              <Requirement applicability="${applicability}" requirement="${req}" exchangeRequirement="${exchangeUuid}"/>\n            </Requirements>\n`;
+
   if (conceptEr._mvdTemplateRulesXml) {
-    // Verbatim re-emission: preserves original nesting, RuleIDs, formatting exactly
-    const lines = conceptEr._mvdTemplateRulesXml.split('\n');
+    // Verbatim re-emission; normalize single-child wrapper to bare <TemplateRule> for Draft9
+    const normalized = normalizeSingleChildTemplateRulesXml(conceptEr._mvdTemplateRulesXml);
     const base = '            ';
-    xml += lines.map(l => base + l.trim()).filter(l => l.trim()).join('\n') + '\n';
+    xml += normalized.split('\n').map(l => base + l.trim()).filter(l => l.trim()).join('\n') + '\n';
   } else if ((conceptEr.informationUnits || []).length > 0) {
     xml += renderTemplateRulesContent(conceptEr, topOp, '            ');
   }
 
-  const req = conceptEr.isMandatory !== false ? 'mandatory' : 'optional';
-  const applicability = conceptEr._mvdApplicability || 'both';
-  xml += `            <Requirements>\n              <Requirement applicability="${applicability}" requirement="${req}" exchangeRequirement="${exchangeUuid}"/>\n            </Requirements>\n`;
   xml += `          </Concept>\n`;
   return xml;
 }
@@ -300,26 +344,26 @@ function renderConcept(c) {
   }
   xml += `            <Template ref="${c.tplUuid}"/>\n`;
 
+  // Draft9 strict sequence: Requirements BEFORE (TemplateRules | TemplateRule)
+  const req = c.isMandatory ? 'mandatory' : 'recommended';
+  xml += `            <Requirements>\n              <Requirement applicability="both" requirement="${req}" exchangeRequirement="${c.erUuid}"/>\n            </Requirements>\n`;
+
   if (c.kind === 'pset') {
-    const rules = [];
-    if (c.pset) rules.push(`PsetName[Value]='${c.pset.replace(/'/g, "''")}'`);
-    if (c.prop) rules.push(`PropName[Value]='${c.prop.replace(/'/g, "''")}'`);
-    // Emit numeric constraint stored during import (e.g. "> 0.0" → PropValue[Value] > '0.0')
+    const parts = [];
+    if (c.pset) parts.push(`PsetName[Value]='${c.pset.replace(/'/g, "''")}'`);
+    if (c.prop) parts.push(`PropName[Value]='${c.prop.replace(/'/g, "''")}'`);
     if (c.iu.constraints) {
       const cm = c.iu.constraints.trim().match(/^([><=!]{1,2})\s*(.+)$/);
-      if (cm) rules.push(`PropValue[Value] ${cm[1]} '${cm[2].trim().replace(/'/g, "''")}'`);
+      if (cm) parts.push(`PropValue[Value] ${cm[1]} '${cm[2].trim().replace(/'/g, "''")}'`);
     }
-    if (rules.length > 0) {
-      xml += `            <TemplateRules operator="and">\n`;
-      xml += `              <TemplateRule Parameters="${escXml(rules.join(' and '))}"/>\n`;
-      xml += `            </TemplateRules>\n`;
+    if (parts.length > 0) {
+      // All parts combine into one Parameters string → always a single rule.
+      // Draft9: <TemplateRules> requires ≥2 children; bare <TemplateRule> goes directly under <Concept>.
+      xml += `            <TemplateRule Parameters="${escXml(parts.join(' and '))}"/>\n`;
     }
   }
-  // attr kind: attribute name is already baked into the ConceptTemplate's AttributeRule,
-  // so no TemplateRules parameters are needed.
+  // attr kind: attribute name is baked into the ConceptTemplate's AttributeRule; no rule needed.
 
-  const req = c.isMandatory ? 'mandatory' : 'optional';
-  xml += `            <Requirements>\n              <Requirement applicability="both" requirement="${req}" exchangeRequirement="${c.erUuid}"/>\n            </Requirements>\n`;
   xml += `          </Concept>\n`;
   return xml;
 }
@@ -327,7 +371,7 @@ function renderConcept(c) {
 // ─── main export ──────────────────────────────────────────────────────────────
 
 /**
- * Generate mvdXML 1.1 XML from IDM project data.
+ * Generate mvdXML 1.2 XML from IDM project data.
  *
  * @param {{ headerData: object, erHierarchy: Array }} params
  * @returns {{ xml: string, erCount: number, conceptCount: number, rootCount: number }}
@@ -375,7 +419,7 @@ export function generateMvdXml({ headerData = {}, erHierarchy = [] }) {
   // ── root element ──
   let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
   xml += `<mvdXML xmlns="${NS}" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"`;
-  xml += ` xsi:schemaLocation="${NS} https://standards.buildingsmart.org/MVD/RELEASE/mvdXML/v1-1/mvdXML_V1.1.xsd"`;
+  xml += ` xsi:schemaLocation="${NS} https://standards.buildingsmart.org/MVD/RELEASE/mvdXML/v1-2/mvdXML_V1-2.xsd"`;
   xml += ` uuid="${mvdUuid}" name="${escXml(name)}"`;
   if (version) xml += ` version="${escXml(version)}"`;
   xml += ` status="${status}"`;
