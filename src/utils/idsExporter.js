@@ -9,6 +9,9 @@
  *   author email recovered from author.uri; author.givenName checked as fallback
  *   for hand-authored projects and files imported before the uri-storage fix.
  *   IFC entity names are uppercased (IFCWALL) per IDS XSD requirement.
+ *   Per-spec ifcVersion recovered from _idsApplicability.ifcVersion (set by importer).
+ *   _idsDataType: '' means the source had no dataType attribute — suppress on re-export.
+ *   _idsMaterial / _idsClassification / _idsPartOf: generate correct facet types.
  */
 
 // Fallback map: IDM generic data types → IFC defined types
@@ -79,12 +82,30 @@ function escapeXml(str) {
 }
 
 /**
+ * Extract a constraint description string from an IU's constraints field.
+ * Handles both the new array format [{id, description, businessRule}] and the
+ * legacy plain string format stored by older versions / mvdXML imports.
+ * For IDS export only the first constraint maps to <ids:value> (IDS supports one value per facet).
+ */
+function constraintStr(constraints) {
+  if (Array.isArray(constraints)) return (constraints[0]?.description) || '';
+  return constraints || '';
+}
+
+/**
  * Extract the instructions text for a facet.
- * IDS-imported IUs carry it in _idsInstructions (clean, no metadata lines).
- * Manually authored IUs fall back to the definition, minus metadata lines.
+ * Priority:
+ *  1. _idsInstructions — faithful roundtrip of the original IDS instructions attribute.
+ *  2. businessRule on the first constraint — user-assigned IDM business rule reference.
+ *  3. Definition-based extraction for hand-authored IUs (strips metadata lines).
  */
 function extractInstructions(iu) {
   if (iu._idsInstructions != null) return iu._idsInstructions;
+  // Business rule from the constraint array maps to the IDS instructions attribute
+  if (Array.isArray(iu.constraints) && iu.constraints.length > 0) {
+    const br = iu.constraints[0].businessRule;
+    if (br) return br;
+  }
   return (iu.definition || '').split('\n')
     .filter(l => !l.match(/^(IFC Data Type:|Applies to:|IFC Version:|Applicability:|IFC attribute of|Must be part of|Relation:|PredefinedType:)/))
     .join('\n').trim();
@@ -102,24 +123,43 @@ function extractIfcDataType(iu) {
 }
 
 /**
- * Build an <ids:value> XML block from a constraints string.
- * Recognises three formats written by the importer:
- *   "Allowed values: A, B, C"  → xs:enumeration
- *   "Pattern: [\S\s]+[\S]+"    → xs:pattern
- *   "Range: > 0"               → xs:minExclusive / xs:maxExclusive etc.
+ * Build an <ids:value> XML block from constraints and/or a simple value (examples).
+ *
+ * constraints formats written by the importer:
+ *   "Allowed values: A, B, C"     → xs:enumeration (single value collapses to simpleValue)
+ *   "Pattern: [\S\s]+[\S]+"       → xs:pattern
+ *   "Range: > 0"                  → xs:minExclusive / xs:maxExclusive etc.
+ *   Any of the above may have a second line: "\nAnnotation text" → xs:annotation/documentation
+ *
+ * examples: used when the source had <ids:simpleValue> (no restriction).
  */
-function buildValueXml(constraints, indent) {
+function buildValueXml(constraints, examples, indent) {
+  // SimpleValue: only when no restriction constraints
+  if (!constraints && examples) {
+    return `${indent}<ids:value>\n${indent}  <ids:simpleValue>${escapeXml(examples)}</ids:simpleValue>\n${indent}</ids:value>\n`;
+  }
+
   if (!constraints) return '';
-  const trimmed = constraints.trim();
+
+  // Split off annotation: first line is the constraint spec, subsequent lines are annotation text
+  const newlineIdx = constraints.indexOf('\n');
+  const mainConstraint = newlineIdx >= 0 ? constraints.substring(0, newlineIdx).trim() : constraints.trim();
+  const annotation = newlineIdx >= 0 ? constraints.substring(newlineIdx + 1).trim() : '';
+
+  function annotationXml(ind) {
+    if (!annotation) return '';
+    return `${ind}  <xs:annotation>\n${ind}    <xs:documentation>${escapeXml(annotation)}</xs:documentation>\n${ind}  </xs:annotation>\n`;
+  }
 
   // Enumeration: "Allowed values: A, B, C"
-  const allowedMatch = trimmed.match(/^Allowed values:\s*(.+)/i);
+  const allowedMatch = mainConstraint.match(/^Allowed values:\s*(.+)/i);
   if (allowedMatch) {
     const values = allowedMatch[1].split(',').map(v => v.trim()).filter(Boolean);
     if (values.length === 1) {
       return `${indent}<ids:value>\n${indent}  <ids:simpleValue>${escapeXml(values[0])}</ids:simpleValue>\n${indent}</ids:value>\n`;
     }
     let xml = `${indent}<ids:value>\n${indent}  <xs:restriction base="xs:string">\n`;
+    xml += annotationXml(indent + '  ');
     for (const v of values) {
       xml += `${indent}    <xs:enumeration value="${escapeXml(v)}"/>\n`;
     }
@@ -128,18 +168,23 @@ function buildValueXml(constraints, indent) {
   }
 
   // Pattern: "Pattern: [\S\s]+[\S]+"
-  const patternMatch = trimmed.match(/^Pattern:\s*(.+)/i);
+  const patternMatch = mainConstraint.match(/^Pattern:\s*(.+)/i);
   if (patternMatch) {
     const pattern = patternMatch[1];
-    return `${indent}<ids:value>\n${indent}  <xs:restriction base="xs:string">\n${indent}    <xs:pattern value="${escapeXml(pattern)}"/>\n${indent}  </xs:restriction>\n${indent}</ids:value>\n`;
+    let xml = `${indent}<ids:value>\n${indent}  <xs:restriction base="xs:string">\n`;
+    xml += annotationXml(indent + '  ');
+    xml += `${indent}    <xs:pattern value="${escapeXml(pattern)}"/>\n`;
+    xml += `${indent}  </xs:restriction>\n${indent}</ids:value>\n`;
+    return xml;
   }
 
   // Range: "Range: > 0", "Range (xs:integer): > 0", "Range: > 0 and < 100"
-  const rangeMatch = trimmed.match(/^Range(?:\s*\(([^)]+)\))?\s*:\s*(.+)/i);
+  const rangeMatch = mainConstraint.match(/^Range(?:\s*\(([^)]+)\))?\s*:\s*(.+)/i);
   if (rangeMatch) {
     const rangeBase = rangeMatch[1] || 'xs:double';
     const rangeParts = rangeMatch[2].split(/\s+and\s+/i);
     let xml = `${indent}<ids:value>\n${indent}  <xs:restriction base="${rangeBase}">\n`;
+    xml += annotationXml(indent + '  ');
     for (const part of rangeParts) {
       const p = part.trim();
       if (p.startsWith('>= ')) {
@@ -163,6 +208,9 @@ function buildValueXml(constraints, indent) {
  * Process a single IU's external element mappings to extract entity candidates and facets.
  *
  * Key logic:
+ * - _idsPartOf  marker  → <ids:partOf> facet (short-circuits other processing)
+ * - _idsMaterial marker → <ids:material> facet
+ * - _idsClassification  → <ids:classification> facet
  * - "ClassName.AttrName" with description="IFC Attribute" → <ids:attribute> facet (E-2)
  * - "PsetName.PropName" without that description         → <ids:property> facet
  * - Bare attribute name (no dot) with description="IFC Attribute" → <ids:attribute> (E-3)
@@ -176,6 +224,49 @@ function resolveCardinality(iu) {
 
 function processIUMappings(iu, entityCandidates, facets) {
   if (!iu) return;
+
+  // --- Special facet types set by the importer --- //
+
+  if (iu._idsPartOf) {
+    const p = iu._idsPartOf;
+    facets.push({
+      type: 'partOf',
+      relation: p.relation,
+      parentEntity: p.parentEntity,            // UPPERCASE (IFCELEMENTASSEMBLY)
+      parentPredefinedType: p.parentPredefinedType || '',
+      cardinality: p.cardinality,              // null = not specified in source
+      instructions: p.instructions || null,
+    });
+    return;
+  }
+
+  if (iu._idsMaterial) {
+    const matMeta = typeof iu._idsMaterial === 'object' ? iu._idsMaterial : {};
+    facets.push({
+      type: 'material',
+      constraints: constraintStr(iu.constraints),
+      examples: iu.examples || '',
+      cardinality: resolveCardinality(iu),
+      uri: matMeta.uri || null,
+      instructions: matMeta.instructions || null,
+    });
+    return;
+  }
+
+  if (iu._idsClassification) {
+    facets.push({
+      type: 'classification',
+      system: iu._idsClassification.system,
+      uri: iu._idsClassification.uri || null,
+      instructions: iu._idsClassification.instructions || null,
+      constraints: constraintStr(iu.constraints),
+      examples: iu.examples || '',
+      cardinality: resolveCardinality(iu),
+    });
+    return;
+  }
+
+  // --- Standard mapping-based facet detection --- //
 
   const mappings = iu.correspondingExternalElements || iu.correspondingExternalElement || iu.externalElements || [];
 
@@ -195,12 +286,17 @@ function processIUMappings(iu, entityCandidates, facets) {
         if (isIfcAttribute || left.startsWith('Ifc') || left.startsWith('IFC')) {
           // "IfcWindowPanelProperties.PanelOperation" — left is IFC class, right is attribute name
           entityCandidates.add(toIdsEntityName(left));
+
+          // Determine the effective dataType for this attribute IU ('' = no dataType in source)
+          const dataTypeRaw = '_idsDataType' in iu ? iu._idsDataType : null;
           facets.push({
             type: 'attribute',
             name: right,
             cardinality: resolveCardinality(iu),
             instructions: extractInstructions(iu),
-            constraints: iu.constraints || '',
+            constraints: constraintStr(iu.constraints),
+            examples: iu.examples || '',
+            dataTypeRaw,
           });
         } else {
           // "Pset_DoorCommon.FireExit" — left is property set
@@ -214,26 +310,34 @@ function processIUMappings(iu, entityCandidates, facets) {
           const propertySets = (iu._idsPropertySets && iu._idsPropertySets.length > 0)
             ? iu._idsPropertySets
             : [left];
+
+          // Determine the effective dataType: '' = absent in source, null = hand-authored fallback
+          const dataTypeRaw = '_idsDataType' in iu ? iu._idsDataType : null;
           facets.push({
             type: 'property',
             propertySet: left,
             propertySets,
             baseName: right,
             dataType: extractIfcDataType(iu),
+            dataTypeRaw,                       // '' = omit on re-export; null = use computed dataType
             cardinality: resolveCardinality(iu),
             instructions: extractInstructions(iu),
             uri,
-            constraints: iu.constraints || '',
+            constraints: constraintStr(iu.constraints),
+            examples: iu.examples || '',
           });
         }
       } else if (isIfcAttribute) {
         // Bare attribute name — no class prefix available (older .idm or unresolved entity)
+        const dataTypeRaw = '_idsDataType' in iu ? iu._idsDataType : null;
         facets.push({
           type: 'attribute',
           name: element,
           cardinality: resolveCardinality(iu),
           instructions: extractInstructions(iu),
           constraints: iu.constraints || '',
+          examples: iu.examples || '',
+          dataTypeRaw,
         });
       } else if (element.startsWith('Pset_') || element.startsWith('Qto_')) {
         const entity = PSET_ENTITY_MAP[element];
@@ -287,6 +391,18 @@ function analyzeERForSpecs(er) {
       const applEntities = Array.isArray(idsAppl.entities) ? idsAppl.entities : [];
       const applPredefinedType = idsAppl.predefinedType || '';
       const minOccurs = (idsAppl.minOccurs != null) ? idsAppl.minOccurs : (iu.isMandatory ? 1 : 0);
+      const maxOccurs = idsAppl.maxOccurs || 'unbounded';
+      const specIfcVersion = idsAppl.ifcVersion || null;   // null = use global ifcVersion param
+      const materialApplicability = Array.isArray(idsAppl.materialApplicability)
+        ? idsAppl.materialApplicability : [];
+      const classificationApplicability = Array.isArray(idsAppl.classificationApplicability)
+        ? idsAppl.classificationApplicability : [];
+      const propertyApplicability = Array.isArray(idsAppl.propertyApplicability)
+        ? idsAppl.propertyApplicability : [];
+      const attributeApplicability = Array.isArray(idsAppl.attributeApplicability)
+        ? idsAppl.attributeApplicability : [];
+      const partOfApplicability = Array.isArray(idsAppl.partOfApplicability)
+        ? idsAppl.partOfApplicability : [];
 
       // Seed entity candidates from _idsApplicability
       for (const en of applEntities) {
@@ -319,10 +435,22 @@ function analyzeERForSpecs(er) {
           entities: exportEntities,
           predefinedType: applPredefinedType,
           minOccurs,
+          maxOccurs,
+          specIfcVersion,
+          materialApplicability,
+          classificationApplicability,
+          propertyApplicability,
+          attributeApplicability,
+          partOfApplicability,
           facets,
           name: iu.name || er.name || 'Unnamed',
-          description: (iu.definition || '').split('\n')[0],
-          id: iu.id || '',
+          // Use preserved original values; null = absent in source (omit on re-export)
+          specDescription: '_idsSpecDescription' in iu ? iu._idsSpecDescription
+            : (iu.definition || '').split('\n')[0],
+          specIdentifier: '_idsSpecIdentifier' in iu ? iu._idsSpecIdentifier : (iu.id || null),
+          specInstructions: '_idsSpecInstructions' in iu ? iu._idsSpecInstructions : null,
+          requirementsDescription: '_idsRequirementsDescription' in iu ? iu._idsRequirementsDescription : null,
+          entityRequirementsInstructions: '_idsEntityRequirementsInstructions' in iu ? iu._idsEntityRequirementsInstructions : null,
         });
       }
     } else {
@@ -343,6 +471,8 @@ function analyzeERForSpecs(er) {
         entities: entityArr,
         predefinedType: '',
         minOccurs: 0,
+        specIfcVersion: null,
+        materialApplicability: [],
         facets,
         name: er.name || 'Unnamed',
         description: ((er.description || er.definition || '')).split('\n')[0],
@@ -361,6 +491,7 @@ function analyzeERForSpecs(er) {
  * @param {Object} params.headerData - IDM header (title, shortTitle, authors, version, copyright)
  * @param {Array}  params.erHierarchy - ER hierarchy (source of truth)
  * @param {string} params.ifcVersion  - Target IFC version: 'IFC2X3', 'IFC4', 'IFC4X3_ADD2'
+ *                                      Used only when a spec has no per-spec ifcVersion.
  * @returns {{ xml: string, specCount: number, skippedCount: number }}
  */
 export function generateIdsXml({ headerData, erHierarchy, ifcVersion = 'IFC4X3_ADD2' }) {
@@ -376,6 +507,8 @@ export function generateIdsXml({ headerData, erHierarchy, ifcVersion = 'IFC4X3_A
   })();
 
   const today = new Date().toISOString().split('T')[0];
+  // Preserve original date when available; fall back to today for new documents
+  const exportDate = headerData.creationDate || today;
 
   let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
   xml += `<ids:ids xmlns:ids="http://standards.buildingsmart.org/IDS" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://standards.buildingsmart.org/IDS http://standards.buildingsmart.org/IDS/1.0/ids.xsd">\n`;
@@ -384,6 +517,7 @@ export function generateIdsXml({ headerData, erHierarchy, ifcVersion = 'IFC4X3_A
   if (headerData.copyright) {
     xml += `    <ids:copyright>${escapeXml(headerData.copyright)}</ids:copyright>\n`;
   }
+  // Only emit <ids:version> when the source had one ('' = absent in source)
   if (headerData.version) {
     xml += `    <ids:version>${escapeXml(headerData.version)}</ids:version>\n`;
   }
@@ -394,7 +528,13 @@ export function generateIdsXml({ headerData, erHierarchy, ifcVersion = 'IFC4X3_A
   if (authorEmail) {
     xml += `    <ids:author>${escapeXml(authorEmail)}</ids:author>\n`;
   }
-  xml += `    <ids:date>${today}</ids:date>\n`;
+  xml += `    <ids:date>${exportDate}</ids:date>\n`;
+  if (headerData.idsPurpose) {
+    xml += `    <ids:purpose>${escapeXml(headerData.idsPurpose)}</ids:purpose>\n`;
+  }
+  if (headerData.idsMilestone) {
+    xml += `    <ids:milestone>${escapeXml(headerData.idsMilestone)}</ids:milestone>\n`;
+  }
   xml += `  </ids:info>\n`;
   xml += `  <ids:specifications>\n`;
 
@@ -412,17 +552,21 @@ export function generateIdsXml({ headerData, erHierarchy, ifcVersion = 'IFC4X3_A
     for (const spec of specs) {
       specCount++;
 
-      const specName = escapeXml(spec.name || `Spec_${specCount}`);
-      const specDesc = spec.description || '';
-      const specId = spec.id || '';
+      // Per-spec IFC version from _idsApplicability takes priority over the global param
+      const specVersion = spec.specIfcVersion || ifcVersion;
 
-      xml += `    <ids:specification name="${specName}" ifcVersion="${ifcVersion}"`;
+      const specName = escapeXml(spec.name || `Spec_${specCount}`);
+      const specDesc = spec.specDescription != null ? spec.specDescription : (spec.description || '');
+      const specId = spec.specIdentifier != null ? spec.specIdentifier : (spec.id || '');
+
+      xml += `    <ids:specification name="${specName}" ifcVersion="${specVersion}"`;
       if (specId) xml += ` identifier="${escapeXml(specId)}"`;
       if (specDesc) xml += ` description="${escapeXml(specDesc)}"`;
+      if (spec.specInstructions) xml += ` instructions="${escapeXml(spec.specInstructions)}"`;
       xml += `>\n`;
 
-      // Applicability — use preserved minOccurs (E-6)
-      xml += `      <ids:applicability minOccurs="${spec.minOccurs}" maxOccurs="unbounded">\n`;
+      // Applicability — use preserved minOccurs/maxOccurs
+      xml += `      <ids:applicability minOccurs="${spec.minOccurs}" maxOccurs="${escapeXml(spec.maxOccurs || 'unbounded')}">\n`;
 
       if (spec.entities && spec.entities.length > 0) {
         xml += `        <ids:entity>\n`;
@@ -457,17 +601,111 @@ export function generateIdsXml({ headerData, erHierarchy, ifcVersion = 'IFC4X3_A
         xml += `        </ids:entity>\n`;
       }
 
+      // PartOf facets in applicability (schema order: entity → partOf → classification → attribute → property → material)
+      for (const po of (spec.partOfApplicability || [])) {
+        xml += `        <ids:partOf`;
+        if (po.relation) xml += ` relation="${escapeXml(po.relation)}"`;
+        xml += `>\n`;
+        xml += `          <ids:entity>\n`;
+        xml += `            <ids:name>\n`;
+        xml += `              <ids:simpleValue>${escapeXml(po.parentEntity)}</ids:simpleValue>\n`;
+        xml += `            </ids:name>\n`;
+        if (po.parentPredefinedType) {
+          xml += `            <ids:predefinedType>\n`;
+          xml += `              <ids:simpleValue>${escapeXml(po.parentPredefinedType)}</ids:simpleValue>\n`;
+          xml += `            </ids:predefinedType>\n`;
+        }
+        xml += `          </ids:entity>\n`;
+        xml += `        </ids:partOf>\n`;
+      }
+
+      // Classification facets in applicability
+      for (const cls of (spec.classificationApplicability || [])) {
+        const clsValue = buildValueXml(constraintStr(cls.constraints), cls.examples || '', '          ');
+        xml += `        <ids:classification>\n`;
+        if (clsValue) xml += clsValue;
+        xml += `          <ids:system>\n`;
+        xml += `            <ids:simpleValue>${escapeXml(cls.system)}</ids:simpleValue>\n`;
+        xml += `          </ids:system>\n`;
+        xml += `        </ids:classification>\n`;
+      }
+
+      // Attribute facets in applicability
+      for (const attr of (spec.attributeApplicability || [])) {
+        xml += `        <ids:attribute>\n`;
+        xml += `          <ids:name>\n`;
+        xml += `            <ids:simpleValue>${escapeXml(attr.name)}</ids:simpleValue>\n`;
+        xml += `          </ids:name>\n`;
+        xml += buildValueXml(constraintStr(attr.constraints), attr.examples || '', '          ');
+        xml += `        </ids:attribute>\n`;
+      }
+
+      // Property facets in applicability
+      for (const prop of (spec.propertyApplicability || [])) {
+        xml += `        <ids:property`;
+        if (prop.dataType) xml += ` dataType="${escapeXml(prop.dataType)}"`;
+        xml += `>\n`;
+        xml += `          <ids:propertySet>\n`;
+        xml += `            <ids:simpleValue>${escapeXml(prop.propertySet)}</ids:simpleValue>\n`;
+        xml += `          </ids:propertySet>\n`;
+        xml += `          <ids:baseName>\n`;
+        xml += `            <ids:simpleValue>${escapeXml(prop.baseName)}</ids:simpleValue>\n`;
+        xml += `          </ids:baseName>\n`;
+        xml += buildValueXml(constraintStr(prop.constraints), prop.examples || '', '          ');
+        xml += `        </ids:property>\n`;
+      }
+
+      // Material facets in applicability
+      for (const mat of (spec.materialApplicability || [])) {
+        const matValue = buildValueXml(constraintStr(mat.constraints), mat.examples || '', '          ');
+        if (matValue) {
+          xml += `        <ids:material>\n`;
+          xml += matValue;
+          xml += `        </ids:material>\n`;
+        } else {
+          xml += `        <ids:material />\n`;
+        }
+      }
+
       xml += `      </ids:applicability>\n`;
 
       // Requirements
-      if (spec.facets.length > 0) {
-        xml += `      <ids:requirements>\n`;
+      if (spec.facets.length > 0 || spec.entityRequirementsInstructions) {
+        const reqDesc = spec.requirementsDescription;
+        xml += `      <ids:requirements`;
+        if (reqDesc) xml += ` description="${escapeXml(reqDesc)}"`;
+        xml += `>\n`;
+
+        // Entity in requirements (carries instructions for IFC authors; entity name mirrors applicability)
+        if (spec.entityRequirementsInstructions && spec.entities && spec.entities.length > 0) {
+          xml += `        <ids:entity instructions="${escapeXml(spec.entityRequirementsInstructions)}">\n`;
+          xml += `          <ids:name>\n`;
+          if (spec.entities.length === 1) {
+            xml += `            <ids:simpleValue>${spec.entities[0]}</ids:simpleValue>\n`;
+          } else {
+            xml += `            <xs:restriction base="xs:string">\n`;
+            for (const ent of spec.entities) {
+              xml += `              <xs:enumeration value="${ent}"/>\n`;
+            }
+            xml += `            </xs:restriction>\n`;
+          }
+          xml += `          </ids:name>\n`;
+          xml += `        </ids:entity>\n`;
+        }
 
         for (const facet of spec.facets) {
           if (facet.type === 'property') {
+            // Determine whether to emit dataType:
+            //   dataTypeRaw === ''   → absent in source, omit
+            //   dataTypeRaw === null → hand-authored, use computed dataType
+            //   dataTypeRaw is a non-empty string → explicit source value, emit it
+            const emitDataType = facet.dataTypeRaw === null
+              ? facet.dataType          // hand-authored: use computed
+              : facet.dataTypeRaw;      // IDS-imported: use raw (possibly '')
+
             xml += `        <ids:property`;
             if (facet.cardinality != null) xml += ` cardinality="${facet.cardinality}"`;
-            if (facet.dataType) xml += ` dataType="${facet.dataType}"`;
+            if (emitDataType) xml += ` dataType="${emitDataType}"`;
             if (facet.instructions) xml += ` instructions="${escapeXml(facet.instructions)}"`;
             if (facet.uri) xml += ` uri="${escapeXml(facet.uri)}"`;
             xml += `>\n`;
@@ -488,7 +726,7 @@ export function generateIdsXml({ headerData, erHierarchy, ifcVersion = 'IFC4X3_A
             xml += `          <ids:baseName>\n`;
             xml += `            <ids:simpleValue>${escapeXml(facet.baseName)}</ids:simpleValue>\n`;
             xml += `          </ids:baseName>\n`;
-            xml += buildValueXml(facet.constraints, '          ');
+            xml += buildValueXml(facet.constraints, facet.examples, '          ');
             xml += `        </ids:property>\n`;
 
           } else if (facet.type === 'attribute') {
@@ -499,20 +737,63 @@ export function generateIdsXml({ headerData, erHierarchy, ifcVersion = 'IFC4X3_A
             xml += `          <ids:name>\n`;
             xml += `            <ids:simpleValue>${escapeXml(facet.name)}</ids:simpleValue>\n`;
             xml += `          </ids:name>\n`;
-            xml += buildValueXml(facet.constraints, '          ');
+            xml += buildValueXml(facet.constraints, facet.examples, '          ');
             xml += `        </ids:attribute>\n`;
 
           } else if (facet.type === 'classification') {
-            xml += `        <ids:classification cardinality="${facet.cardinality}"`;
+            xml += `        <ids:classification`;
+            if (facet.cardinality != null) xml += ` cardinality="${facet.cardinality}"`;
+            if (facet.uri) xml += ` uri="${escapeXml(facet.uri)}"`;
             if (facet.instructions) xml += ` instructions="${escapeXml(facet.instructions)}"`;
             xml += `>\n`;
-            xml += `          <ids:value>\n`;
-            xml += `            <ids:simpleValue>${escapeXml(facet.value)}</ids:simpleValue>\n`;
-            xml += `          </ids:value>\n`;
+            const classValue = buildValueXml(facet.constraints, facet.examples, '          ');
+            if (classValue) xml += classValue;
             xml += `          <ids:system>\n`;
             xml += `            <ids:simpleValue>${escapeXml(facet.system)}</ids:simpleValue>\n`;
             xml += `          </ids:system>\n`;
             xml += `        </ids:classification>\n`;
+
+          } else if (facet.type === 'material') {
+            const matValue = buildValueXml(facet.constraints, facet.examples, '          ');
+            const matAttrs = [
+              facet.cardinality != null ? ` cardinality="${facet.cardinality}"` : '',
+              facet.uri ? ` uri="${escapeXml(facet.uri)}"` : '',
+              facet.instructions ? ` instructions="${escapeXml(facet.instructions)}"` : '',
+            ].join('');
+            if (matValue) {
+              xml += `        <ids:material${matAttrs}>\n`;
+              xml += matValue;
+              xml += `        </ids:material>\n`;
+            } else {
+              xml += `        <ids:material${matAttrs} />\n`;
+            }
+
+          } else if (facet.type === 'partOf') {
+            xml += `        <ids:partOf`;
+            if (facet.relation) xml += ` relation="${escapeXml(facet.relation)}"`;
+            if (facet.cardinality != null) xml += ` cardinality="${facet.cardinality}"`;
+            if (facet.instructions) xml += ` instructions="${escapeXml(facet.instructions)}"`;
+            xml += `>\n`;
+            xml += `          <ids:entity>\n`;
+            xml += `            <ids:name>\n`;
+            xml += `              <ids:simpleValue>${escapeXml(facet.parentEntity)}</ids:simpleValue>\n`;
+            xml += `            </ids:name>\n`;
+            if (facet.parentPredefinedType) {
+              const ptValues = facet.parentPredefinedType.split(',').map(v => v.trim()).filter(Boolean);
+              xml += `            <ids:predefinedType>\n`;
+              if (ptValues.length === 1) {
+                xml += `              <ids:simpleValue>${escapeXml(ptValues[0])}</ids:simpleValue>\n`;
+              } else {
+                xml += `              <xs:restriction base="xs:string">\n`;
+                for (const ptv of ptValues) {
+                  xml += `                <xs:enumeration value="${escapeXml(ptv)}"/>\n`;
+                }
+                xml += `              </xs:restriction>\n`;
+              }
+              xml += `            </ids:predefinedType>\n`;
+            }
+            xml += `          </ids:entity>\n`;
+            xml += `        </ids:partOf>\n`;
           }
         }
 

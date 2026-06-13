@@ -456,6 +456,26 @@ export const generateStandaloneHtml = ({
       color: #0066cc;
     }
 
+    .constraints-cell {
+      font-size: 9pt;
+      color: #444;
+    }
+
+    .constraint-item {
+      margin-bottom: 4px;
+      line-height: 1.4;
+    }
+
+    .constraint-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .constraint-br {
+      color: #888;
+      font-style: italic;
+      font-size: 8.5pt;
+    }
+
     .task-list-section {
       margin: 35px 0;
     }
@@ -1144,6 +1164,7 @@ const generateErHtml = (er, level = 3) => {
             <th>Data Type</th>
             <th>Required</th>
             <th>Definition</th>
+            <th>Constraints</th>
           </tr>
         </thead>
         <tbody>
@@ -1187,6 +1208,19 @@ const generateInfoUnitRow = (unit, level = 0) => {
   const exFigures = (unit.exampleImages || []).filter(f => f.data);
   const hasFigures = defFigures.length > 0 || exFigures.length > 0;
 
+  // Build constraints cell — support both legacy string and new array format
+  const rawConstraints = unit.constraints;
+  let constraintsHtml = '';
+  if (Array.isArray(rawConstraints) && rawConstraints.length > 0) {
+    constraintsHtml = rawConstraints.map(c => {
+      const desc = escapeHtml(c.description || c);
+      const br = c.businessRule ? `<span class="constraint-br"> [${escapeHtml(c.businessRule)}]</span>` : '';
+      return `<div class="constraint-item">${desc}${br}</div>`;
+    }).join('');
+  } else if (typeof rawConstraints === 'string' && rawConstraints.trim()) {
+    constraintsHtml = `<div class="constraint-item">${escapeHtml(rawConstraints)}</div>`;
+  }
+
   let rows = `
     <tr>
       <td>
@@ -1202,12 +1236,13 @@ const generateInfoUnitRow = (unit, level = 0) => {
       <td>${escapeHtml(unit.dataType || 'String')}</td>
       <td><span class="${unit.isMandatory ? 'mandatory' : 'optional'}">${unit.isMandatory ? 'Yes' : 'No'}</span></td>
       <td>${escapeHtml(unit.definition || '')}</td>
+      <td class="constraints-cell">${constraintsHtml}</td>
     </tr>
   `;
 
   // Render figures in a full-width row directly under this IU
   if (hasFigures) {
-    rows += `<tr class="iu-figures-row"><td colspan="4"><div class="iu-figures">`;
+    rows += `<tr class="iu-figures-row"><td colspan="5"><div class="iu-figures">`;
     if (defFigures.length > 0) {
       rows += `<div class="iu-figures-group"><span class="iu-figures-label">Definition Figures</span><div class="iu-figures-list">`;
       rows += defFigures.map(f => `

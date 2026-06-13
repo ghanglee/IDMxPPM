@@ -1251,6 +1251,7 @@ const ERPanel = ({
       examples: '',
       exampleImages: [],
       correspondingExternalElements: [],
+      constraints: [],
       subInformationUnits: []
     };
 
@@ -3128,9 +3129,11 @@ const ERPanel = ({
                   {/* Constraints - shown in full table mode */}
                   {!showBpmnEditor && (
                     <div className="er-tree-cell er-col-constraints">
-                      {row.type === 'iu' && row.data?.constraints?.length > 0 ? (
-                        <span className="er-constraint-badge">{row.data.constraints.length}</span>
-                      ) : '-'}
+                      {row.type === 'iu' && (() => {
+                        const c = row.data?.constraints;
+                        const count = Array.isArray(c) ? c.length : (c ? 1 : 0);
+                        return count > 0 ? <span className="er-constraint-badge">{count}</span> : '-';
+                      })()}
                     </div>
                   )}
                   {/* External Element Mappings - shown in full table mode */}
@@ -3244,6 +3247,77 @@ const ERPanel = ({
                       rows={3}
                     />
                   </div>
+                  {/* Constraints
+                      Normalise legacy string format (mvdXML/old imports) to array for display.
+                      On first edit the array is written back, migrating the IU in place. */}
+                  {(() => {
+                    const raw = selectedItem.data?.constraints;
+                    const constraintArr = Array.isArray(raw)
+                      ? raw
+                      : (raw ? [{ id: 'legacy-0', description: raw, businessRule: '' }] : []);
+                    const setConstraints = (updater) => setSelectedItem(prev => ({
+                      ...prev,
+                      data: { ...prev.data, constraints: updater(Array.isArray(prev.data?.constraints) ? prev.data.constraints : []) }
+                    }));
+                    return (
+                  <div className="er-card-field">
+                    <div className="er-card-field-header">
+                      <label>Constraints</label>
+                      <button
+                        className="er-link-btn"
+                        onClick={() => {
+                          const newConstraint = { id: uuid(), description: '', businessRule: '' };
+                          setConstraints(prev => [...prev, newConstraint]);
+                        }}
+                      >
+                        + Add Constraint
+                      </button>
+                    </div>
+                    {constraintArr.length === 0 ? (
+                      <p className="er-empty-small">No constraints defined</p>
+                    ) : (
+                      <div className="er-constraint-list">
+                        {constraintArr.map((constraint, idx) => (
+                          <div key={constraint.id} className="er-constraint-item">
+                            <div className="er-constraint-index">{idx + 1}</div>
+                            <div className="er-constraint-fields">
+                              <input
+                                type="text"
+                                value={constraint.description || ''}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  setConstraints(prev => prev.map(c =>
+                                    c.id === constraint.id ? { ...c, description: v } : c
+                                  ));
+                                }}
+                                placeholder="Constraint (e.g., > 0, length ≤ 100, must be unique, Pattern: RAL.*)"
+                                className="er-input-small er-constraint-desc"
+                              />
+                              <input
+                                type="text"
+                                value={constraint.businessRule || ''}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  setConstraints(prev => prev.map(c =>
+                                    c.id === constraint.id ? { ...c, businessRule: v } : c
+                                  ));
+                                }}
+                                placeholder="Business rule reference (optional, e.g., BR-001) → IDS instructions"
+                                className="er-input-small er-constraint-br"
+                              />
+                            </div>
+                            <button
+                              className="er-remove-btn"
+                              onClick={() => setConstraints(prev => prev.filter(c => c.id !== constraint.id))}
+                            >×</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                    );
+                  })()}
+
                   {/* External Mappings */}
                   <div className="er-card-field">
                     <div className="er-card-field-header">
