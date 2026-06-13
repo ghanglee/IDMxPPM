@@ -228,6 +228,60 @@ function createWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+
+  // After the page loads, offer to remove the installer file (once per version)
+  mainWindow.webContents.once('did-finish-load', () => {
+    setTimeout(() => checkInstallerCleanup(), 3000);
+  });
+}
+
+async function checkInstallerCleanup() {
+  if (isDev) return;
+
+  // Run at most once per installed version
+  const flagPath = path.join(app.getPath('userData'), 'installer-cleanup.json');
+  try {
+    const flag = JSON.parse(fs.readFileSync(flagPath, 'utf-8'));
+    if (flag.checkedVersion === app.getVersion()) return;
+  } catch { /* first run for this version */ }
+  fs.writeFileSync(flagPath, JSON.stringify({ checkedVersion: app.getVersion() }));
+
+  // Search Downloads for installer files that look like ours
+  const downloadsPath = app.getPath('downloads');
+  let files;
+  try { files = fs.readdirSync(downloadsPath); } catch { return; }
+
+  const ext = process.platform === 'win32' ? '.exe' : '.dmg';
+  const installerFiles = files
+    .filter(f => f.endsWith(ext) && /xppm|neo.?seoul/i.test(f))
+    .map(f => path.join(downloadsPath, f));
+
+  if (installerFiles.length === 0) return;
+
+  for (const installerPath of installerFiles) {
+    if (!mainWindow) return;
+    const { response } = await dialog.showMessageBox(mainWindow, {
+      type: 'question',
+      title: 'Remove Installer?',
+      message: `Move "${path.basename(installerPath)}" to Trash?`,
+      detail: 'This installer file was used to install xPPM neo-Seoul and is no longer needed. You can safely remove it.',
+      buttons: ['Move to Trash', 'Keep'],
+      defaultId: 0,
+      cancelId: 1
+    });
+    if (response === 0) {
+      try {
+        await shell.trashItem(installerPath);
+      } catch (err) {
+        dialog.showMessageBox(mainWindow, {
+          type: 'warning',
+          title: 'Could Not Remove Installer',
+          message: 'Failed to move the installer to Trash.',
+          detail: err.message
+        });
+      }
+    }
+  }
 }
 
 // 프로젝트 열기 (.json, .idm, .xml for idmXML, .bpmn, .zip, .xppm)
