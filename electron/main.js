@@ -238,13 +238,14 @@ function createWindow() {
 async function checkInstallerCleanup() {
   if (isDev) return;
 
-  // Run at most once per installed version
+  // Load the list of installer paths the user previously chose to keep
   const flagPath = path.join(app.getPath('userData'), 'installer-cleanup.json');
+  let keepList = [];
   try {
-    const flag = JSON.parse(fs.readFileSync(flagPath, 'utf-8'));
-    if (flag.checkedVersion === app.getVersion()) return;
-  } catch { /* first run for this version */ }
-  fs.writeFileSync(flagPath, JSON.stringify({ checkedVersion: app.getVersion() }));
+    const saved = JSON.parse(fs.readFileSync(flagPath, 'utf-8'));
+    // Only keep entries that still exist on disk (self-cleaning)
+    keepList = (saved.keepList || []).filter(p => fs.existsSync(p));
+  } catch { /* no saved state yet */ }
 
   // Search likely download locations for installer files that look like ours
   const ext = process.platform === 'win32' ? '.exe' : '.dmg';
@@ -258,7 +259,7 @@ async function checkInstallerCleanup() {
         .filter(f => f.endsWith(ext) && /xppm|neo.?seoul/i.test(f))
         .map(f => path.join(dir, f));
     } catch { return []; }
-  });
+  }).filter(p => !keepList.includes(p));
 
   if (installerFiles.length === 0) return;
 
@@ -284,6 +285,10 @@ async function checkInstallerCleanup() {
           detail: err.message
         });
       }
+    } else {
+      // User chose to keep — remember this path so we don't ask again
+      keepList.push(installerPath);
+      fs.writeFileSync(flagPath, JSON.stringify({ keepList }));
     }
   }
 }
