@@ -426,7 +426,7 @@
     for the AEC industry
   </p>
   <div class="meta">
-    <span>v1.5.0</span>
+    <span>v1.5.1</span>
     <span>23 Tutorials</span>
     <span>Building Informatics Group, Yonsei University</span>
   </div>
@@ -458,7 +458,7 @@
     <a href="#t20" class="new-badge"><span class="num">20</span> IDS Import</a>
     <a href="#t21" class="new-badge"><span class="num">21</span> LOIN Import</a>
     <a href="#t22" class="new-badge"><span class="num">22</span> mvdXML Import &amp; Export</a>
-    <a href="#t23" class="new-badge"><span class="num">23</span> What's New in v1.5.0</a>
+    <a href="#t23" class="new-badge"><span class="num">23</span> What's New in v1.5.1</a>
   </div>
 </nav>
 
@@ -1987,13 +1987,33 @@
     <div class="tutorial-header">
       <div class="tutorial-num">23</div>
       <div>
-        <h2>What's New in v1.5.0</h2>
+        <h2>What's New in v1.5.1</h2>
         <p class="tutorial-subtitle">
-          <span class="new-tag">NEW in v1.5.0</span>
-          Release notes and bug fixes introduced in xPPM neo-Seoul v1.5.0.
+          <span class="new-tag">NEW in v1.5.1</span>
+          Release notes and improvements introduced in xPPM neo-Seoul v1.5.1.
         </p>
       </div>
     </div>
+
+    <h3>New Feature: Automatic Version Update Check</h3>
+    <p>xPPM neo-Seoul now checks GitHub for newer releases and notifies you when an update is available.</p>
+    <ul>
+      <li><strong>Startup check</strong> — The app silently checks for updates 5 seconds after launch. If a newer release is found, a notification banner appears at the bottom of the screen.</li>
+      <li><strong>Help menu</strong> — Use <strong>Help &gt; Check for Updates…</strong> at any time to trigger a manual check. A dialog reports whether you are up to date or shows the new version with a <strong>Download</strong> button.</li>
+      <li><strong>About dialog</strong> — The <strong>Check for Updates</strong> button inside <strong>Help &gt; About xPPM neo-Seoul</strong> also runs the check and displays the result inline.</li>
+      <li><strong>Same-version updates</strong> — If a release is re-published under the same version number, the app detects the newer build date and notifies you accordingly.</li>
+    </ul>
+
+    <div class="note">
+      <span class="icon">&#128161;</span>
+      <span>Clicking <strong>Download</strong> in any of these locations opens the GitHub Releases page in your default browser. An internet connection is required for the check to succeed.</span>
+    </div>
+
+    <h3>New Feature: IDS Constraints Editor</h3>
+    <p>Information Units now support a structured <strong>Constraints</strong> field — a list of individual constraint entries, each with a description and a business rule. This replaces the previous single-string constraints field and provides a richer, IDS-aligned authoring experience.</p>
+
+    <hr style="margin: 2rem 0; border: none; border-top: 1px solid var(--border);" />
+    <h3 style="color: var(--muted);">v1.5.0 Release Notes</h3>
 
     <h3>New Feature: idmXML 1.0 Export</h3>
     <p>v1.5.0 re-introduces the idmXML 1.0 export format as a ZIP archive alongside the existing idmXML 2.0 export. This is useful for exchanging IDMs with tools or workflows that require the earlier idmXSD v1.0 schema.</p>
@@ -2066,7 +2086,7 @@
 <!-- FOOTER -->
 <footer class="footer">
   <p>
-    <strong>xPPM neo-Seoul</strong> v1.5.0 &nbsp;|&nbsp;
+    <strong>xPPM neo-Seoul</strong> v1.5.1 &nbsp;|&nbsp;
     Building Informatics Group (BIG), Yonsei University &nbsp;|&nbsp;
     <a href="http://big.yonsei.ac.kr" target="_blank">big.yonsei.ac.kr</a>
   </p>
