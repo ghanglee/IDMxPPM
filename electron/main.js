@@ -246,15 +246,19 @@ async function checkInstallerCleanup() {
   } catch { /* first run for this version */ }
   fs.writeFileSync(flagPath, JSON.stringify({ checkedVersion: app.getVersion() }));
 
-  // Search Downloads for installer files that look like ours
-  const downloadsPath = app.getPath('downloads');
-  let files;
-  try { files = fs.readdirSync(downloadsPath); } catch { return; }
-
+  // Search likely download locations for installer files that look like ours
   const ext = process.platform === 'win32' ? '.exe' : '.dmg';
-  const installerFiles = files
-    .filter(f => f.endsWith(ext) && /xppm|neo.?seoul/i.test(f))
-    .map(f => path.join(downloadsPath, f));
+  const searchPaths = process.platform === 'darwin'
+    ? [app.getPath('desktop'), app.getPath('downloads')]
+    : [app.getPath('downloads')];
+
+  const installerFiles = searchPaths.flatMap(dir => {
+    try {
+      return fs.readdirSync(dir)
+        .filter(f => f.endsWith(ext) && /xppm|neo.?seoul/i.test(f))
+        .map(f => path.join(dir, f));
+    } catch { return []; }
+  });
 
   if (installerFiles.length === 0) return;
 
