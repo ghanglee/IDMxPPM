@@ -39,6 +39,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Open external URL in default browser
   openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
 
+  // Check GitHub Releases for a newer version
+  checkForUpdates: () => ipcRenderer.invoke('app:checkForUpdates'),
+
   // Open user manual from local resources
   openManual: () => ipcRenderer.invoke('shell:openManual'),
 

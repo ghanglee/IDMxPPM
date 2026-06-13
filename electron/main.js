@@ -141,9 +141,50 @@ function createWindow() {
             dialog.showMessageBox({
               type: 'info',
               title: 'About xPPM neo-Seoul',
-              message: 'xPPM neo-Seoul v1.5.0',
+              message: `xPPM neo-Seoul v${app.getVersion()}`,
               detail: 'Information Delivery Manual authoring tool based on the eXtended Process to Product Modeling method.\n\nISO 29481-1 & ISO 29481-3 (idmXML) Compliant\n\nDeveloped by Building Informatics Group (BIG)\nYonsei University, Seoul, Korea\n\nhttps://big.yonsei.ac.kr'
             });
+          }
+        },
+        {
+          label: 'Check for Updates...',
+          click: async () => {
+            const result = await fetchLatestRelease();
+            if (result.error) {
+              dialog.showMessageBox({
+                type: 'warning',
+                title: 'Update Check Failed',
+                message: 'Could not check for updates.',
+                detail: result.error
+              });
+            } else if (result.hasUpdate) {
+              const isSameVersion = result.latestVersion === result.currentVersion;
+              const publishedStr = result.publishedAt
+                ? `\nReleased: ${new Date(result.publishedAt).toLocaleString()}`
+                : '';
+              const detail = isSameVersion
+                ? `Version ${result.currentVersion} has been updated since your build.${publishedStr}\nWould you like to download the latest release?`
+                : `You are running version ${result.currentVersion}.${publishedStr}\nWould you like to download the latest release?`;
+              const { response } = await dialog.showMessageBox({
+                type: 'info',
+                title: 'Update Available',
+                message: isSameVersion
+                  ? `A newer build of v${result.latestVersion} is available`
+                  : `Version ${result.latestVersion} is available`,
+                detail,
+                buttons: ['Download', 'Later'],
+                defaultId: 0,
+                cancelId: 1
+              });
+              if (response === 0) shell.openExternal(result.downloadUrl);
+            } else {
+              dialog.showMessageBox({
+                type: 'info',
+                title: 'No Updates Available',
+                message: `xPPM neo-Seoul is up to date.`,
+                detail: `Version ${result.currentVersion} is the latest release.`
+              });
+            }
           }
         },
         { type: 'separator' },
@@ -495,6 +536,58 @@ ipcMain.handle('fs:readRelativeFileBase64', async (event, { basePath, relativePa
 ipcMain.handle('shell:openExternal', async (event, url) => {
   await shell.openExternal(url);
 });
+
+// Read build date from the dist/build-info.json written by Vite at build time
+function getBuildDate() {
+  try {
+    const infoPath = path.join(app.getAppPath(), 'dist', 'build-info.json');
+    return JSON.parse(require('fs').readFileSync(infoPath, 'utf-8')).buildDate || null;
+  } catch {
+    return null;
+  }
+}
+
+// Check GitHub Releases for a newer version (shared by IPC handler and menu item)
+// hasUpdate is true if either the version tag changed OR the release was published after the local build.
+function fetchLatestRelease() {
+  const https = require('https');
+  const currentVersion = app.getVersion();
+  const buildDate = getBuildDate();
+  return new Promise((resolve) => {
+    const options = {
+      hostname: 'api.github.com',
+      path: '/repos/ghanglee/IDMxPPM/releases/latest',
+      headers: { 'User-Agent': 'xPPM-neo-Seoul/' + currentVersion },
+    };
+    const req = https.get(options, (res) => {
+      let data = '';
+      res.on('data', chunk => { data += chunk; });
+      res.on('end', () => {
+        try {
+          const release = JSON.parse(data);
+          const latestVersion = (release.tag_name || '').replace(/^v/, '');
+          const publishedAt = release.published_at || null;
+          const downloadUrl = release.html_url || 'https://github.com/ghanglee/IDMxPPM/releases';
+          const versionChanged = !!(latestVersion && latestVersion !== currentVersion);
+          const newerBuild = !!(publishedAt && buildDate && new Date(publishedAt) > new Date(buildDate));
+          const hasUpdate = versionChanged || newerBuild;
+          resolve({ currentVersion, latestVersion, publishedAt, buildDate, downloadUrl, hasUpdate, error: null });
+        } catch {
+          resolve({ currentVersion, latestVersion: null, publishedAt: null, buildDate, downloadUrl: null, hasUpdate: false, error: 'Failed to parse release info' });
+        }
+      });
+    });
+    req.on('error', (err) => {
+      resolve({ currentVersion, latestVersion: null, publishedAt: null, buildDate, downloadUrl: null, hasUpdate: false, error: err.message });
+    });
+    req.setTimeout(8000, () => {
+      req.destroy();
+      resolve({ currentVersion, latestVersion: null, publishedAt: null, buildDate, downloadUrl: null, hasUpdate: false, error: 'Request timed out' });
+    });
+  });
+}
+
+ipcMain.handle('app:checkForUpdates', () => fetchLatestRelease());
 
 // Open user manual HTML file from local resources
 ipcMain.handle('shell:openManual', async () => {

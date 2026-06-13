@@ -233,6 +233,24 @@ const App = () => {
 
   // About Dialog State
   const [showAboutDialog, setShowAboutDialog] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState('idle'); // 'idle' | 'checking' | 'up-to-date' | 'available' | 'error'
+  const [updateInfo, setUpdateInfo] = useState(null);
+
+  // Auto-check for updates on startup (after 5s to let the app settle)
+  useEffect(() => {
+    if (!window.electronAPI?.checkForUpdates) return;
+    const timer = setTimeout(async () => {
+      const result = await window.electronAPI.checkForUpdates();
+      if (!result || result.error) return;
+      setUpdateInfo(result);
+      if (result.hasUpdate) {
+        setUpdateStatus('available');
+        showToast(`Version ${result.latestVersion} is available — open Help > About to download.`, 12000);
+      }
+    }, 5000);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Server Connection State
   const serverConnection = useServerConnection();
@@ -5662,6 +5680,32 @@ const App = () => {
                     Information Delivery Manual (IDM) Authoring Tool<br />
                     Compliant with ISO 29481-1 and ISO 29481-3 (idmXML)
                   </p>
+                  {updateStatus === 'checking' && (
+                    <p className="about-update-status about-update-checking">Checking for updates...</p>
+                  )}
+                  {updateStatus === 'up-to-date' && (
+                    <p className="about-update-status about-update-ok">You are running the latest version.</p>
+                  )}
+                  {updateStatus === 'available' && updateInfo && (
+                    <p className="about-update-status about-update-available">
+                      {updateInfo.latestVersion === updateInfo.currentVersion
+                        ? `A newer build of v${updateInfo.latestVersion} is available`
+                        : `Version ${updateInfo.latestVersion} is available`}
+                      {updateInfo.publishedAt && (
+                        <> (released {new Date(updateInfo.publishedAt).toLocaleDateString()})</>
+                      )}
+                      {'. '}
+                      <a
+                        href="#"
+                        onClick={(e) => { e.preventDefault(); window.electronAPI?.openExternal(updateInfo.downloadUrl); }}
+                      >
+                        Download
+                      </a>
+                    </p>
+                  )}
+                  {updateStatus === 'error' && updateInfo && (
+                    <p className="about-update-status about-update-error">Update check failed: {updateInfo.error}</p>
+                  )}
                 </div>
                 <div className="about-credits">
                   <p><strong>Developer:</strong> Ghang Lee</p>
@@ -5691,7 +5735,23 @@ const App = () => {
                 </div>
               </div>
               <div className="about-dialog-footer">
-                <button className="about-ok-btn" onClick={() => setShowAboutDialog(false)}>OK</button>
+                <button
+                  className="about-check-updates-btn"
+                  disabled={updateStatus === 'checking'}
+                  onClick={async () => {
+                    if (!window.electronAPI?.checkForUpdates) return;
+                    setUpdateStatus('checking');
+                    setUpdateInfo(null);
+                    const result = await window.electronAPI.checkForUpdates();
+                    setUpdateInfo(result);
+                    if (result.error) setUpdateStatus('error');
+                    else if (result.hasUpdate) setUpdateStatus('available');
+                    else setUpdateStatus('up-to-date');
+                  }}
+                >
+                  Check for Updates
+                </button>
+                <button className="about-ok-btn" onClick={() => { setShowAboutDialog(false); setUpdateStatus('idle'); setUpdateInfo(null); }}>OK</button>
               </div>
             </div>
           </>
@@ -6648,12 +6708,37 @@ const App = () => {
             margin-top: 8px !important;
           }
 
+          .about-update-status {
+            margin: 8px 0 0;
+            font-size: 12px;
+          }
+          .about-update-checking { color: var(--text-secondary); }
+          .about-update-ok { color: #22c55e; }
+          .about-update-available { color: var(--accent-primary); font-weight: 500; }
+          .about-update-available a { color: var(--accent-primary); }
+          .about-update-error { color: #ef4444; }
+
           .about-dialog-footer {
             display: flex;
-            justify-content: center;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
             padding: 16px 24px;
             border-top: 1px solid var(--border-primary);
           }
+
+          .about-check-updates-btn {
+            padding: 8px 20px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.15s ease;
+          }
+          .about-check-updates-btn:hover:not(:disabled) { background: var(--bg-tertiary); }
+          .about-check-updates-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
           .about-ok-btn {
             padding: 8px 32px;
