@@ -247,19 +247,44 @@ async function checkInstallerCleanup() {
     keepList = (saved.keepList || []).filter(p => fs.existsSync(p));
   } catch { /* no saved state yet */ }
 
-  // Search likely download locations for installer files that look like ours
+  // Find installer files: on macOS use Spotlight for a system-wide search,
+  // with a fallback directory scan; on Windows scan common download folders.
   const ext = process.platform === 'win32' ? '.exe' : '.dmg';
-  const searchPaths = process.platform === 'darwin'
-    ? [app.getPath('desktop'), app.getPath('downloads')]
-    : [app.getPath('downloads')];
 
-  const installerFiles = searchPaths.flatMap(dir => {
+  let installerFiles = [];
+  if (process.platform === 'darwin') {
     try {
-      return fs.readdirSync(dir)
-        .filter(f => f.endsWith(ext) && /xppm|neo.?seoul/i.test(f))
-        .map(f => path.join(dir, f));
-    } catch { return []; }
-  }).filter(p => !keepList.includes(p));
+      const { execSync } = require('child_process');
+      const raw = execSync(
+        `mdfind "kMDItemFSName LIKE '*.dmg' && kMDItemDisplayName LIKE '*neo*Seoul*'"`,
+        { encoding: 'utf-8', timeout: 5000 }
+      ).trim();
+      installerFiles = raw ? raw.split('\n').filter(Boolean) : [];
+    } catch { /* Spotlight unavailable */ }
+
+    // Fallback: scan Desktop and Downloads directly
+    if (installerFiles.length === 0) {
+      const fallbackDirs = [app.getPath('desktop'), app.getPath('downloads')];
+      installerFiles = fallbackDirs.flatMap(dir => {
+        try {
+          return fs.readdirSync(dir)
+            .filter(f => f.endsWith(ext) && /xppm|neo.?seoul/i.test(f))
+            .map(f => path.join(dir, f));
+        } catch { return []; }
+      });
+    }
+  } else {
+    const searchPaths = [app.getPath('downloads')];
+    installerFiles = searchPaths.flatMap(dir => {
+      try {
+        return fs.readdirSync(dir)
+          .filter(f => f.endsWith(ext) && /xppm|neo.?seoul/i.test(f))
+          .map(f => path.join(dir, f));
+      } catch { return []; }
+    });
+  }
+
+  installerFiles = installerFiles.filter(p => !keepList.includes(p));
 
   if (installerFiles.length === 0) return;
 
