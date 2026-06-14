@@ -655,7 +655,25 @@ function fetchLatestRelease() {
           const release = JSON.parse(data);
           const latestVersion = (release.tag_name || '').replace(/^v/, '');
           const publishedAt = release.published_at || null;
-          const downloadUrl = release.html_url || 'https://github.com/ghanglee/IDMxPPM/releases';
+          const assets = Array.isArray(release.assets) ? release.assets : [];
+          // Pick the platform-appropriate installer asset
+          let installerUrl = null;
+          if (process.platform === 'darwin') {
+            // Prefer arm64 DMG on Apple Silicon, fall back to x64 DMG
+            const armDmg = assets.find(a => a.name.endsWith('.dmg') && a.name.includes('arm64'));
+            const x64Dmg = assets.find(a => a.name.endsWith('.dmg') && !a.name.endsWith('.blockmap'));
+            const dmg = armDmg || x64Dmg;
+            installerUrl = dmg ? dmg.browser_download_url : null;
+          } else if (process.platform === 'win32') {
+            // Prefer NSIS Setup installer over portable
+            const setupExe = assets.find(a => a.name.endsWith('.exe') && a.name.toLowerCase().includes('setup'));
+            const anyExe = assets.find(a => a.name.endsWith('.exe') && !a.name.endsWith('.blockmap'));
+            installerUrl = (setupExe || anyExe)?.browser_download_url || null;
+          } else {
+            const appImage = assets.find(a => a.name.endsWith('.AppImage'));
+            installerUrl = appImage ? appImage.browser_download_url : null;
+          }
+          const downloadUrl = installerUrl || release.html_url || 'https://github.com/ghanglee/IDMxPPM/releases';
           const versionChanged = !!(latestVersion && latestVersion !== currentVersion);
           const newerBuild = !!(publishedAt && buildDate && new Date(publishedAt) > new Date(buildDate));
           const hasUpdate = versionChanged || newerBuild;

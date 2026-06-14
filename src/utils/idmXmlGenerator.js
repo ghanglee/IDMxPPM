@@ -475,23 +475,29 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, da
 
   // author elements per idmXSD v2.0 - id required, contains person or organization
   // Lead author (isLead: true) is emitted first; order of others preserved.
+
+  // Org lookup and helper hoisted — also used by UC authoring section below
+  const orgById = {};
+  authorsArray.forEach(a => { if (a?.type === 'organization' && a.id) orgById[a.id] = a; });
+  const getLinkedOrgIds = (authorObj) => {
+    if (Array.isArray(authorObj.affiliationOrgIds)) return authorObj.affiliationOrgIds;
+    if (authorObj.affiliationOrgId) return [authorObj.affiliationOrgId];
+    return [];
+  };
+
   if (authorsArray.length > 0) {
     const sorted = [
       ...authorsArray.filter(a => a && typeof a === 'object' && a.isLead),
       ...authorsArray.filter(a => !(a && typeof a === 'object' && a.isLead))
     ];
-    // Build org lookup for resolving affiliationOrgId → name
-    const orgById = {};
-    authorsArray.forEach(a => { if (a?.type === 'organization' && a.id) orgById[a.id] = a; });
 
     sorted.forEach((authorObj, index) => {
       const authorId = authorObj?.id || `author-${index + 1}`;
       if (authorObj && typeof authorObj === 'object') {
         lines.push(`    <author id="${escapeXml(authorId)}">`);
         if (authorObj.type === 'person') {
-          // Resolve affiliation: prefer linked org name, fall back to free-text
-          const affiliation = (authorObj.affiliationOrgId && orgById[authorObj.affiliationOrgId]?.name)
-            || authorObj.affiliation || '';
+          const linkedOrgIds = getLinkedOrgIds(authorObj);
+          const linkedOrgs = linkedOrgIds.map(id => orgById[id]).filter(Boolean);
           lines.push('      <person');
           lines.push(`        firstName="${escapeXml(authorObj.givenName || authorObj.firstName || '')}"`);
           if (authorObj.middleInitial || authorObj.middleName) {
@@ -503,10 +509,21 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, da
           if (authorObj.uri || authorObj.emailAddress) {
             lines.push(`        emailAddress="${escapeXml(authorObj.uri || authorObj.emailAddress)}"`);
           }
-          if (affiliation) {
-            lines.push(`        affiliation="${escapeXml(affiliation)}"`);
+          // Free-text affiliation only when no structured org links
+          if (linkedOrgs.length === 0 && authorObj.affiliation) {
+            lines.push(`        affiliation="${escapeXml(authorObj.affiliation)}"`);
           }
           lines.push('      />');
+          // Emit one <organization/> per linked org inside the same <author> block
+          linkedOrgs.forEach(org => {
+            const orgAttrs = [`name="${escapeXml(org.name || '')}"`];
+            if (org.uri) orgAttrs.push(`uri="${escapeXml(org.uri)}"`);
+            lines.push(`      <organization ${orgAttrs.join(' ')}/>`);
+          });
+          // Also emit free-text affiliation as an org when linked orgs are present but user typed an extra one
+          if (linkedOrgs.length > 0 && authorObj.affiliation) {
+            lines.push(`      <organization name="${escapeXml(authorObj.affiliation)}"/>`);
+          }
         } else if (authorObj.type === 'organization') {
           lines.push(`      <organization name="${escapeXml(authorObj.name || '')}"/>`);
         } else {
@@ -551,14 +568,24 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, da
       if (authorObj && typeof authorObj === 'object') {
         lines.push(`      <author id="${escapeXml(authorId)}">`);
         if (authorObj.type === 'person') {
+          const linkedOrgIds = getLinkedOrgIds(authorObj);
+          const linkedOrgs = linkedOrgIds.map(id => orgById[id]).filter(Boolean);
           lines.push(`        <person firstName="${escapeXml(authorObj.givenName || authorObj.firstName || '')}"`);
           if (authorObj.familyName || authorObj.lastName) {
             lines.push(`          lastName="${escapeXml(authorObj.familyName || authorObj.lastName)}"`);
           }
-          if (authorObj.affiliation) {
+          if (linkedOrgs.length === 0 && authorObj.affiliation) {
             lines.push(`          affiliation="${escapeXml(authorObj.affiliation)}"`);
           }
           lines.push('        />');
+          linkedOrgs.forEach(org => {
+            const orgAttrs = [`name="${escapeXml(org.name || '')}"`];
+            if (org.uri) orgAttrs.push(`uri="${escapeXml(org.uri)}"`);
+            lines.push(`        <organization ${orgAttrs.join(' ')}/>`);
+          });
+          if (linkedOrgs.length > 0 && authorObj.affiliation) {
+            lines.push(`        <organization name="${escapeXml(authorObj.affiliation)}"/>`);
+          }
         } else if (authorObj.type === 'organization') {
           lines.push(`        <organization name="${escapeXml(authorObj.name || '')}"/>`);
         }

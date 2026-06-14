@@ -709,8 +709,8 @@
 
 .author-type-badge {
   padding: 1px 5px;
-  background: var(--accent-primary);
-  color: #fff;
+  background: color-mix(in srgb, var(--accent-primary) 25%, var(--bg-secondary));
+  color: var(--accent-primary);
   border-radius: 3px;
   font-size: 9px;
   font-weight: 600;
@@ -773,8 +773,8 @@
   background: color-mix(in srgb, var(--accent-primary) 8%, var(--bg-secondary));
 }
 .author-entry-lead > .author-entry-header .author-type-badge {
-  background: color-mix(in srgb, var(--accent-primary) 20%, var(--bg-secondary));
-  color: var(--accent-primary);
+  background: color-mix(in srgb, var(--accent-primary) 70%, #000);
+  color: #fff;
 }
 
 /* Sub-item: person nested under its organization */
@@ -786,32 +786,35 @@
   padding-left: 10px;
 }
 
-/* Affiliation link row (shown below free-text input) */
-.affiliation-link-row {
+/* Affiliation org checklist (shown above free-text input) */
+.affiliation-org-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 6px;
+  padding: 6px 8px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+}
+.affiliation-org-check-item {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-primary);
+  cursor: pointer;
+  user-select: none;
 }
-.affiliation-org-select {
-  flex: 1;
-  font-size: 11px;
-  padding: 3px 6px;
+.affiliation-org-check-item input[type="checkbox"] {
+  accent-color: var(--accent-primary);
+  cursor: pointer;
 }
-.affiliation-linked-note {
-  font-size: 11px;
-  color: var(--accent-primary);
-  flex: 1;
-}
-.affiliation-unlink-btn {
-  background: none;
-  border: none;
+/* Compact affiliation hint in collapsed header */
+.author-affiliation-hint {
   color: var(--text-secondary);
   font-size: 11px;
-  cursor: pointer;
-  padding: 0;
-  text-decoration: underline;
-  flex-shrink: 0;
+  font-weight: 400;
 }
 
 .author-entry-body {

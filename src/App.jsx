@@ -245,7 +245,7 @@ const App = () => {
       setUpdateInfo(result);
       if (result.hasUpdate) {
         setUpdateStatus('available');
-        showToast(`Version ${result.latestVersion} is available — open Help > About to download.`, 12000);
+        showToast(`Version ${result.latestVersion} is available — open Help > Check for Updates… to download.`, 12000);
       }
     }, 5000);
     return () => clearTimeout(timer);

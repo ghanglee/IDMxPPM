@@ -281,14 +281,45 @@ export const parseIdmXml = (xmlContent) => {
       result.headerData.authors = [];
 
       if (authorElements.length > 0) {
+        // Two-pass parse: first collect standalone org authors, then resolve person links
+        const pendingPersons = []; // { entry, orgNames[] } for persons with org children
+
         authorElements.forEach(author => {
           const authorId = author.getAttribute('id') || '';
-
-          // v2.0 format: <author id="..."><person .../></author> or <author id="..."><organization .../></author>
           const personChild = getFirstChild(author, 'person');
-          const orgChild = getFirstChild(author, 'organization');
+          const orgChildren = getDirectChildren(author, 'organization');
 
-          if (personChild) {
+          if (personChild && orgChildren.length > 0) {
+            // Multi-affiliation pattern: <person/> + one or more <organization/> siblings
+            const firstName = personChild.getAttribute('firstName') || personChild.getAttribute('givenName') || '';
+            const lastName = personChild.getAttribute('lastName') || personChild.getAttribute('familyName') || '';
+            const middleName = personChild.getAttribute('middleName') || personChild.getAttribute('middleInitial') || '';
+            const email = personChild.getAttribute('emailAddress') || personChild.getAttribute('uri') || '';
+            const prefix = personChild.getAttribute('prefix') || '';
+            const suffix = personChild.getAttribute('suffix') || '';
+            const postnominal = personChild.getAttribute('postnominalDesignation') || '';
+            // affiliation attr on person is ignored here since org children carry that info
+            const orgNames = orgChildren.map(o => ({
+              name: o.getAttribute('name') || '',
+              uri: o.getAttribute('uri') || ''
+            })).filter(o => o.name);
+            const entry = {
+              type: 'person',
+              id: authorId,
+              givenName: firstName,
+              familyName: lastName,
+              middleInitial: middleName,
+              affiliation: '',
+              uri: email,
+              prefix,
+              suffix,
+              postnominalDesignation: postnominal,
+              affiliationOrgIds: [] // filled in post-processing
+            };
+            result.headerData.authors.push(entry);
+            pendingPersons.push({ entry, orgNames });
+          } else if (personChild) {
+            // Person only — may have free-text affiliation attr
             const firstName = personChild.getAttribute('firstName') || personChild.getAttribute('givenName') || '';
             const lastName = personChild.getAttribute('lastName') || personChild.getAttribute('familyName') || '';
             const middleName = personChild.getAttribute('middleName') || personChild.getAttribute('middleInitial') || '';
@@ -297,20 +328,22 @@ export const parseIdmXml = (xmlContent) => {
             const prefix = personChild.getAttribute('prefix') || '';
             const suffix = personChild.getAttribute('suffix') || '';
             const postnominal = personChild.getAttribute('postnominalDesignation') || '';
-
             result.headerData.authors.push({
               type: 'person',
               id: authorId,
               givenName: firstName,
               familyName: lastName,
               middleInitial: middleName,
-              affiliation: affiliation,
+              affiliation,
               uri: email,
               prefix,
               suffix,
-              postnominalDesignation: postnominal
+              postnominalDesignation: postnominal,
+              affiliationOrgIds: []
             });
-          } else if (orgChild) {
+          } else if (orgChildren.length > 0) {
+            // Standalone org author (first org child = the org entry; extra children unusual here)
+            const orgChild = orgChildren[0];
             result.headerData.authors.push({
               type: 'organization',
               id: authorId,
@@ -324,7 +357,6 @@ export const parseIdmXml = (xmlContent) => {
             const middleName = author.getAttribute('middleName') || author.getAttribute('middleInitial') || '';
             const affiliation = author.getAttribute('affiliation') || '';
             const digitalSignature = author.getAttribute('digitalSignature') || '';
-
             if (firstName || lastName) {
               result.headerData.authors.push({
                 type: 'person',
@@ -332,15 +364,34 @@ export const parseIdmXml = (xmlContent) => {
                 givenName: firstName,
                 familyName: lastName,
                 middleInitial: middleName,
-                affiliation: affiliation,
-                uri: digitalSignature
+                affiliation,
+                uri: digitalSignature,
+                affiliationOrgIds: []
               });
             }
           }
         });
+
+        // Resolve org references for multi-affiliation persons.
+        // For each org name in the person's org-children list: find or create an org author entry.
+        if (pendingPersons.length > 0) {
+          pendingPersons.forEach(({ entry, orgNames }) => {
+            const ids = orgNames.map(({ name, uri }) => {
+              const existing = result.headerData.authors.find(
+                a => a.type === 'organization' && a.name.trim().toLowerCase() === name.trim().toLowerCase()
+              );
+              if (existing) return existing.id;
+              // Create a new org author entry for orgs referenced but not separately listed
+              const newId = `org-parsed-${result.headerData.authors.length}`;
+              result.headerData.authors.push({ type: 'organization', id: newId, name, uri });
+              return newId;
+            });
+            entry.affiliationOrgIds = ids;
+          });
+        }
       }
 
-      // Post-process: mark first person as lead; resolve affiliationOrgId from affiliation string
+      // Post-process: mark first person as lead; resolve free-text affiliation to org id where possible
       {
         const orgs = result.headerData.authors.filter(a => a.type === 'organization' && a.name);
         let firstPerson = true;
@@ -348,11 +399,17 @@ export const parseIdmXml = (xmlContent) => {
           if (a.type !== 'person') return a;
           const isLead = firstPerson;
           firstPerson = false;
-          // Try to match affiliation string to an org entry
-          const matched = a.affiliation
-            ? orgs.find(o => o.name.trim().toLowerCase() === a.affiliation.trim().toLowerCase())
-            : null;
-          return { ...a, isLead, affiliationOrgId: matched?.id || '', affiliation: a.affiliation || '' };
+          // Normalize legacy affiliationOrgId
+          const ids = Array.isArray(a.affiliationOrgIds) ? a.affiliationOrgIds
+            : a.affiliationOrgId ? [a.affiliationOrgId] : [];
+          // For persons with free-text affiliation and no structured org links, try string match
+          const resolvedIds = ids.length > 0 ? ids : (() => {
+            const matched = a.affiliation
+              ? orgs.find(o => o.name.trim().toLowerCase() === a.affiliation.trim().toLowerCase())
+              : null;
+            return matched ? [matched.id] : [];
+          })();
+          return { ...a, isLead, affiliationOrgIds: resolvedIds, affiliationOrgId: '' };
         });
       }
 
