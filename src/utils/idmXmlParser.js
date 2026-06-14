@@ -340,6 +340,22 @@ export const parseIdmXml = (xmlContent) => {
         });
       }
 
+      // Post-process: mark first person as lead; resolve affiliationOrgId from affiliation string
+      {
+        const orgs = result.headerData.authors.filter(a => a.type === 'organization' && a.name);
+        let firstPerson = true;
+        result.headerData.authors = result.headerData.authors.map(a => {
+          if (a.type !== 'person') return a;
+          const isLead = firstPerson;
+          firstPerson = false;
+          // Try to match affiliation string to an org entry
+          const matched = a.affiliation
+            ? orgs.find(o => o.name.trim().toLowerCase() === a.affiliation.trim().toLowerCase())
+            : null;
+          return { ...a, isLead, affiliationOrgId: matched?.id || '', affiliation: a.affiliation || '' };
+        });
+      }
+
       // Fallback: standalone <person>/<organization> elements not inside <author> (rare)
       if (result.headerData.authors.length === 0) {
         getDirectChildren(authoring, 'person').forEach(person => {

@@ -220,7 +220,7 @@ const OptionalFieldsToggle = ({ options, selected = [], onChange, label = 'Add o
  * - Person: familyName, givenName, middleInitial, prefix, suffix, postnominalDesignation, uri
  * - Organization: name, localName, code, localCode, uri
  */
-const AuthorEntry = ({ author, onChange, onRemove, index }) => {
+const AuthorEntry = ({ author, onChange, onRemove, onToggleLead, index, orgAuthors = [] }) => {
   const [expanded, setExpanded] = useState(false);
   const [showOptional, setShowOptional] = useState(false);
   const isPerson = author.type === 'person';
@@ -228,6 +228,9 @@ const AuthorEntry = ({ author, onChange, onRemove, index }) => {
   const handleFieldChange = (field, value) => {
     onChange({ ...author, [field]: value });
   };
+
+  // Resolve affiliated org name from orgAuthors list (for display)
+  const linkedOrg = orgAuthors.find(o => o.id && o.id === author.affiliationOrgId);
 
   // Build display name from ISO 29481-3 fields (with backward compatibility)
   const displayName = isPerson
@@ -242,11 +245,23 @@ const AuthorEntry = ({ author, onChange, onRemove, index }) => {
     : author.name || author.organizationName || '(unnamed organization)';
 
   return (
-    <div className="author-entry">
+    <div className={`author-entry${author.isLead ? ' author-entry-lead' : ''}`}>
       <div className="author-entry-header" onClick={() => setExpanded(!expanded)}>
         {expanded ? <ChevronDownIcon size={14} /> : <ChevronRightIcon size={14} />}
-        <span className="author-type-badge">{isPerson ? 'Person' : 'Org'}</span>
+        <span className={`author-type-badge${author.isLead ? ' lead' : ''}`}>
+          {isPerson ? (author.isLead ? '★ Lead' : 'Person') : 'Org'}
+        </span>
         <span className="author-name">{displayName}</span>
+        {isPerson && (
+          <button
+            type="button"
+            className={`author-lead-btn${author.isLead ? ' is-lead' : ''}`}
+            onClick={(e) => { e.stopPropagation(); onToggleLead(); }}
+            title={author.isLead ? 'Lead author — click to unset' : 'Set as lead author'}
+          >
+            {author.isLead ? '★' : '☆'}
+          </button>
+        )}
         <button
           type="button"
           className="author-remove"
@@ -295,13 +310,52 @@ const AuthorEntry = ({ author, onChange, onRemove, index }) => {
               </div>
               <div className="pane-field">
                 <label>Affiliation (Organization)</label>
-                <input
-                  type="text"
-                  value={author.affiliation || ''}
-                  onChange={(e) => handleFieldChange('affiliation', e.target.value)}
-                  placeholder="e.g., Yonsei University"
-                  className="pane-input"
-                />
+                {orgAuthors.length > 0 ? (
+                  <>
+                    <select
+                      className="pane-input"
+                      value={author.affiliationOrgId || ''}
+                      onChange={(e) => {
+                        const orgId = e.target.value;
+                        if (orgId) {
+                          const org = orgAuthors.find(o => o.id === orgId);
+                          onChange({ ...author, affiliationOrgId: orgId, affiliation: org?.name || '' });
+                        } else {
+                          onChange({ ...author, affiliationOrgId: '', affiliation: '' });
+                        }
+                      }}
+                    >
+                      <option value="">— Select organization —</option>
+                      {orgAuthors.map((org, i) => (
+                        <option key={org.id || i} value={org.id}>{org.name || '(unnamed organization)'}</option>
+                      ))}
+                    </select>
+                    {!author.affiliationOrgId && (
+                      <input
+                        type="text"
+                        value={author.affiliation || ''}
+                        onChange={(e) => handleFieldChange('affiliation', e.target.value)}
+                        placeholder="Or type organization name"
+                        className="pane-input"
+                        style={{ marginTop: 4 }}
+                      />
+                    )}
+                    {linkedOrg && (
+                      <div className="affiliation-linked-note">
+                        Linked to: <strong>{linkedOrg.name}</strong>
+                        <button type="button" className="affiliation-unlink-btn" onClick={() => onChange({ ...author, affiliationOrgId: '', affiliation: linkedOrg.name })}>unlink</button>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <input
+                    type="text"
+                    value={author.affiliation || ''}
+                    onChange={(e) => handleFieldChange('affiliation', e.target.value)}
+                    placeholder="e.g., Yonsei University"
+                    className="pane-input"
+                  />
+                )}
               </div>
 
               {/* Optional fields toggle */}
@@ -400,8 +454,13 @@ const AuthorEntry = ({ author, onChange, onRemove, index }) => {
  * Per ISO 29481-3: Supports Person and Organization types
  */
 const AuthorsList = ({ authors = [], onChange }) => {
+  // Org authors with stable IDs (needed for affiliationOrgId linking)
+  const orgAuthors = authors
+    .filter(a => a.type === 'organization')
+    .map((a, i) => ({ ...a, id: a.id || `org-${i}` }));
+
   const handleAddPerson = () => {
-    // ISO 29481-3 Person structure
+    const isFirst = !authors.some(a => a.type === 'person');
     onChange([...authors, {
       type: 'person',
       givenName: '',
@@ -411,14 +470,17 @@ const AuthorsList = ({ authors = [], onChange }) => {
       suffix: '',
       postnominalDesignation: '',
       uri: '',
-      affiliation: ''
+      affiliation: '',
+      affiliationOrgId: '',
+      isLead: isFirst  // First person added is automatically lead
     }]);
   };
 
   const handleAddOrganization = () => {
-    // ISO 29481-3 Organization structure
+    const id = `org-${Date.now()}`;
     onChange([...authors, {
       type: 'organization',
+      id,
       name: '',
       localName: '',
       code: '',
@@ -432,8 +494,27 @@ const AuthorsList = ({ authors = [], onChange }) => {
     onChange(updated);
   };
 
+  const handleToggleLead = (index) => {
+    // Only one person can be lead — clicking the current lead unsets it
+    const target = authors[index];
+    const becomingLead = !target.isLead;
+    const updated = authors.map((a, i) => {
+      if (a.type !== 'person') return a;
+      return { ...a, isLead: i === index ? becomingLead : false };
+    });
+    onChange(updated);
+  };
+
   const handleRemoveAuthor = (index) => {
-    onChange(authors.filter((_, i) => i !== index));
+    const removed = authors[index];
+    let updated = authors.filter((_, i) => i !== index);
+    // If removing an org, clear affiliationOrgId references to it
+    if (removed.type === 'organization' && removed.id) {
+      updated = updated.map(a =>
+        a.affiliationOrgId === removed.id ? { ...a, affiliationOrgId: '', affiliation: a.affiliation } : a
+      );
+    }
+    onChange(updated);
   };
 
   return (
@@ -452,10 +533,12 @@ const AuthorsList = ({ authors = [], onChange }) => {
         <div className="authors-entries">
           {authors.map((author, index) => (
             <AuthorEntry
-              key={index}
+              key={author.id || index}
               author={author}
               index={index}
+              orgAuthors={orgAuthors}
               onChange={(updated) => handleAuthorChange(index, updated)}
+              onToggleLead={() => handleToggleLead(index)}
               onRemove={() => handleRemoveAuthor(index)}
             />
           ))}

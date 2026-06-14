@@ -748,6 +748,52 @@
   color: #fff;
 }
 
+.author-lead-btn {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 13px;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+  margin-right: 2px;
+}
+.author-lead-btn:hover { color: var(--accent-primary); }
+.author-lead-btn.is-lead { color: #f59e0b; }
+
+.author-entry-lead > .author-entry-header {
+  background: color-mix(in srgb, var(--accent-primary) 6%, var(--bg-secondary));
+}
+
+.author-type-badge.lead {
+  background: color-mix(in srgb, #f59e0b 20%, var(--bg-secondary));
+  color: #b45309;
+}
+
+.affiliation-linked-note {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.affiliation-unlink-btn {
+  background: none;
+  border: none;
+  color: var(--accent-primary);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
 .author-entry-body {
   padding: 8px;
   border-top: 1px solid var(--border-primary);
