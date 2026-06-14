@@ -748,50 +748,70 @@
   color: #fff;
 }
 
-.author-lead-btn {
-  width: 18px;
-  height: 18px;
+/* Lead checkbox in author header */
+.author-lead-label {
   display: flex;
   align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-sm);
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 13px;
-  flex-shrink: 0;
-  transition: all var(--transition-fast);
-  margin-right: 2px;
-}
-.author-lead-btn:hover { color: var(--accent-primary); }
-.author-lead-btn.is-lead { color: #f59e0b; }
-
-.author-entry-lead > .author-entry-header {
-  background: color-mix(in srgb, var(--accent-primary) 6%, var(--bg-secondary));
-}
-
-.author-type-badge.lead {
-  background: color-mix(in srgb, #f59e0b 20%, var(--bg-secondary));
-  color: #b45309;
-}
-
-.affiliation-linked-note {
-  margin-top: 4px;
+  gap: 4px;
   font-size: 11px;
   color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-right: 4px;
+  user-select: none;
+}
+.author-lead-check {
+  cursor: pointer;
+  accent-color: var(--accent-primary);
+}
+.author-lead-label:has(.author-lead-check:checked) {
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
+.author-entry-lead > .author-entry-header {
+  background: color-mix(in srgb, var(--accent-primary) 8%, var(--bg-secondary));
+}
+.author-entry-lead > .author-entry-header .author-type-badge {
+  background: color-mix(in srgb, var(--accent-primary) 20%, var(--bg-secondary));
+  color: var(--accent-primary);
+}
+
+/* Sub-item: person nested under its organization */
+.author-sub-item {
+  margin-left: 16px;
+  border-left: 2px solid var(--border-primary);
+}
+.author-sub-item > .author-entry-header {
+  padding-left: 10px;
+}
+
+/* Affiliation link row (shown below free-text input) */
+.affiliation-link-row {
   display: flex;
   align-items: center;
   gap: 6px;
+  margin-top: 4px;
+}
+.affiliation-org-select {
+  flex: 1;
+  font-size: 11px;
+  padding: 3px 6px;
+}
+.affiliation-linked-note {
+  font-size: 11px;
+  color: var(--accent-primary);
+  flex: 1;
 }
 .affiliation-unlink-btn {
   background: none;
   border: none;
-  color: var(--accent-primary);
+  color: var(--text-secondary);
   font-size: 11px;
   cursor: pointer;
   padding: 0;
   text-decoration: underline;
+  flex-shrink: 0;
 }
 
 .author-entry-body {

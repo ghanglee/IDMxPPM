@@ -220,19 +220,15 @@ const OptionalFieldsToggle = ({ options, selected = [], onChange, label = 'Add o
  * - Person: familyName, givenName, middleInitial, prefix, suffix, postnominalDesignation, uri
  * - Organization: name, localName, code, localCode, uri
  */
-const AuthorEntry = ({ author, onChange, onRemove, onToggleLead, index, orgAuthors = [] }) => {
+const AuthorEntry = ({ author, onChange, onRemove, onToggleLead, isSubItem = false, orgAuthors = [] }) => {
   const [expanded, setExpanded] = useState(false);
   const [showOptional, setShowOptional] = useState(false);
   const isPerson = author.type === 'person';
 
-  const handleFieldChange = (field, value) => {
-    onChange({ ...author, [field]: value });
-  };
+  const handleFieldChange = (field, value) => onChange({ ...author, [field]: value });
 
-  // Resolve affiliated org name from orgAuthors list (for display)
   const linkedOrg = orgAuthors.find(o => o.id && o.id === author.affiliationOrgId);
 
-  // Build display name from ISO 29481-3 fields (with backward compatibility)
   const displayName = isPerson
     ? [
         author.prefix,
@@ -245,125 +241,96 @@ const AuthorEntry = ({ author, onChange, onRemove, onToggleLead, index, orgAutho
     : author.name || author.organizationName || '(unnamed organization)';
 
   return (
-    <div className={`author-entry${author.isLead ? ' author-entry-lead' : ''}`}>
+    <div className={`author-entry${author.isLead ? ' author-entry-lead' : ''}${isSubItem ? ' author-sub-item' : ''}`}>
       <div className="author-entry-header" onClick={() => setExpanded(!expanded)}>
         {expanded ? <ChevronDownIcon size={14} /> : <ChevronRightIcon size={14} />}
         <span className={`author-type-badge${author.isLead ? ' lead' : ''}`}>
-          {isPerson ? (author.isLead ? '★ Lead' : 'Person') : 'Org'}
+          {isPerson ? 'Person' : 'Org'}
         </span>
         <span className="author-name">{displayName}</span>
-        {isPerson && (
-          <button
-            type="button"
-            className={`author-lead-btn${author.isLead ? ' is-lead' : ''}`}
-            onClick={(e) => { e.stopPropagation(); onToggleLead(); }}
-            title={author.isLead ? 'Lead author — click to unset' : 'Set as lead author'}
-          >
-            {author.isLead ? '★' : '☆'}
-          </button>
-        )}
+        {/* Lead checkbox — applies to both persons and organizations */}
+        <label className="author-lead-label" onClick={e => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            className="author-lead-check"
+            checked={!!author.isLead}
+            onChange={() => onToggleLead()}
+          />
+          Lead
+        </label>
         <button
           type="button"
           className="author-remove"
           onClick={(e) => { e.stopPropagation(); onRemove(); }}
           title="Remove"
-        >
-          ×
-        </button>
+        >×</button>
       </div>
+
       {expanded && (
         <div className="author-entry-body">
           {isPerson ? (
             <>
-              {/* Required fields */}
               <div className="pane-field-row">
                 <div className="pane-field">
                   <label>Given Name <span className="required">*</span></label>
-                  <input
-                    type="text"
+                  <input type="text" className="pane-input"
                     value={author.givenName || author.firstName || ''}
                     onChange={(e) => handleFieldChange('givenName', e.target.value)}
-                    placeholder="e.g., John"
-                    className="pane-input"
-                  />
+                    placeholder="e.g., John" />
                 </div>
                 <div className="pane-field">
-                  <label>Family Name <span className="required">*</span></label>
-                  <input
-                    type="text"
+                  <label>Family Name</label>
+                  <input type="text" className="pane-input"
                     value={author.familyName || author.lastName || ''}
                     onChange={(e) => handleFieldChange('familyName', e.target.value)}
-                    placeholder="e.g., Smith"
-                    className="pane-input"
-                  />
+                    placeholder="e.g., Smith" />
                 </div>
               </div>
               <div className="pane-field">
                 <label>URI (Email / Website)</label>
-                <input
-                  type="text"
+                <input type="text" className="pane-input"
                   value={author.uri || author.email || ''}
                   onChange={(e) => handleFieldChange('uri', e.target.value)}
-                  placeholder="e.g., john.smith@example.com"
-                  className="pane-input"
-                />
+                  placeholder="e.g., john.smith@example.com" />
               </div>
+
+              {/* Affiliation: free-text always available; link to listed org is optional */}
               <div className="pane-field">
                 <label>Affiliation (Organization)</label>
-                {orgAuthors.length > 0 ? (
-                  <>
-                    <select
-                      className="pane-input"
-                      value={author.affiliationOrgId || ''}
-                      onChange={(e) => {
-                        const orgId = e.target.value;
-                        if (orgId) {
-                          const org = orgAuthors.find(o => o.id === orgId);
-                          onChange({ ...author, affiliationOrgId: orgId, affiliation: org?.name || '' });
-                        } else {
-                          onChange({ ...author, affiliationOrgId: '', affiliation: '' });
-                        }
-                      }}
-                    >
-                      <option value="">— Select organization —</option>
-                      {orgAuthors.map((org, i) => (
-                        <option key={org.id || i} value={org.id}>{org.name || '(unnamed organization)'}</option>
-                      ))}
-                    </select>
-                    {!author.affiliationOrgId && (
-                      <input
-                        type="text"
-                        value={author.affiliation || ''}
-                        onChange={(e) => handleFieldChange('affiliation', e.target.value)}
-                        placeholder="Or type organization name"
-                        className="pane-input"
-                        style={{ marginTop: 4 }}
-                      />
+                <input type="text" className="pane-input"
+                  value={linkedOrg ? (linkedOrg.name || '') : (author.affiliation || '')}
+                  readOnly={!!linkedOrg}
+                  onChange={(e) => onChange({ ...author, affiliationOrgId: '', affiliation: e.target.value })}
+                  placeholder="e.g., Yonsei University" />
+                {orgAuthors.length > 0 && (
+                  <div className="affiliation-link-row">
+                    {linkedOrg ? (
+                      <>
+                        <span className="affiliation-linked-note">Linked to listed org</span>
+                        <button type="button" className="affiliation-unlink-btn"
+                          onClick={() => onChange({ ...author, affiliationOrgId: '', affiliation: linkedOrg.name || '' })}>
+                          Unlink
+                        </button>
+                      </>
+                    ) : (
+                      <select className="pane-input affiliation-org-select"
+                        value=""
+                        onChange={(e) => {
+                          const org = orgAuthors.find(o => o.id === e.target.value);
+                          if (org) onChange({ ...author, affiliationOrgId: org.id, affiliation: org.name || '' });
+                        }}>
+                        <option value="">Link to a listed organization (optional)…</option>
+                        {orgAuthors.map((org, i) => (
+                          <option key={org.id || i} value={org.id}>{org.name || '(unnamed organization)'}</option>
+                        ))}
+                      </select>
                     )}
-                    {linkedOrg && (
-                      <div className="affiliation-linked-note">
-                        Linked to: <strong>{linkedOrg.name}</strong>
-                        <button type="button" className="affiliation-unlink-btn" onClick={() => onChange({ ...author, affiliationOrgId: '', affiliation: linkedOrg.name })}>unlink</button>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <input
-                    type="text"
-                    value={author.affiliation || ''}
-                    onChange={(e) => handleFieldChange('affiliation', e.target.value)}
-                    placeholder="e.g., Yonsei University"
-                    className="pane-input"
-                  />
+                  </div>
                 )}
               </div>
 
-              {/* Optional fields toggle */}
-              <button
-                type="button"
-                className="optional-fields-btn small"
-                onClick={() => setShowOptional(!showOptional)}
-              >
+              <button type="button" className="optional-fields-btn small"
+                onClick={() => setShowOptional(!showOptional)}>
                 <SettingsIcon size={12} />
                 <span>Optional fields</span>
                 {showOptional ? <ChevronDownIcon size={12} /> : <ChevronRightIcon size={12} />}
@@ -374,45 +341,33 @@ const AuthorEntry = ({ author, onChange, onRemove, onToggleLead, index, orgAutho
                   <div className="pane-field-row">
                     <div className="pane-field">
                       <label>Prefix</label>
-                      <input
-                        type="text"
+                      <input type="text" className="pane-input"
                         value={author.prefix || ''}
                         onChange={(e) => handleFieldChange('prefix', e.target.value)}
-                        placeholder="e.g., Dr., Prof."
-                        className="pane-input"
-                      />
+                        placeholder="e.g., Dr., Prof." />
                     </div>
                     <div className="pane-field">
                       <label>Suffix</label>
-                      <input
-                        type="text"
+                      <input type="text" className="pane-input"
                         value={author.suffix || ''}
                         onChange={(e) => handleFieldChange('suffix', e.target.value)}
-                        placeholder="e.g., Jr., III"
-                        className="pane-input"
-                      />
+                        placeholder="e.g., Jr., III" />
                     </div>
                   </div>
                   <div className="pane-field-row">
                     <div className="pane-field">
                       <label>Middle Initial</label>
-                      <input
-                        type="text"
+                      <input type="text" className="pane-input"
                         value={author.middleInitial || author.middleName || ''}
                         onChange={(e) => handleFieldChange('middleInitial', e.target.value)}
-                        placeholder="e.g., A."
-                        className="pane-input"
-                      />
+                        placeholder="e.g., A." />
                     </div>
                     <div className="pane-field">
                       <label>Postnominal Designation</label>
-                      <input
-                        type="text"
+                      <input type="text" className="pane-input"
                         value={author.postnominalDesignation || ''}
                         onChange={(e) => handleFieldChange('postnominalDesignation', e.target.value)}
-                        placeholder="e.g., PhD, PE, AIA"
-                        className="pane-input"
-                      />
+                        placeholder="e.g., PhD, PE, AIA" />
                     </div>
                   </div>
                 </div>
@@ -420,26 +375,19 @@ const AuthorEntry = ({ author, onChange, onRemove, onToggleLead, index, orgAutho
             </>
           ) : (
             <>
-              {/* Organization fields per ISO 29481-3 */}
               <div className="pane-field">
                 <label>Organization Name <span className="required">*</span></label>
-                <input
-                  type="text"
+                <input type="text" className="pane-input"
                   value={author.name || author.organizationName || ''}
                   onChange={(e) => handleFieldChange('name', e.target.value)}
-                  placeholder="e.g., buildingSMART International"
-                  className="pane-input"
-                />
+                  placeholder="e.g., buildingSMART International" />
               </div>
               <div className="pane-field">
                 <label>URI (Website)</label>
-                <input
-                  type="text"
+                <input type="text" className="pane-input"
                   value={author.uri || ''}
                   onChange={(e) => handleFieldChange('uri', e.target.value)}
-                  placeholder="e.g., https://www.buildingsmart.org"
-                  className="pane-input"
-                />
+                  placeholder="e.g., https://www.buildingsmart.org" />
               </div>
             </>
           )}
@@ -450,11 +398,9 @@ const AuthorEntry = ({ author, onChange, onRemove, onToggleLead, index, orgAutho
 };
 
 /**
- * Authors List Component
- * Per ISO 29481-3: Supports Person and Organization types
+ * Authors List Component — display order: orgs first, linked persons as sub-items, then independent persons.
  */
 const AuthorsList = ({ authors = [], onChange }) => {
-  // Org authors with stable IDs (needed for affiliationOrgId linking)
   const orgAuthors = authors
     .filter(a => a.type === 'organization')
     .map((a, i) => ({ ...a, id: a.id || `org-${i}` }));
@@ -462,53 +408,36 @@ const AuthorsList = ({ authors = [], onChange }) => {
   const handleAddPerson = () => {
     const isFirst = !authors.some(a => a.type === 'person');
     onChange([...authors, {
-      type: 'person',
-      givenName: '',
-      familyName: '',
-      middleInitial: '',
-      prefix: '',
-      suffix: '',
-      postnominalDesignation: '',
-      uri: '',
-      affiliation: '',
-      affiliationOrgId: '',
-      isLead: isFirst  // First person added is automatically lead
+      type: 'person', givenName: '', familyName: '', middleInitial: '',
+      prefix: '', suffix: '', postnominalDesignation: '',
+      uri: '', affiliation: '', affiliationOrgId: '', isLead: isFirst
     }]);
   };
 
   const handleAddOrganization = () => {
-    const id = `org-${Date.now()}`;
     onChange([...authors, {
-      type: 'organization',
-      id,
-      name: '',
-      localName: '',
-      code: '',
-      localCode: '',
-      uri: ''
+      type: 'organization', id: `org-${Date.now()}`,
+      name: '', localName: '', code: '', localCode: '', uri: '', isLead: false
     }]);
   };
 
   const handleAuthorChange = (index, updatedAuthor) => {
-    const updated = authors.map((a, i) => i === index ? updatedAuthor : a);
-    onChange(updated);
+    onChange(authors.map((a, i) => i === index ? updatedAuthor : a));
   };
 
   const handleToggleLead = (index) => {
-    // Only one person can be lead — clicking the current lead unsets it
+    // One lead per type (person / organization) independently
     const target = authors[index];
     const becomingLead = !target.isLead;
-    const updated = authors.map((a, i) => {
-      if (a.type !== 'person') return a;
+    onChange(authors.map((a, i) => {
+      if (a.type !== target.type) return a;
       return { ...a, isLead: i === index ? becomingLead : false };
-    });
-    onChange(updated);
+    }));
   };
 
   const handleRemoveAuthor = (index) => {
     const removed = authors[index];
     let updated = authors.filter((_, i) => i !== index);
-    // If removing an org, clear affiliationOrgId references to it
     if (removed.type === 'organization' && removed.id) {
       updated = updated.map(a =>
         a.affiliationOrgId === removed.id ? { ...a, affiliationOrgId: '', affiliation: a.affiliation } : a
@@ -517,33 +446,66 @@ const AuthorsList = ({ authors = [], onChange }) => {
     onChange(updated);
   };
 
+  if (authors.length === 0) {
+    return (
+      <div className="authors-list">
+        <div className="authors-actions">
+          <button type="button" className="pane-add-btn" onClick={handleAddPerson}><AddIcon size={12} /> Person</button>
+          <button type="button" className="pane-add-btn" onClick={handleAddOrganization}><AddIcon size={12} /> Organization</button>
+        </div>
+        <div className="pane-empty-small">No authors added</div>
+      </div>
+    );
+  }
+
+  // Build display order: orgs → linked persons as sub-items → independent persons
+  const renderedItems = [];
+  const renderedPersonIndices = new Set();
+
+  orgAuthors.forEach(org => {
+    const orgIndex = authors.findIndex(a => a === org || (a.id && a.id === org.id));
+    if (orgIndex === -1) return;
+    renderedItems.push(
+      <AuthorEntry key={`org-${orgIndex}`}
+        author={authors[orgIndex]} index={orgIndex} orgAuthors={orgAuthors}
+        onChange={(u) => handleAuthorChange(orgIndex, u)}
+        onToggleLead={() => handleToggleLead(orgIndex)}
+        onRemove={() => handleRemoveAuthor(orgIndex)} />
+    );
+    // Linked persons as sub-items
+    authors.forEach((a, pi) => {
+      if (a.type === 'person' && a.affiliationOrgId && a.affiliationOrgId === org.id) {
+        renderedPersonIndices.add(pi);
+        renderedItems.push(
+          <AuthorEntry key={`person-${pi}`}
+            author={a} index={pi} orgAuthors={orgAuthors} isSubItem
+            onChange={(u) => handleAuthorChange(pi, u)}
+            onToggleLead={() => handleToggleLead(pi)}
+            onRemove={() => handleRemoveAuthor(pi)} />
+        );
+      }
+    });
+  });
+
+  // Independent persons (no org link or org not in list)
+  authors.forEach((a, pi) => {
+    if (a.type !== 'person' || renderedPersonIndices.has(pi)) return;
+    renderedItems.push(
+      <AuthorEntry key={`person-${pi}`}
+        author={a} index={pi} orgAuthors={orgAuthors}
+        onChange={(u) => handleAuthorChange(pi, u)}
+        onToggleLead={() => handleToggleLead(pi)}
+        onRemove={() => handleRemoveAuthor(pi)} />
+    );
+  });
+
   return (
     <div className="authors-list">
       <div className="authors-actions">
-        <button type="button" className="pane-add-btn" onClick={handleAddPerson}>
-          <AddIcon size={12} /> Person
-        </button>
-        <button type="button" className="pane-add-btn" onClick={handleAddOrganization}>
-          <AddIcon size={12} /> Organization
-        </button>
+        <button type="button" className="pane-add-btn" onClick={handleAddPerson}><AddIcon size={12} /> Person</button>
+        <button type="button" className="pane-add-btn" onClick={handleAddOrganization}><AddIcon size={12} /> Organization</button>
       </div>
-      {authors.length === 0 ? (
-        <div className="pane-empty-small">No authors added</div>
-      ) : (
-        <div className="authors-entries">
-          {authors.map((author, index) => (
-            <AuthorEntry
-              key={author.id || index}
-              author={author}
-              index={index}
-              orgAuthors={orgAuthors}
-              onChange={(updated) => handleAuthorChange(index, updated)}
-              onToggleLead={() => handleToggleLead(index)}
-              onRemove={() => handleRemoveAuthor(index)}
-            />
-          ))}
-        </div>
-      )}
+      <div className="authors-entries">{renderedItems}</div>
     </div>
   );
 };
