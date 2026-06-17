@@ -247,7 +247,7 @@ const App = () => {
         setUpdateStatus('available');
         showToast(`Version ${result.latestVersion} is available — open Help > Check for Updates… to download.`, 12000);
       }
-    }, 5000);
+    }, 1000);
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
