@@ -238,53 +238,70 @@ function createWindow() {
 async function checkInstallerCleanup() {
   if (isDev) return;
 
-  // Load the list of installer paths the user previously chose to keep
+  // Linux: the AppImage IS the executable — no separate installer to clean up
+  if (process.platform === 'linux') return;
+
+  const exePath = path.resolve(app.getPath('exe'));
+
+  // macOS safety: if the app is running directly from a mounted DMG volume,
+  // trashing the DMG would kill the running app — abort entirely
+  if (process.platform === 'darwin' && exePath.startsWith('/Volumes/')) return;
+
+  // Guard: returns false if a candidate file path is the running app itself
+  // or a protected system location — must never be sent to Trash
+  const isSafeToRemove = (filePath) => {
+    const p = path.resolve(filePath);
+    // Exact match with the running executable
+    if (p === exePath) return false;
+    // File is a parent directory of the running executable
+    if (exePath.startsWith(p + path.sep)) return false;
+    // macOS: nothing inside /Applications
+    if (process.platform === 'darwin' && p.startsWith('/Applications' + path.sep)) return false;
+    // Windows: nothing inside Program Files or the user's local Programs directory
+    if (process.platform === 'win32') {
+      const pf = (process.env['ProgramFiles'] || 'C:\\Program Files') + path.sep;
+      const pf86 = (process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)') + path.sep;
+      const localProgs = path.resolve(app.getPath('appData'), '..', 'Local', 'Programs') + path.sep;
+      if (p.startsWith(pf) || p.startsWith(pf86) || p.startsWith(localProgs)) return false;
+    }
+    return true;
+  };
+
   const flagPath = path.join(app.getPath('userData'), 'installer-cleanup.json');
   let keepList = [];
   try {
     const saved = JSON.parse(fs.readFileSync(flagPath, 'utf-8'));
-    // Only keep entries that still exist on disk (self-cleaning)
     keepList = (saved.keepList || []).filter(p => fs.existsSync(p));
   } catch { /* no saved state yet */ }
 
-  // Find installer files: on macOS use Spotlight for a system-wide search,
-  // with a fallback directory scan; on Windows scan common download folders.
-  const ext = process.platform === 'win32' ? '.exe' : '.dmg';
-
   let installerFiles = [];
-  if (process.platform === 'darwin') {
-    try {
-      const { execSync } = require('child_process');
-      const raw = execSync(
-        `mdfind "kMDItemFSName LIKE '*.dmg' && kMDItemDisplayName LIKE '*neo*Seoul*'"`,
-        { encoding: 'utf-8', timeout: 5000 }
-      ).trim();
-      installerFiles = raw ? raw.split('\n').filter(Boolean) : [];
-    } catch { /* Spotlight unavailable */ }
 
-    // Fallback: scan Desktop and Downloads directly
-    if (installerFiles.length === 0) {
-      const fallbackDirs = [app.getPath('desktop'), app.getPath('downloads')];
-      installerFiles = fallbackDirs.flatMap(dir => {
-        try {
-          return fs.readdirSync(dir)
-            .filter(f => f.endsWith(ext) && /xppm|neo.?seoul/i.test(f))
-            .map(f => path.join(dir, f));
-        } catch { return []; }
-      });
-    }
-  } else {
-    const searchPaths = [app.getPath('downloads')];
-    installerFiles = searchPaths.flatMap(dir => {
+  if (process.platform === 'darwin') {
+    // Scan Downloads and Desktop for DMG files matching the app name.
+    // Avoid mdfind: it can return paths inside mounted DMG volumes or
+    // other indexed locations that are not the downloaded installer.
+    const searchDirs = [app.getPath('downloads'), app.getPath('desktop')];
+    installerFiles = searchDirs.flatMap(dir => {
       try {
         return fs.readdirSync(dir)
-          .filter(f => f.endsWith(ext) && /xppm|neo.?seoul/i.test(f))
+          .filter(f => f.endsWith('.dmg') && /xppm|neo.?seoul/i.test(f))
+          .map(f => path.join(dir, f));
+      } catch { return []; }
+    });
+  } else if (process.platform === 'win32') {
+    const searchDirs = [app.getPath('downloads'), app.getPath('desktop')];
+    installerFiles = searchDirs.flatMap(dir => {
+      try {
+        return fs.readdirSync(dir)
+          .filter(f => f.endsWith('.exe') && /xppm|neo.?seoul/i.test(f))
           .map(f => path.join(dir, f));
       } catch { return []; }
     });
   }
 
-  installerFiles = installerFiles.filter(p => !keepList.includes(p));
+  installerFiles = installerFiles
+    .filter(p => isSafeToRemove(p))
+    .filter(p => !keepList.includes(p));
 
   if (installerFiles.length === 0) return;
 
@@ -311,7 +328,6 @@ async function checkInstallerCleanup() {
         });
       }
     } else {
-      // User chose to keep — remember this path so we don't ask again
       keepList.push(installerPath);
       fs.writeFileSync(flagPath, JSON.stringify({ keepList }));
     }
