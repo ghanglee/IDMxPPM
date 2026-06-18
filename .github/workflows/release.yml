@@ -38,15 +38,15 @@ jobs:
           cache: 'npm'
       - name: Install dependencies
         run: npm ci
-      - name: Build macOS DMG
+      - name: Build macOS arm64 DMG
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
           CSC_LINK: ''
           APPLE_ID: ''
           APPLE_APP_SPECIFIC_PASSWORD: ''
-        run: npx vite build && npx electron-builder --mac --publish never
+        run: npx vite build && npx electron-builder --mac dmg --arm64 --publish never
       - name: List build output
-        run: ls -la release/
+        run: ls -la release/ || echo "No release/ directory found"
       - uses: actions/upload-artifact@v4
         with:
           name: mac-installers
@@ -65,14 +65,14 @@ jobs:
           cache: 'npm'
       - name: Install dependencies
         run: npm ci
-      - name: Build Windows installer
+      - name: Build Windows x64 installer
         env:
           WIN_CSC_LINK: ''
         shell: bash
-        run: npx vite build && npx electron-builder --win --publish never
+        run: npx vite build && npx electron-builder --win nsis --x64 --publish never
       - name: List build output
         shell: bash
-        run: ls -la release/
+        run: ls -la release/ || echo "No release/ directory found"
       - uses: actions/upload-artifact@v4
         with:
           name: win-installers
