@@ -38,13 +38,25 @@ jobs:
           cache: 'npm'
       - name: Install dependencies
         run: npm ci
-      - name: Build macOS arm64 DMG
+      - name: Build macOS arm64 app bundle
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
           CSC_LINK: ''
           APPLE_ID: ''
           APPLE_APP_SPECIFIC_PASSWORD: ''
-        run: npx vite build && npx electron-builder --mac dmg --arm64 --publish never
+        run: npx vite build && npx electron-builder --mac dir --arm64 --publish never
+      - name: Ad-hoc sign app bundle
+        run: |
+          APP=$(find release/mac-arm64 -maxdepth 1 -name "*.app" | head -1)
+          echo "Signing: $APP"
+          codesign --deep --sign - --force "$APP"
+      - name: Package signed app into DMG
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+          CSC_LINK: ''
+        run: |
+          APP=$(find release/mac-arm64 -maxdepth 1 -name "*.app" | head -1)
+          npx electron-builder --mac dmg --arm64 --prepackaged "$APP" --publish never
       - name: List build output
         run: ls -la release/ || echo "No release/ directory found"
       - uses: actions/upload-artifact@v4
