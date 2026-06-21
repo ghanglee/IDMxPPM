@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: release
+  cancel-in-progress: true
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -20,10 +24,15 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if gh release view "v${{ steps.ver.outputs.version }}" &>/dev/null 2>&1; then
-            echo "should_release=false" >> $GITHUB_OUTPUT
-          else
+          VERSION="${{ steps.ver.outputs.version }}"
+          # Find the commit the existing tag points to (empty if no tag)
+          DEREF=$(git ls-remote origin "refs/tags/v${VERSION}^{}" | cut -f1)
+          DIRECT=$(git ls-remote origin "refs/tags/v${VERSION}" | cut -f1)
+          TAG_COMMIT="${DEREF:-$DIRECT}"
+          if [ -z "$TAG_COMMIT" ] || [ "$TAG_COMMIT" != "${{ github.sha }}" ]; then
             echo "should_release=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_release=false" >> $GITHUB_OUTPUT
           fi
 
   build-mac:
@@ -107,6 +116,12 @@ jobs:
           merge-multiple: true
       - name: List installer files
         run: ls -la installers/
+      - name: Replace existing release if present
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          gh release delete "v${VERSION}" --yes --cleanup-tag 2>/dev/null || true
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
