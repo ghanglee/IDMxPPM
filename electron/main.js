@@ -698,7 +698,7 @@ ipcMain.handle('app:checkForUpdates', () => fetchLatestRelease());
 // This supports XSLT 1.0, 2.0, and 3.0 stylesheets.
 ipcMain.handle('xslt:transform', async (event, { xmlContent, xsltContent }) => {
   const os = require('os');
-  const { execFile } = require('child_process');
+  const { fork } = require('child_process');
   const stamp = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const tmpXsl = path.join(os.tmpdir(), `xslt-${stamp}.xsl`);
   const tmpXml = path.join(os.tmpdir(), `xslt-src-${stamp}.xml`);
@@ -706,16 +706,18 @@ ipcMain.handle('xslt:transform', async (event, { xmlContent, xsltContent }) => {
     fs.writeFileSync(tmpXsl, xsltContent, 'utf-8');
     fs.writeFileSync(tmpXml, xmlContent, 'utf-8');
     const xslt3 = require.resolve('xslt3');
+    // fork() uses Electron's embedded Node.js runtime, not process.execPath
+    // (which points to the Electron binary and would launch a window instead).
     const html = await new Promise((resolve, reject) => {
-      execFile(
-        process.execPath,
-        [xslt3, `-xsl:${tmpXsl}`, `-s:${tmpXml}`],
-        { maxBuffer: 50 * 1024 * 1024 },
-        (err, stdout, stderr) => {
-          if (err) reject(new Error(stderr || err.message));
-          else resolve(stdout);
-        }
-      );
+      const child = fork(xslt3, [`-xsl:${tmpXsl}`, `-s:${tmpXml}`], { silent: true });
+      let stdout = '', stderr = '';
+      child.stdout.on('data', d => { stdout += d; });
+      child.stderr.on('data', d => { stderr += d; });
+      child.on('close', code => {
+        if (code !== 0) reject(new Error(stderr || `xslt3 exited with code ${code}`));
+        else resolve(stdout);
+      });
+      child.on('error', err => reject(err));
     });
     return { success: true, html };
   } catch (err) {
