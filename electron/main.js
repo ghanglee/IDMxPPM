@@ -690,17 +690,30 @@ function fetchLatestRelease() {
 ipcMain.handle('app:checkForUpdates', () => fetchLatestRelease());
 
 // XSLT transformation via Saxon-JS (Node.js build — supports XSLT 2.0 and 3.0)
+//
+// Saxon-JS API distinction:
+//   stylesheetText   = compiled SEF (JSON format) — NOT raw XSLT source XML
+//   stylesheetFileName = path to a .xsl file (compiled at runtime by the bundled
+//                        XX compiler) OR a .sef.json file (pre-compiled SEF)
+//
+// We receive raw XSLT source from the renderer, so we write it to a temp .xsl file
+// and let Saxon-JS compile it on the fly with the XX compiler.
 ipcMain.handle('xslt:transform', async (event, { xmlContent, xsltContent }) => {
+  const os = require('os');
+  const tmpXsl = path.join(os.tmpdir(), `xslt-${Date.now()}.xsl`);
   try {
+    fs.writeFileSync(tmpXsl, xsltContent, 'utf-8');
     const SaxonJS = require('saxon-js');
     const result = await SaxonJS.transform({
-      stylesheetText: xsltContent,
-      sourceText: xmlContent,
+      stylesheetFileName: tmpXsl,   // raw XSLT source; XX compiler compiles at runtime
+      sourceText: xmlContent,       // XML source as string (sourceText is supported)
       destination: 'serialized'
     }, 'async');
     return { success: true, html: result.principalResult };
   } catch (err) {
     return { success: false, error: err.message };
+  } finally {
+    try { fs.unlinkSync(tmpXsl); } catch {}
   }
 });
 
