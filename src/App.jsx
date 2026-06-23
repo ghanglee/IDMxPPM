@@ -4212,6 +4212,39 @@ const App = () => {
             }
           }
 
+          // When a custom XSLT is selected, generate idmXML so the XSLT can transform it.
+          // The JS-based HTML generator doesn't need idmXML, so this is XSLT-path only.
+          let idmXmlContent = null;
+          if (customXsltContent) {
+            try {
+              const exportErDataMapForXslt = {};
+              Object.entries(dataObjectErMap).forEach(([doId, erId]) => {
+                const findEr = (items) => {
+                  for (const item of items) {
+                    if (item.id === erId || item.guid === erId) return item;
+                    if (item.subERs?.length) { const f = findEr(item.subERs); if (f) return f; }
+                  }
+                  return null;
+                };
+                const er = findEr(erHierarchy);
+                if (er) exportErDataMapForXslt[doId] = er;
+              });
+              Object.entries(erDataMap).forEach(([doId, er]) => {
+                if (!exportErDataMapForXslt[doId]) exportErDataMapForXslt[doId] = er;
+              });
+              const xmlResult = generateIdmXml({
+                headerData,
+                bpmnXml: currentBpmnXml,
+                erDataMap: exportErDataMapForXslt,
+                erHierarchy,
+                dataObjects: Object.keys(exportErDataMapForXslt).map(id => ({ id, name: id }))
+              });
+              idmXmlContent = xmlResult.xml;
+            } catch (err) {
+              console.error('Failed to generate idmXML for XSLT transform:', err);
+            }
+          }
+
           // Build erDataMap from ER-first architecture for HTML export
           const htmlErDataMap = {};
           Object.entries(dataObjectErMap).forEach(([dataObjectId, erId]) => {
@@ -4250,6 +4283,7 @@ const App = () => {
             erHierarchy,
             bpmnSvg,
             customXsltContent,
+            idmXmlContent,
             dataObjectErMap,
             bpmnElements,
             projectData: reviewProjectData,

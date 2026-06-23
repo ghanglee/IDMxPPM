@@ -55,6 +55,18 @@ const transformXmlWithXslt = (xmlContent, xsltContent) => {
     throw new Error('Invalid XSLT: ' + xsltError.textContent);
   }
 
+  // Browsers only support XSLT 1.0. Detect version="2.0" or version="3.0" early
+  // so the user gets a clear message instead of a silent empty result.
+  const xsltRoot = xsltDoc.documentElement;
+  const xsltVersion = xsltRoot?.getAttribute('version') || '';
+  if (xsltVersion && xsltVersion !== '1.0') {
+    throw new Error(
+      `This XSLT stylesheet uses version ${xsltVersion}, but browsers only support XSLT 1.0.\n` +
+      'Convert the stylesheet to XSLT 1.0, or run the transformation outside the app ' +
+      '(e.g. with Saxon or xsltproc) and open the resulting HTML directly.'
+    );
+  }
+
   const xsltProcessor = new XSLTProcessor();
   xsltProcessor.importStylesheet(xsltDoc);
 
@@ -202,11 +214,24 @@ export const generateStandaloneHtml = ({
   erHierarchy,
   bpmnSvg,
   customXsltContent,
+  idmXmlContent,
   dataObjectErMap,
   bpmnElements,
   projectData,
   enableReview
 }) => {
+  // When custom XSLT + generated idmXML are both available, apply the XSLT transformation
+  // instead of the built-in JS-based HTML generator.
+  if (customXsltContent && idmXmlContent) {
+    return generateHtmlDocument({
+      headerData,
+      erDataMap,
+      bpmnSvg,
+      customXsltContent,
+      idmXmlContent
+    });
+  }
+
   const title = headerData?.title || headerData?.shortTitle || 'IDM Specification';
   const shortTitle = headerData?.shortTitle || title;
   const version = headerData?.version || '1.0';
