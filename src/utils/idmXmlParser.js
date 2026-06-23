@@ -1041,7 +1041,12 @@ const parseErElement = (erElement) => {
     const idmCode = trimStr(specId.getAttribute('idmCode'));
     const idFromCode = idmCode.startsWith('ER-') ? idmCode.substring(3) : idmCode;
     er.id = er.guid || idFromCode || `ER-${Date.now()}`;
-    er.name = er.shortTitle || er.fullTitle;
+    // idmXML v1.0 uses shortTitle as a machine-readable code (prefixed with "er_",
+    // "uc_", "idm_", "pm_", etc.) and fullTitle as the human-readable label.
+    // Our own v2.0 exports write the human-readable name into shortTitle directly.
+    // Detect the code pattern and prefer fullTitle when it is present.
+    const shortTitleIsCode = /^(?:er|uc|idm|pm|bcm|req|usecase)_/i.test(er.shortTitle);
+    er.name = (shortTitleIsCode ? er.fullTitle : er.shortTitle) || er.fullTitle || er.shortTitle;
   }
 
   // Parse ALL description elements - namespace-safe (merge text, collect all images)
