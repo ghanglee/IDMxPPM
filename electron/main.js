@@ -689,31 +689,40 @@ function fetchLatestRelease() {
 
 ipcMain.handle('app:checkForUpdates', () => fetchLatestRelease());
 
-// XSLT transformation via Saxon-JS (Node.js build — supports XSLT 2.0 and 3.0)
+// XSLT transformation via the xslt3 CLI (part of the saxon-js ecosystem).
 //
-// Saxon-JS API distinction:
-//   stylesheetText   = compiled SEF (JSON format) — NOT raw XSLT source XML
-//   stylesheetFileName = path to a .xsl file (compiled at runtime by the bundled
-//                        XX compiler) OR a .sef.json file (pre-compiled SEF)
-//
-// We receive raw XSLT source from the renderer, so we write it to a temp .xsl file
-// and let Saxon-JS compile it on the fly with the XX compiler.
+// SaxonJS.transform() API only accepts pre-compiled SEF (JSON format), not raw
+// XSLT source XML. Compilation from source is handled by the xslt3 CLI, which
+// runs the embedded XX compiler internally. We spawn xslt3 as a child process,
+// pass the XSLT and XML as temp files, and capture the HTML from stdout.
+// This supports XSLT 1.0, 2.0, and 3.0 stylesheets.
 ipcMain.handle('xslt:transform', async (event, { xmlContent, xsltContent }) => {
   const os = require('os');
-  const tmpXsl = path.join(os.tmpdir(), `xslt-${Date.now()}.xsl`);
+  const { execFile } = require('child_process');
+  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const tmpXsl = path.join(os.tmpdir(), `xslt-${stamp}.xsl`);
+  const tmpXml = path.join(os.tmpdir(), `xslt-src-${stamp}.xml`);
   try {
     fs.writeFileSync(tmpXsl, xsltContent, 'utf-8');
-    const SaxonJS = require('saxon-js');
-    const result = await SaxonJS.transform({
-      stylesheetFileName: tmpXsl,   // raw XSLT source; XX compiler compiles at runtime
-      sourceText: xmlContent,       // XML source as string (sourceText is supported)
-      destination: 'serialized'
-    }, 'async');
-    return { success: true, html: result.principalResult };
+    fs.writeFileSync(tmpXml, xmlContent, 'utf-8');
+    const xslt3 = require.resolve('xslt3');
+    const html = await new Promise((resolve, reject) => {
+      execFile(
+        process.execPath,
+        [xslt3, `-xsl:${tmpXsl}`, `-s:${tmpXml}`],
+        { maxBuffer: 50 * 1024 * 1024 },
+        (err, stdout, stderr) => {
+          if (err) reject(new Error(stderr || err.message));
+          else resolve(stdout);
+        }
+      );
+    });
+    return { success: true, html };
   } catch (err) {
     return { success: false, error: err.message };
   } finally {
     try { fs.unlinkSync(tmpXsl); } catch {}
+    try { fs.unlinkSync(tmpXml); } catch {}
   }
 });
 
