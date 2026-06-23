@@ -1031,11 +1031,17 @@ const parseErElement = (erElement) => {
   if (specId) {
     er.guid = trimStr(specId.getAttribute('guid'));
     er.shortTitle = trimStr(specId.getAttribute('shortTitle'));
+    er.fullTitle = trimStr(specId.getAttribute('fullTitle'));
 
+    // Use GUID as the primary id — GUIDs are guaranteed unique per ER.
+    // idmCode is NOT unique (different ERs in the same document can share the
+    // same idmCode, as seen in real v1.0 files), and associatedEr references
+    // in <dataObjectAndEr> elements always use GUIDs, so matching only works
+    // when er.id === guid.
     const idmCode = trimStr(specId.getAttribute('idmCode'));
     const idFromCode = idmCode.startsWith('ER-') ? idmCode.substring(3) : idmCode;
-    er.id = idFromCode || er.guid || `ER-${Date.now()}`;
-    er.name = er.shortTitle || trimStr(specId.getAttribute('fullTitle'));
+    er.id = er.guid || idFromCode || `ER-${Date.now()}`;
+    er.name = er.shortTitle || er.fullTitle;
   }
 
   // Parse ALL description elements - namespace-safe (merge text, collect all images)

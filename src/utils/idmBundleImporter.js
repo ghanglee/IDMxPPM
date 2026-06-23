@@ -127,6 +127,13 @@ export const importIdmBundle = async (zipData) => {
           result.erDataMap = idmData.erDataMap;
         }
 
+        // Capture explicit data-object → ER links from <dataObjectAndEr> elements
+        if (idmData.dataObjectErLinks) {
+          Object.entries(idmData.dataObjectErLinks).forEach(([doId, erId]) => {
+            if (!result.dataObjectErMap[doId]) result.dataObjectErMap[doId] = erId;
+          });
+        }
+
         // Try to load BPMN from the path stored in idmXML (<diagram filePath="...">)
         // Normalize backslashes — idmXML 1.0 files from Windows use backslash separators
         if (!result.bpmnXml && idmData.bpmnFilePath) {
@@ -235,9 +242,10 @@ export const autoMapDataObjectsToERs = (bpmnXml, erHierarchy, existingMap = {}) 
   };
   flatten(erHierarchy);
 
-  // Build normalized-name → ER lookup (first match wins)
+  // Build normalized-name → ER lookup across all name fields (first match wins)
   const erByName = new Map();
   allERs.forEach(er => {
+    // Include name, shortTitle, and fullTitle — parser now stores all three
     [er.name, er.shortTitle, er.fullTitle].forEach(n => {
       if (n) {
         const key = n.trim().toLowerCase();
