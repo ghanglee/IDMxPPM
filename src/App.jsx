@@ -4277,7 +4277,7 @@ const App = () => {
           } : null;
 
           // Generate standalone HTML
-          const htmlContent = generateStandaloneHtml({
+          const htmlContent = await generateStandaloneHtml({
             headerData,
             erDataMap: htmlErDataMap,
             erHierarchy,

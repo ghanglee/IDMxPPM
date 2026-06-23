@@ -17,20 +17,17 @@ import { getReviewUIStyles, getReviewUIScript } from './reviewCommentingUI';
  * @param {string} params.idmXmlContent - Generated idmXML content
  * @returns {string} Complete HTML document
  */
-export const generateHtmlDocument = ({
+export const generateHtmlDocument = async ({
   headerData,
   erDataMap,
   bpmnSvg,
   customXsltContent,
   idmXmlContent
 }) => {
-  // Use custom XSLT or default
   const xsltContent = customXsltContent || defaultIdmXslt;
 
-  // First, transform XML using XSLT
-  let htmlContent = transformXmlWithXslt(idmXmlContent, xsltContent);
+  let htmlContent = await transformXmlWithXslt(idmXmlContent, xsltContent);
 
-  // Now enhance the HTML with BPMN diagram and images
   htmlContent = enhanceHtmlWithBpmn(htmlContent, bpmnSvg);
   htmlContent = enhanceHtmlWithImages(htmlContent, erDataMap);
 
@@ -38,9 +35,12 @@ export const generateHtmlDocument = ({
 };
 
 /**
- * Transform XML using XSLT stylesheet
+ * Transform XML using XSLT stylesheet.
+ * XSLT 1.0 uses the browser's native XSLTProcessor.
+ * XSLT 2.0 / 3.0 uses Saxon-JS (lazy-loaded — only downloaded when needed).
+ * Returns a Promise<string> in all cases.
  */
-const transformXmlWithXslt = (xmlContent, xsltContent) => {
+const transformXmlWithXslt = async (xmlContent, xsltContent) => {
   const parser = new DOMParser();
 
   const xmlDoc = parser.parseFromString(xmlContent, 'text/xml');
@@ -55,21 +55,22 @@ const transformXmlWithXslt = (xmlContent, xsltContent) => {
     throw new Error('Invalid XSLT: ' + xsltError.textContent);
   }
 
-  // Browsers only support XSLT 1.0. Detect version="2.0" or version="3.0" early
-  // so the user gets a clear message instead of a silent empty result.
-  const xsltRoot = xsltDoc.documentElement;
-  const xsltVersion = xsltRoot?.getAttribute('version') || '';
-  if (xsltVersion && xsltVersion !== '1.0') {
-    throw new Error(
-      `This XSLT stylesheet uses version ${xsltVersion}, but browsers only support XSLT 1.0.\n` +
-      'Convert the stylesheet to XSLT 1.0, or run the transformation outside the app ' +
-      '(e.g. with Saxon or xsltproc) and open the resulting HTML directly.'
-    );
+  const xsltVersion = xsltDoc.documentElement?.getAttribute('version') || '1.0';
+
+  if (xsltVersion !== '1.0') {
+    // XSLT 2.0 / 3.0 — use Saxon-JS (lazy-loaded so bundle stays small for 1.0 users)
+    const { default: SaxonJS } = await import('saxon-js');
+    const result = await SaxonJS.transform({
+      stylesheetText: xsltContent,
+      sourceText: xmlContent,
+      destination: 'serialized'
+    }, 'async');
+    return result.principalResult;
   }
 
+  // XSLT 1.0 — use browser native XSLTProcessor
   const xsltProcessor = new XSLTProcessor();
   xsltProcessor.importStylesheet(xsltDoc);
-
   const resultDoc = xsltProcessor.transformToDocument(xmlDoc);
   const serializer = new XMLSerializer();
   return serializer.serializeToString(resultDoc);
@@ -208,7 +209,7 @@ const collectImagesFromUnits = (units, images, erName) => {
  * @param {string|null} params.customXsltContent - Custom XSLT content
  * @returns {string} Complete HTML document
  */
-export const generateStandaloneHtml = ({
+export const generateStandaloneHtml = async ({
   headerData,
   erDataMap,
   erHierarchy,
@@ -223,7 +224,7 @@ export const generateStandaloneHtml = ({
   // When custom XSLT + generated idmXML are both available, apply the XSLT transformation
   // instead of the built-in JS-based HTML generator.
   if (customXsltContent && idmXmlContent) {
-    return generateHtmlDocument({
+    return await generateHtmlDocument({
       headerData,
       erDataMap,
       bpmnSvg,
