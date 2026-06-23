@@ -58,14 +58,18 @@ const transformXmlWithXslt = async (xmlContent, xsltContent) => {
   const xsltVersion = xsltDoc.documentElement?.getAttribute('version') || '1.0';
 
   if (xsltVersion !== '1.0') {
-    // XSLT 2.0 / 3.0 — use Saxon-JS (lazy-loaded so bundle stays small for 1.0 users)
-    const { default: SaxonJS } = await import('saxon-js');
-    const result = await SaxonJS.transform({
-      stylesheetText: xsltContent,
-      sourceText: xmlContent,
-      destination: 'serialized'
-    }, 'async');
-    return result.principalResult;
+    // XSLT 2.0 / 3.0 — route through Electron main process (Saxon-JS Node.js build)
+    // which supports XSLT 2.0 and 3.0 natively. The browser-only fallback would
+    // require the separate SaxonJS2.js browser build; in Electron we use IPC instead.
+    if (window.electronAPI?.transformXslt) {
+      const result = await window.electronAPI.transformXslt(xmlContent, xsltContent);
+      if (!result.success) throw new Error('XSLT transform failed: ' + result.error);
+      return result.html;
+    }
+    throw new Error(
+      `XSLT version ${xsltVersion} requires Saxon-JS, which is only available ` +
+      'in the desktop app. In a browser, convert the stylesheet to XSLT 1.0.'
+    );
   }
 
   // XSLT 1.0 — use browser native XSLTProcessor

@@ -689,6 +689,21 @@ function fetchLatestRelease() {
 
 ipcMain.handle('app:checkForUpdates', () => fetchLatestRelease());
 
+// XSLT transformation via Saxon-JS (Node.js build — supports XSLT 2.0 and 3.0)
+ipcMain.handle('xslt:transform', async (event, { xmlContent, xsltContent }) => {
+  try {
+    const SaxonJS = require('saxon-js');
+    const result = await SaxonJS.transform({
+      stylesheetText: xsltContent,
+      sourceText: xmlContent,
+      destination: 'serialized'
+    }, 'async');
+    return { success: true, html: result.principalResult };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
 // Open user manual HTML file from local resources
 ipcMain.handle('shell:openManual', async () => {
   const manualRelPath = 'user_manuals/V1.5.0/IDMxPPM-Tutorials.html';
