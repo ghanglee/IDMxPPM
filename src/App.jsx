@@ -19,7 +19,7 @@ import { api } from './utils/apiClient';
 import { generateIdmXml, generateIdmXmlV1, generateErXmlStandalone } from './utils/idmXmlGenerator';
 import JSZip from 'jszip';
 import { downloadIdmBundle, exportIdmBundle } from './utils/idmBundleExporter';
-import { importIdmBundle, isZipBundle } from './utils/idmBundleImporter';
+import { importIdmBundle, isZipBundle, autoMapDataObjectsToERs } from './utils/idmBundleImporter';
 import { validateProject, getValidationStatusLabel } from './utils/validation';
 import { parseIdmXml, isIdmXml, detectIdmXmlVersion, getFirstChild, getDirectChildren, parseErElement } from './utils/idmXmlParser';
 import { readFileAsText } from './utils/pdfExporter';
@@ -3124,7 +3124,7 @@ const App = () => {
             idmData.headerData.idmXsdVersion = versionInfo.version;
             idmData.headerData.idmXsdVersionConfidence = versionInfo.confidence;
 
-            // Build dataObjectErMap from dataObjectErLinks
+            // Build dataObjectErMap from explicit dataObjectAndEr links in the XML
             const newDataObjectErMap = {};
             if (idmData.dataObjectErLinks) {
               Object.entries(idmData.dataObjectErLinks).forEach(([doId, erId]) => {
@@ -3136,6 +3136,12 @@ const App = () => {
             const hasBpmn = !!idmData.bpmnXml;
             const bpmnToImport = hasBpmn ? idmData.bpmnXml : 'EMPTY';
             const isDirtyAfterImport = !hasBpmn;
+
+            // Auto-fill any unmapped data objects by matching names with ERs
+            if (hasBpmn && idmData.erHierarchy && idmData.erHierarchy.length > 0) {
+              const autoMapped = autoMapDataObjectsToERs(idmData.bpmnXml, idmData.erHierarchy, newDataObjectErMap);
+              Object.assign(newDataObjectErMap, autoMapped);
+            }
 
             // Check if we need to show root selection modal
             if (idmData.erHierarchy && handleErHierarchyImport(idmData.erHierarchy, {

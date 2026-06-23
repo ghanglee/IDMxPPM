@@ -13,6 +13,13 @@ import { getMimeType, buildDataUri } from './filePathUtils.js';
  * @param {File|Blob|ArrayBuffer} zipData - The ZIP file data
  * @returns {Promise<Object>} Parsed project data
  */
+// ZIP paths always use forward slashes; idmXML 1.0 files produced on Windows
+// store paths with backslashes — normalize before any zip.file() lookup.
+const normalizeZipPath = (p) => p.replace(/\\/g, '/');
+
+const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.bmp']);
+const isImagePath = (p) => IMAGE_EXTENSIONS.has(p.slice(p.lastIndexOf('.')).toLowerCase());
+
 export const importIdmBundle = async (zipData) => {
   try {
     const zip = await JSZip.loadAsync(zipData);
@@ -26,6 +33,12 @@ export const importIdmBundle = async (zipData) => {
       erLibrary: [],
       images: {}
     };
+
+    // Build a flat list of all entries for fallback scanning
+    const allEntries = [];
+    zip.forEach((relativePath, file) => {
+      if (!file.dir) allEntries.push({ path: relativePath, file });
+    });
 
     // Try to read manifest first
     let manifest = null;
@@ -46,32 +59,18 @@ export const importIdmBundle = async (zipData) => {
         const projectContent = await projectFile.async('string');
         const projectData = JSON.parse(projectContent);
 
-        if (projectData.headerData) {
-          result.headerData = projectData.headerData;
-        }
-        if (projectData.erHierarchy) {
-          result.erHierarchy = projectData.erHierarchy;
-        }
-        if (projectData.dataObjectErMap) {
-          result.dataObjectErMap = projectData.dataObjectErMap;
-        }
-        if (projectData.erDataMap) {
-          result.erDataMap = projectData.erDataMap;
-        }
-        if (projectData.erLibrary) {
-          result.erLibrary = projectData.erLibrary;
-        }
-        // Get BPMN from project.json if available (backup)
-        if (projectData.bpmnXml) {
-          result.bpmnXml = projectData.bpmnXml;
-        }
+        if (projectData.headerData) result.headerData = projectData.headerData;
+        if (projectData.erHierarchy) result.erHierarchy = projectData.erHierarchy;
+        if (projectData.dataObjectErMap) result.dataObjectErMap = projectData.dataObjectErMap;
+        if (projectData.erDataMap) result.erDataMap = projectData.erDataMap;
+        if (projectData.erLibrary) result.erLibrary = projectData.erLibrary;
+        if (projectData.bpmnXml) result.bpmnXml = projectData.bpmnXml;
       } catch (err) {
         console.warn('Failed to parse project.json:', err);
       }
     }
 
-    // Read BPMN file from separate file (overrides project.json if found)
-    // Try manifest path first, then common file names
+    // Read BPMN file — try manifest path and known names first, then scan all entries
     const bpmnPaths = [
       manifest?.files?.processMap,
       'process-map.bpmn',
@@ -95,93 +94,115 @@ export const importIdmBundle = async (zipData) => {
       }
     }
 
-    // Also parse idmXML to get any additional data (even if we have project.json)
-    const xmlPaths = [
+    // Parse idmXML — try manifest/known paths first, then scan for any .xml file
+    const knownXmlPaths = [
       manifest?.files?.specification,
       'idm-specification.xml',
       'specification.xml',
       'idm.xml'
     ].filter(Boolean);
 
-    for (const xmlPath of xmlPaths) {
-      const xmlFile = zip.file(xmlPath);
-      if (xmlFile) {
-        try {
-          const xmlContent = await xmlFile.async('string');
-          const idmData = parseIdmXml(xmlContent);
+    // Fall back to the first .xml file found in the archive (idmXML 1.0 bundles
+    // name the file after the IDM title rather than using a fixed filename)
+    const xmlEntry =
+      knownXmlPaths.map(p => zip.file(p)).find(Boolean) ||
+      allEntries.find(({ path }) =>
+        path.endsWith('.xml') &&
+        !path.toLowerCase().endsWith('.xsd') &&
+        !path.toLowerCase().includes('xslt')
+      )?.file;
 
-          // Merge parsed data (project.json takes precedence if available)
-          if (!result.headerData || Object.keys(result.headerData).length === 0) {
-            result.headerData = idmData.headerData;
-          }
-          if (!result.erHierarchy || result.erHierarchy.length === 0) {
-            if (idmData.erHierarchy) {
-              result.erHierarchy = idmData.erHierarchy;
-            }
-          }
-          if (!result.erDataMap || Object.keys(result.erDataMap).length === 0) {
-            result.erDataMap = idmData.erDataMap;
-          }
+    if (xmlEntry) {
+      try {
+        const xmlContent = await xmlEntry.async('string');
+        const idmData = parseIdmXml(xmlContent);
 
-          // Try to load BPMN from the file path specified in idmXML
-          if (!result.bpmnXml && idmData.bpmnFilePath) {
-            const bpmnFromPath = zip.file(idmData.bpmnFilePath);
-            if (bpmnFromPath) {
-              try {
-                const bpmnContent = await bpmnFromPath.async('string');
-                if (bpmnContent && bpmnContent.trim()) {
-                  result.bpmnXml = bpmnContent;
-                  console.info(`Loaded BPMN from idmXML path: ${idmData.bpmnFilePath}`);
-                }
-              } catch (bpmnErr) {
-                console.warn(`Failed to load BPMN from path ${idmData.bpmnFilePath}:`, bpmnErr);
+        if (!result.headerData || Object.keys(result.headerData).length === 0) {
+          result.headerData = idmData.headerData;
+        }
+        if (!result.erHierarchy || result.erHierarchy.length === 0) {
+          if (idmData.erHierarchy) result.erHierarchy = idmData.erHierarchy;
+        }
+        if (!result.erDataMap || Object.keys(result.erDataMap).length === 0) {
+          result.erDataMap = idmData.erDataMap;
+        }
+
+        // Try to load BPMN from the path stored in idmXML (<diagram filePath="...">)
+        // Normalize backslashes — idmXML 1.0 files from Windows use backslash separators
+        if (!result.bpmnXml && idmData.bpmnFilePath) {
+          const normalizedPath = normalizeZipPath(idmData.bpmnFilePath);
+          const bpmnFromPath = zip.file(normalizedPath);
+          if (bpmnFromPath) {
+            try {
+              const bpmnContent = await bpmnFromPath.async('string');
+              if (bpmnContent && bpmnContent.trim()) {
+                result.bpmnXml = bpmnContent;
+                console.info(`Loaded BPMN from idmXML path: ${normalizedPath}`);
               }
+            } catch (bpmnErr) {
+              console.warn(`Failed to load BPMN from path ${normalizedPath}:`, bpmnErr);
             }
           }
+        }
 
-          // Fallback: use embedded BPMN from idmXML if still no BPMN
-          if (!result.bpmnXml && idmData.bpmnXml) {
-            result.bpmnXml = idmData.bpmnXml;
+        // Fallback: scan all entries for a .bpmn file
+        if (!result.bpmnXml) {
+          const bpmnEntry = allEntries.find(({ path }) => path.endsWith('.bpmn'));
+          if (bpmnEntry) {
+            try {
+              const bpmnContent = await bpmnEntry.file.async('string');
+              if (bpmnContent && bpmnContent.trim()) {
+                result.bpmnXml = bpmnContent;
+                console.info(`Loaded BPMN by scan: ${bpmnEntry.path}`);
+              }
+            } catch (bpmnErr) {
+              console.warn(`Failed to read scanned BPMN ${bpmnEntry.path}:`, bpmnErr);
+            }
           }
-          break;
-        } catch (err) {
-          console.warn(`Failed to parse idmXML file ${xmlPath}:`, err);
         }
+
+        // Last resort: embedded BPMN content inside the idmXML itself
+        if (!result.bpmnXml && idmData.bpmnXml) {
+          result.bpmnXml = idmData.bpmnXml;
+        }
+      } catch (err) {
+        console.warn('Failed to parse idmXML file:', err);
       }
     }
 
-    // Load images from the images folder
-    const imagesFolder = zip.folder('images');
-    if (imagesFolder) {
-      const imageFiles = [];
-      imagesFolder.forEach((relativePath, file) => {
-        if (!file.dir) {
-          imageFiles.push({ path: `images/${relativePath}`, file });
-        }
-      });
-
-      for (const { path, file } of imageFiles) {
-        try {
-          const data = await file.async('base64');
-          const mimeType = getMimeType(path);
-          result.images[path] = buildDataUri(mimeType, data);
-        } catch (err) {
-          console.warn(`Failed to load image ${path}:`, err);
-        }
+    // Load all image files — scan every entry (covers both 'images/' and 'Diagram/'
+    // folders used by idmXML 1.0 bundles, as well as any other location)
+    for (const { path, file } of allEntries) {
+      if (!isImagePath(path)) continue;
+      try {
+        const data = await file.async('base64');
+        const mimeType = getMimeType(path);
+        const dataUri = buildDataUri(mimeType, data);
+        // Store under both the original path and the forward-slash-normalized path
+        // so that lookups work regardless of which separator the idmXML used.
+        result.images[path] = dataUri;
+        const normalized = normalizeZipPath(path);
+        if (normalized !== path) result.images[normalized] = dataUri;
+      } catch (err) {
+        console.warn(`Failed to load image ${path}:`, err);
       }
-
-      // Restore image data in ERs and headerData
-      restoreImageData(result.erDataMap, result.images);
-      restoreErHierarchyImageData(result.erHierarchy, result.images);
-      restoreHeaderImageData(result.headerData, result.images);
     }
+
+    // Restore image data back into ER and header structures
+    restoreImageData(result.erDataMap, result.images);
+    restoreErHierarchyImageData(result.erHierarchy, result.images);
+    restoreHeaderImageData(result.headerData, result.images);
 
     // Apply GUIDs from manifest if available
     if (manifest?.guids) {
-      result.headerData = {
-        ...result.headerData,
-        ...manifest.guids
-      };
+      result.headerData = { ...result.headerData, ...manifest.guids };
+    }
+
+    // Auto-map data objects to ERs by name for any entries not already mapped
+    if (result.bpmnXml && result.erHierarchy.length > 0) {
+      result.dataObjectErMap = autoMapDataObjectsToERs(
+        result.bpmnXml, result.erHierarchy, result.dataObjectErMap
+      );
     }
 
     return result;
@@ -191,6 +212,62 @@ export const importIdmBundle = async (zipData) => {
   }
 };
 
+
+/**
+ * Auto-map BPMN data object references to ERs by matching names.
+ * Only adds entries not already present in existingMap — existing links are preserved.
+ * Matching is case-insensitive and whitespace-trimmed.
+ * @param {string} bpmnXml - BPMN XML string
+ * @param {Array} erHierarchy - ER hierarchy (nested)
+ * @param {Object} [existingMap={}] - existing dataObjectErMap entries to preserve
+ * @returns {Object} merged map with auto-matched entries added
+ */
+export const autoMapDataObjectsToERs = (bpmnXml, erHierarchy, existingMap = {}) => {
+  if (!bpmnXml || !erHierarchy || erHierarchy.length === 0) return { ...existingMap };
+
+  // Flatten the ER hierarchy recursively
+  const allERs = [];
+  const flatten = (ers) => {
+    ers.forEach(er => {
+      allERs.push(er);
+      if (er.subERs && er.subERs.length > 0) flatten(er.subERs);
+    });
+  };
+  flatten(erHierarchy);
+
+  // Build normalized-name → ER lookup (first match wins)
+  const erByName = new Map();
+  allERs.forEach(er => {
+    [er.name, er.shortTitle, er.fullTitle].forEach(n => {
+      if (n) {
+        const key = n.trim().toLowerCase();
+        if (!erByName.has(key)) erByName.set(key, er);
+      }
+    });
+  });
+
+  // Parse BPMN XML and extract all DataObjectReference id/name pairs
+  let bpmnDoc;
+  try {
+    bpmnDoc = new DOMParser().parseFromString(bpmnXml, 'text/xml');
+    if (bpmnDoc.querySelector('parsererror')) return { ...existingMap };
+  } catch {
+    return { ...existingMap };
+  }
+
+  const result = { ...existingMap };
+  const allEls = bpmnDoc.getElementsByTagName('*');
+  for (let i = 0; i < allEls.length; i++) {
+    const el = allEls[i];
+    if (el.localName !== 'dataObjectReference') continue;
+    const id = el.getAttribute('id');
+    const name = el.getAttribute('name');
+    if (!id || !name || result[id]) continue; // skip unmapped or already mapped
+    const matched = erByName.get(name.trim().toLowerCase());
+    if (matched) result[id] = matched.id;
+  }
+  return result;
+};
 
 /**
  * Restore base64 image data in ER data map from extracted images

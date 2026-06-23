@@ -14,6 +14,9 @@ releases/
 xPPM/
 samples/xPPM-neo/
 
+# Proprietary sample files from external contributors (not for distribution)
+samples/IDM/KillianReyer/
+
 # Test scripts
 test-main*.js
 
