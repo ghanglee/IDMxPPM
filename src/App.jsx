@@ -3752,12 +3752,10 @@ const App = () => {
     });
     setValidationResults(results);
 
-    // Default filename = shortTitle with the type prefix stripped (e.g. "idm_Hochrechnung02" → "Hochrechnung02").
-    // Fall back to title, then a generic name.
-    const codePrefix = /^(?:er|uc|idm|pm|bcm|req|usecase)_/i;
-    const cleanedShortTitle = headerData.shortTitle?.replace(codePrefix, '') || headerData.shortTitle;
-    const defaultName = (cleanedShortTitle || headerData.title || 'idm-specification')
-      .replace(/[^a-zA-Z0-9가-힣\s.-]/g, '') // Allow Korean characters, spaces, dots, hyphens
+    // Default filename = shortTitle exactly as entered, falling back to title.
+    // Only strip characters that are genuinely invalid in file system paths.
+    const defaultName = (headerData.shortTitle || headerData.title || 'idm-specification')
+      .replace(/[/\\?%*:|"<>]/g, '')
       .trim();
     setExportFilename(defaultName);
     setExportSavePath(''); // Clear any previously selected save path

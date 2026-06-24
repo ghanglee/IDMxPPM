@@ -1292,12 +1292,11 @@ export const generateIdmXmlV1 = ({ headerData, bpmnXml, bpmnSvg, erDataMap, erHi
   if (bpmnSvg) {
     // Strip XML declaration so the SVG can be embedded as inline XML nodes.
     // The XSLT can then copy these nodes directly into HTML output.
-    // Strip <?xml ...?> and <!DOCTYPE ...> — both are only valid in a document
-    // prolog and cause "invalid element name" errors when embedded in another XML doc.
-    const inlineSvg = bpmnSvg
-      .replace(/^<\?xml[^?]*\?>\s*/i, '')
-      .replace(/^<!DOCTYPE[^>]*>\s*/i, '')
-      .trim();
+    // Skip everything before <svg — the XML declaration, any DOCTYPE, and
+    // any comments (e.g. "<!-- created with bpmn-js -->") are only valid in
+    // a document prolog and cause parse errors inside another XML document.
+    const svgStart = bpmnSvg.indexOf('<svg');
+    const inlineSvg = (svgStart >= 0 ? bpmnSvg.slice(svgStart) : bpmnSvg).trim();
     lines.push('        <bpmnSvg>');
     lines.push(inlineSvg);
     lines.push('        </bpmnSvg>');
