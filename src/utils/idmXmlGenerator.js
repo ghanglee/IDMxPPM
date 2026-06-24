@@ -418,7 +418,7 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, da
 
   const title = headerData?.title || 'IDM Specification';
   const shortTitle = headerData?.shortTitle || title; // Separate shortTitle
-  const version = headerData?.version || '1.0';
+  const version = headerData?.version ?? '1.0'; // preserve "" when stored; default 1.0 for new
   const status = headerData?.status || 'WD';
   const language = headerData?.language || 'EN';
   const creationDate = headerData?.creationDate || formatDate();
@@ -1190,7 +1190,7 @@ export const generateIdmXmlV1 = ({ headerData, bpmnXml, bpmnSvg, erDataMap, erHi
 
   const title = headerData?.title || 'IDM Specification';
   const shortTitle = headerData?.shortTitle || title;
-  const version = headerData?.version || '1.0';
+  const version = headerData?.version ?? ''; // preserve "" from original; new v1 projects default to empty
   const status = headerData?.status || 'WD';
   const language = headerData?.language || 'EN';
   const creationDate = headerData?.creationDate || formatDate();
@@ -1227,7 +1227,7 @@ export const generateIdmXmlV1 = ({ headerData, bpmnXml, bpmnSvg, erDataMap, erHi
   const ucIdmCode = headerData?.ucIdmCode || `UC-${idmCode.replace(/^IDM-/i, '')}`;
   const ucSubTitle = headerData?.ucSubTitle ?? subTitle;
   const ucDocumentStatus = headerData?.ucDocumentStatus || status;
-  const ucVersion = headerData?.ucVersion || version;
+  const ucVersion = headerData?.ucVersion ?? version;
   const ucLocalCode = headerData?.ucLocalCode || '';
   const ucLocalDocumentStatus = headerData?.ucLocalDocumentStatus || '';
   lines.push('  <uc>');
@@ -1349,7 +1349,7 @@ export const generateIdmXmlV1 = ({ headerData, bpmnXml, bpmnSvg, erDataMap, erHi
   const bcmIdmCode = headerData?.bcmIdmCode || (idmCode.replace(/^IDM-/i, 'BCM-') || `BCM-${idmCode}`);
   const bcmSubTitle = headerData?.bcmSubTitle ?? subTitle;
   const bcmDocumentStatus = headerData?.bcmDocumentStatus || status;
-  const bcmVersion = headerData?.bcmVersion || version;
+  const bcmVersion = headerData?.bcmVersion ?? version;
   const bcmLocalCode = headerData?.bcmLocalCode || '';
   const bcmLocalDocumentStatus = headerData?.bcmLocalDocumentStatus || '';
   lines.push('  <businessContextMap>');

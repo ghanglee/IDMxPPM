@@ -274,7 +274,7 @@ export const parseIdmXml = (xmlContent) => {
       result.headerData.subTitle = trimStr(specId.getAttribute('subTitle'));
       result.headerData.idmCode = trimStr(specId.getAttribute('idmCode'));
       result.headerData.localCode = trimStr(specId.getAttribute('localCode'));
-      result.headerData.version = trimStr(specId.getAttribute('version')) || '1.0';
+      result.headerData.version = trimStr(specId.getAttribute('version')); // preserve "" from original
       result.headerData.status = trimStr(specId.getAttribute('documentStatus')) || 'WD';
       result.headerData.localDocumentStatus = trimStr(specId.getAttribute('localDocumentStatus'));
     }
