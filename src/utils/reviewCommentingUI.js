@@ -193,25 +193,69 @@ export const getReviewUIScript = () => `
     updateCommentCount();
   }
 
+  // Find the primary heading of a section: check direct children first so that
+  // nested sub-sections don't steal the heading from the parent section.
+  // Falls back one level deeper (heading inside a header/div wrapper), then
+  // falls back to any descendant as a last resort.
+  function findPrimaryHeading(element) {
+    var children = element.children;
+    var i, tag;
+    // 1. Direct child heading
+    for (i = 0; i < children.length; i++) {
+      tag = children[i].tagName.toLowerCase();
+      if (tag === 'h1' || tag === 'h2' || tag === 'h3' || tag === 'h4') {
+        return children[i];
+      }
+    }
+    // 2. Grandchild heading (heading wrapped in a container div/header)
+    for (i = 0; i < children.length; i++) {
+      var gc = children[i].children;
+      for (var k = 0; k < gc.length; k++) {
+        tag = gc[k].tagName.toLowerCase();
+        if (tag === 'h1' || tag === 'h2' || tag === 'h3' || tag === 'h4') {
+          return gc[k];
+        }
+      }
+    }
+    // 3. Any heading in the subtree
+    return element.querySelector('h1, h2, h3, h4');
+  }
+
   function attachCommentButtons() {
+    // Cover page (idmXML title section) — not a div.page.* so normalization
+    // never assigns it a class; handle it explicitly here.
+    var coverDiv = document.querySelector('div.cover, .cover');
+    if (coverDiv) {
+      if (!coverDiv.id) coverDiv.id = 'cover-section';
+      var coverHeading = findPrimaryHeading(coverDiv);
+      addCommentButton(coverDiv, coverDiv.id, 'section',
+        coverHeading ? coverHeading.textContent.trim() : 'Cover');
+    }
+
+    // ER sections (normalized from div.page.er / div.page.suber)
     var erSections = document.querySelectorAll('.er-section[id]');
     for (var i = 0; i < erSections.length; i++) {
       var section = erSections[i];
       var title = section.querySelector('.er-title');
-      addCommentButton(section, section.id, 'er', title ? title.textContent : 'ER');
+      addCommentButton(section, section.id, 'er',
+        title ? title.textContent.trim() : 'ER');
     }
 
+    // Regular sections (normalized from div.page that are not ER/sub-ER).
+    // Use h2 as the primary heading (section title); fall back to h3/h4.
     var sections = document.querySelectorAll('.section');
     for (var j = 0; j < sections.length; j++) {
       var sec = sections[j];
-      var heading = sec.querySelector('h3');
+      var heading = sec.querySelector('h2') || sec.querySelector('h3, h4');
       if (heading) {
-        var sectionId = sec.id || ('section-' + heading.textContent.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
+        var sectionTitle = heading.textContent.trim();
+        var sectionId = sec.id || ('section-' + sectionTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
         sec.id = sectionId;
-        addCommentButton(sec, sectionId, 'section', heading.textContent);
+        addCommentButton(sec, sectionId, 'section', sectionTitle);
       }
     }
 
+    // Explicit BPMN section (injected by the app when adding the process map)
     var bpmnSection = document.querySelector('.bpmn-section');
     if (bpmnSection) {
       bpmnSection.id = bpmnSection.id || 'bpmn-process-map';
@@ -228,9 +272,9 @@ export const getReviewUIScript = () => `
       e.stopPropagation();
       showCommentForm(targetId, targetType, targetName);
     };
-    // Place the button immediately after the section heading wherever it lives
-    // in the DOM (the heading may be inside a nested container in XSLT output).
-    var heading = element.querySelector('h1, h2, h3');
+    // Use findPrimaryHeading so the button lands after the section's OWN heading
+    // rather than after the first heading found anywhere in its subtree.
+    var heading = findPrimaryHeading(element);
     if (heading) {
       heading.insertAdjacentElement('afterend', btn);
     } else {
