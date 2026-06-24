@@ -197,8 +197,11 @@ const findAllDescendants = (parent, tagName) => {
  */
 export const parseIdmXml = (xmlContent) => {
   try {
+    // Strip UTF-8 BOM (EF BB BF) if present — Windows tools often prepend it
+    // before <?xml...?>, which causes strict XML parsers to throw a parseerror.
+    const cleanXml = xmlContent.replace(/^﻿/, '');
     const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(xmlContent, 'text/xml');
+    const xmlDoc = parser.parseFromString(cleanXml, 'text/xml');
 
     // Check for parsing errors
     const parseError = xmlDoc.querySelector('parsererror');

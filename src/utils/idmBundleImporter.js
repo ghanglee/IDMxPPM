@@ -94,7 +94,9 @@ export const importIdmBundle = async (zipData) => {
       }
     }
 
-    // Parse idmXML — try manifest/known paths first, then scan for any .xml file
+    // Parse idmXML — try manifest/known paths first, then scan for any .xml file.
+    // Record the path of whichever XML entry we find so we can resolve relative
+    // BPMN paths (e.g. a ZIP with a top-level directory like "00_Hochrechnung/").
     const knownXmlPaths = [
       manifest?.files?.specification,
       'idm-specification.xml',
@@ -102,19 +104,27 @@ export const importIdmBundle = async (zipData) => {
       'idm.xml'
     ].filter(Boolean);
 
-    // Fall back to the first .xml file found in the archive (idmXML 1.0 bundles
-    // name the file after the IDM title rather than using a fixed filename)
-    const xmlEntry =
-      knownXmlPaths.map(p => zip.file(p)).find(Boolean) ||
-      allEntries.find(({ path }) =>
+    let xmlEntryPath = null;
+    let xmlEntry = null;
+    for (const p of knownXmlPaths) {
+      const f = zip.file(p);
+      if (f) { xmlEntry = f; xmlEntryPath = p; break; }
+    }
+    if (!xmlEntry) {
+      const found = allEntries.find(({ path }) =>
         path.endsWith('.xml') &&
         !path.toLowerCase().endsWith('.xsd') &&
         !path.toLowerCase().includes('xslt')
-      )?.file;
+      );
+      if (found) { xmlEntry = found.file; xmlEntryPath = found.path; }
+    }
 
     if (xmlEntry) {
       try {
-        const xmlContent = await xmlEntry.async('string');
+        // Strip UTF-8 BOM — some editors (Word, Excel, Windows tools) prepend
+        // before <?xml...?>, which makes strict XML parsers throw a parseerror.
+        const rawXml = await xmlEntry.async('string');
+        const xmlContent = rawXml.replace(/^﻿/, '');
         const idmData = parseIdmXml(xmlContent);
 
         if (!result.headerData || Object.keys(result.headerData).length === 0) {
@@ -134,36 +144,32 @@ export const importIdmBundle = async (zipData) => {
           });
         }
 
-        // Try to load BPMN from the path stored in idmXML (<diagram filePath="...">)
-        // Normalize backslashes — idmXML 1.0 files from Windows use backslash separators
+        // Try to load BPMN from the path stored in idmXML (<diagram filePath="...">).
+        // Also try the path relative to the XML file's own directory — idmXML 1.0
+        // bundles often wrap everything under a top-level folder (e.g. "00_Hochrechnung/")
+        // so the stored filePath ("Diagram/x.bpmn") must be resolved relative to
+        // where the XML was found ("00_Hochrechnung/Diagram/x.bpmn").
         if (!result.bpmnXml && idmData.bpmnFilePath) {
           const normalizedPath = normalizeZipPath(idmData.bpmnFilePath);
-          const bpmnFromPath = zip.file(normalizedPath);
-          if (bpmnFromPath) {
-            try {
-              const bpmnContent = await bpmnFromPath.async('string');
-              if (bpmnContent && bpmnContent.trim()) {
-                result.bpmnXml = bpmnContent;
-                console.info(`Loaded BPMN from idmXML path: ${normalizedPath}`);
-              }
-            } catch (bpmnErr) {
-              console.warn(`Failed to load BPMN from path ${normalizedPath}:`, bpmnErr);
-            }
-          }
-        }
+          const xmlDir = xmlEntryPath && xmlEntryPath.includes('/')
+            ? xmlEntryPath.substring(0, xmlEntryPath.lastIndexOf('/'))
+            : '';
+          const candidates = [normalizedPath];
+          if (xmlDir) candidates.push(xmlDir + '/' + normalizedPath);
 
-        // Fallback: scan all entries for a .bpmn file
-        if (!result.bpmnXml) {
-          const bpmnEntry = allEntries.find(({ path }) => path.endsWith('.bpmn'));
-          if (bpmnEntry) {
-            try {
-              const bpmnContent = await bpmnEntry.file.async('string');
-              if (bpmnContent && bpmnContent.trim()) {
-                result.bpmnXml = bpmnContent;
-                console.info(`Loaded BPMN by scan: ${bpmnEntry.path}`);
+          for (const candidate of candidates) {
+            const bpmnFromPath = zip.file(candidate);
+            if (bpmnFromPath) {
+              try {
+                const bpmnContent = await bpmnFromPath.async('string');
+                if (bpmnContent && bpmnContent.trim()) {
+                  result.bpmnXml = bpmnContent;
+                  console.info(`Loaded BPMN from idmXML path: ${candidate}`);
+                  break;
+                }
+              } catch (bpmnErr) {
+                console.warn(`Failed to load BPMN from path ${candidate}:`, bpmnErr);
               }
-            } catch (bpmnErr) {
-              console.warn(`Failed to read scanned BPMN ${bpmnEntry.path}:`, bpmnErr);
             }
           }
         }
@@ -174,6 +180,23 @@ export const importIdmBundle = async (zipData) => {
         }
       } catch (err) {
         console.warn('Failed to parse idmXML file:', err);
+      }
+    }
+
+    // Final fallback: scan every entry for a .bpmn file.  This runs regardless
+    // of whether XML parsing succeeded, so a BOM/parse error can't hide the BPMN.
+    if (!result.bpmnXml) {
+      const bpmnEntry = allEntries.find(({ path }) => path.endsWith('.bpmn'));
+      if (bpmnEntry) {
+        try {
+          const bpmnContent = await bpmnEntry.file.async('string');
+          if (bpmnContent && bpmnContent.trim()) {
+            result.bpmnXml = bpmnContent;
+            console.info(`Loaded BPMN by scan: ${bpmnEntry.path}`);
+          }
+        } catch (bpmnErr) {
+          console.warn(`Failed to read scanned BPMN ${bpmnEntry.path}:`, bpmnErr);
+        }
       }
     }
 
