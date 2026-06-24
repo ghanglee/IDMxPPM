@@ -44,10 +44,11 @@ export const getReviewUIStyles = () => `
 .review-toggle-label { font-size: 12px; color: #ccc; cursor: pointer; display: flex; align-items: center; gap: 4px; }
 
 .add-comment-btn {
-  position: absolute; top: 6px; right: 6px;
+  display: inline-block;
   background: #f0f4ff; border: 1px solid #bcd;
   color: #0066cc; padding: 3px 10px; border-radius: 4px;
   font-size: 11px; font-weight: 500; cursor: pointer;
+  margin: 4px 0 8px 0; vertical-align: middle;
 }
 .add-comment-btn:hover { background: #dde4ff; }
 
@@ -227,10 +228,14 @@ export const getReviewUIScript = () => `
       e.stopPropagation();
       showCommentForm(targetId, targetType, targetName);
     };
-    if (!element.style.position || element.style.position === 'static') {
-      element.style.position = 'relative';
+    // Place the button immediately after the section heading so it appears
+    // below the title rather than floating in the corner.
+    var heading = element.querySelector('h1, h2, h3');
+    if (heading && heading.parentNode === element) {
+      heading.insertAdjacentElement('afterend', btn);
+    } else {
+      element.insertBefore(btn, element.firstChild);
     }
-    element.appendChild(btn);
   }
 
   function showCommentForm(targetId, targetType, targetName) {

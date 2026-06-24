@@ -3752,18 +3752,20 @@ const App = () => {
     });
     setValidationResults(results);
 
-    // Default filename = shortTitle exactly as entered, falling back to title.
-    // Only strip characters that are genuinely invalid in file system paths.
-    const defaultName = (headerData.shortTitle || headerData.title || 'idm-specification')
-      .replace(/[/\\?%*:|"<>]/g, '')
-      .trim();
+    // Default filename: shortTitle, then title, then the open file's basename
+    // (e.g. currentFilePath "/path/to/idm_Foo.idm" → "idm_Foo"), then generic fallback.
+    const fileBaseName = currentFilePath
+      ? currentFilePath.split(/[/\\]/).pop().replace(/\.[^.]+$/, '')
+      : null;
+    const rawName = headerData.shortTitle || headerData.title || fileBaseName || 'idm-specification';
+    const defaultName = rawName.replace(/[/\\?%*:|"<>]/g, '').trim() || 'idm-specification';
     setExportFilename(defaultName);
     setExportSavePath(''); // Clear any previously selected save path
 
     // Show export dialog regardless of validation result
     // Users may want to save incomplete work to continue later
     setShowExportDialog(true);
-  }, [headerData, bpmnXml, erDataMap]);
+  }, [headerData, bpmnXml, erDataMap, currentFilePath]);
 
   // Auto-scroll selected export format to center of the list
   useEffect(() => {
