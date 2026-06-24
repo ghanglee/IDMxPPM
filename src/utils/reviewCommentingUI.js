@@ -228,10 +228,10 @@ export const getReviewUIScript = () => `
       e.stopPropagation();
       showCommentForm(targetId, targetType, targetName);
     };
-    // Place the button immediately after the section heading so it appears
-    // below the title rather than floating in the corner.
+    // Place the button immediately after the section heading wherever it lives
+    // in the DOM (the heading may be inside a nested container in XSLT output).
     var heading = element.querySelector('h1, h2, h3');
-    if (heading && heading.parentNode === element) {
+    if (heading) {
       heading.insertAdjacentElement('afterend', btn);
     } else {
       element.insertBefore(btn, element.firstChild);

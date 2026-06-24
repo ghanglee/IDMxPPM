@@ -5101,7 +5101,7 @@ const App = () => {
     window.electronAPI.onMenuSave(() => saveProject(false));
     window.electronAPI.onMenuSaveAs(() => saveProject(true));
     window.electronAPI.onMenuServerConnect(() => setShowServerModal(true));
-    window.electronAPI.onMenuExportIdmXML(() => setShowExportDialog(true));
+    window.electronAPI.onMenuExportIdmXML(() => handleSaveExport());
 
     return () => {
       window.electronAPI.removeAllListeners('file-opened');
