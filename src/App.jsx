@@ -3752,12 +3752,11 @@ const App = () => {
     });
     setValidationResults(results);
 
-    // Set default filename from project title.
-    // v1.0 XML uses shortTitle as a machine code (e.g. "idm_Hochrechnung02") and
-    // fullTitle (stored as headerData.title) as the human-readable name. Prefer
-    // the human-readable title; fall back to shortTitle only when title is absent.
-    const shortTitleIsCode = /^(?:er|uc|idm|pm|bcm|req|usecase)_/i.test(headerData.shortTitle);
-    const defaultName = ((shortTitleIsCode ? null : headerData.shortTitle) || headerData.title || 'idm-specification')
+    // Default filename = shortTitle with the type prefix stripped (e.g. "idm_Hochrechnung02" → "Hochrechnung02").
+    // Fall back to title, then a generic name.
+    const codePrefix = /^(?:er|uc|idm|pm|bcm|req|usecase)_/i;
+    const cleanedShortTitle = headerData.shortTitle?.replace(codePrefix, '') || headerData.shortTitle;
+    const defaultName = (cleanedShortTitle || headerData.title || 'idm-specification')
       .replace(/[^a-zA-Z0-9가-힣\s.-]/g, '') // Allow Korean characters, spaces, dots, hyphens
       .trim();
     setExportFilename(defaultName);
@@ -4244,6 +4243,7 @@ const App = () => {
               const xmlResult = generateIdmXmlV1({
                 headerData,
                 bpmnXml: currentBpmnXml,
+                bpmnSvg,
                 erDataMap: exportErDataMapForXslt,
                 erHierarchy,
                 dataObjects: Object.keys(exportErDataMapForXslt).map(id => ({ id, name: id }))

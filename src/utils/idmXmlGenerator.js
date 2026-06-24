@@ -1151,7 +1151,7 @@ const v1ErXml = (er, authorsList, creationDate, copyright, indent, isRoot = true
  *   - <localProjectPhase> instead of <localProjectStage>
  *   - Descriptions use <description><content>text</content></description>
  */
-export const generateIdmXmlV1 = ({ headerData, bpmnXml, erDataMap, erHierarchy, dataObjects = [] }) => {
+export const generateIdmXmlV1 = ({ headerData, bpmnXml, bpmnSvg, erDataMap, erHierarchy, dataObjects = [] }) => {
   const idmGuid = ensureUUID(headerData?.idmGuid);
   const ucGuid = ensureUUID(headerData?.ucGuid);
   const bcmGuid = ensureUUID(headerData?.bcmGuid);
@@ -1288,6 +1288,14 @@ export const generateIdmXmlV1 = ({ headerData, bpmnXml, erDataMap, erHierarchy, 
     lines.push('        <diagramContent><![CDATA[');
     lines.push(bpmnXml);
     lines.push(']]></diagramContent>');
+  }
+  if (bpmnSvg) {
+    // Strip XML declaration so the SVG can be embedded as inline XML nodes.
+    // The XSLT can then copy these nodes directly into HTML output.
+    const inlineSvg = bpmnSvg.replace(/^<\?xml[^?]*\?>\s*/i, '').trim();
+    lines.push('        <bpmnSvg>');
+    lines.push(inlineSvg);
+    lines.push('        </bpmnSvg>');
   }
   lines.push('      </diagram>');
 

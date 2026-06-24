@@ -250,7 +250,36 @@ export const generateStandaloneHtml = async ({
       } else if (html.includes('</head>')) {
         html = html.replace('</head>', `<style>${getReviewUIStyles()}</style></head>`);
       }
-      html = html.replace('</body>', generateReviewBlocks(projectData) + '</body>');
+      // The review UI targets .er-section[id] and .section elements. XSLT stylesheets
+      // (like KillianReyer's) output div.page.er and div.page instead. Inject a
+      // normalization script that runs before the review UI's DOMContentLoaded handler
+      // so attachCommentButtons() finds the right elements.
+      const xsltNormalizer = `
+  <script>
+  (function() {
+    function normalizeXsltClasses() {
+      var erDivs = document.querySelectorAll('div.page.er, div.page.suber');
+      for (var i = 0; i < erDivs.length; i++) {
+        var div = erDivs[i];
+        div.classList.add('er-section');
+        if (!div.id) {
+          var h2 = div.querySelector('h2');
+          div.id = 'er-section-' + (h2 ? h2.textContent.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-') : i);
+        }
+        var h2 = div.querySelector('h2');
+        if (h2 && !div.querySelector('.er-title')) h2.classList.add('er-title');
+      }
+      var pageDivs = document.querySelectorAll('div.page:not(.er):not(.suber)');
+      for (var j = 0; j < pageDivs.length; j++) pageDivs[j].classList.add('section');
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', normalizeXsltClasses);
+    } else {
+      normalizeXsltClasses();
+    }
+  })();
+  </script>`;
+      html = html.replace('</body>', xsltNormalizer + generateReviewBlocks(projectData) + '</body>');
     }
     return html;
   }
