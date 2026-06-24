@@ -1058,11 +1058,32 @@ const v1Examples = (text, indent) => {
   ];
 };
 
-/** v1.0 authoring block (flat author attributes, committee, publisher) */
-const v1Authoring = (headerData, authorsList, copyright, creationDate, indent) => {
+/**
+ * v1.0 authoring block.
+ * @param {Array|null} storedChangeLogs - parsed changeLogs from headerData (IDM level only)
+ */
+const v1Authoring = (headerData, authorsList, copyright, creationDate, indent, storedChangeLogs) => {
   const lines = [];
+  const firstAuthorId = authorsList[0]?.id || 'author-1';
   lines.push(`${indent}<authoring copyright="${escapeXmlV1(copyright || '')}">`);
-  lines.push(`${indent}  <changeLog id="log-1" changeDateTime="${creationDate}T00:00:00" changeSummary="Initial creation" changedBy="author-1"/>`);
+
+  if (storedChangeLogs && storedChangeLogs.length > 0) {
+    storedChangeLogs.forEach(log => {
+      const hasCh = log.changes && log.changes.length > 0;
+      if (hasCh) {
+        lines.push(`${indent}  <changeLog id="${escapeXmlV1(log.id)}" changeDateTime="${escapeXmlV1(log.changeDateTime)}" changeSummary="${escapeXmlV1(log.changeSummary || '')}" changedBy="${escapeXmlV1(log.changedBy)}">`);
+        log.changes.forEach(ch => {
+          lines.push(`${indent}    <change changedElement="${escapeXmlV1(ch.changedElement)}" changedFrom="${escapeXmlV1(ch.changedFrom)}" />`);
+        });
+        lines.push(`${indent}  </changeLog>`);
+      } else {
+        lines.push(`${indent}  <changeLog id="${escapeXmlV1(log.id)}" changeDateTime="${escapeXmlV1(log.changeDateTime)}" changeSummary="${escapeXmlV1(log.changeSummary || '')}" changedBy="${escapeXmlV1(log.changedBy)}"/>`);
+      }
+    });
+  } else {
+    lines.push(`${indent}  <changeLog id="${ensureUUID(null)}" changeDateTime="${creationDate}" changeSummary="" changedBy="${firstAuthorId}"/>`);
+  }
+
   if (authorsList.length > 0) {
     authorsList.forEach((a, i) => {
       const aid = a?.id || `author-${i + 1}`;
@@ -1076,7 +1097,7 @@ const v1Authoring = (headerData, authorsList, copyright, creationDate, indent) =
   } else {
     lines.push(`${indent}  <author id="author-1" digitalSignature="" firstName="IDMxPPM" middleName="" lastName="User" affiliation="" />`);
   }
-  lines.push(`${indent}  <committee name=""><leader>author-1</leader></committee>`);
+  // Note: v1 format does NOT have <committee> — only <publisher>
   lines.push(`${indent}  <publisher name="" location="" />`);
   lines.push(`${indent}</authoring>`);
   return lines;
@@ -1118,8 +1139,18 @@ const v1ErXml = (er, authorsList, creationDate, copyright, indent, isRoot = true
 
   if (isRoot) lines.push(`${indent}<er>`);
 
-  lines.push(`${indent}  <specId guid="${erGuid}" shortTitle="${escapeXmlV1(er.name || er.shortTitle || 'ER')}" fullTitle="${escapeXmlV1(er.fullTitle || er.name || 'Exchange Requirement')}" subTitle="" idmCode="${escapeXmlV1(er.idmCode || `ER-${er.id || Date.now()}`)}" localCode="" documentStatus="${escapeXmlV1(er.documentStatus || 'WD')}" localDocumentStatus="" version="" />`);
+  lines.push(`${indent}  <specId guid="${erGuid}" shortTitle="${escapeXmlV1(er.shortTitle || er.name || 'ER')}" fullTitle="${escapeXmlV1(er.fullTitle || er.name || 'Exchange Requirement')}" subTitle="${escapeXmlV1(er.subTitle || '')}" idmCode="${escapeXmlV1(er.idmCode || `ER-${er.id || Date.now()}`)}" localCode="${escapeXmlV1(er.localCode || '')}" documentStatus="${escapeXmlV1(er.documentStatus || 'WD')}" localDocumentStatus="${escapeXmlV1(er.localDocumentStatus || '')}" version="" />`);
   lines.push(...v1Authoring(null, authorsList, copyright, er.creationDate || creationDate, indent + '  '));
+
+  // v1 element order: correspondingMvd → description → informationUnits → subERs
+  // Always emit at least one correspondingMvd (empty if none stored)
+  if (er.correspondingMvd && er.correspondingMvd.length > 0) {
+    er.correspondingMvd.forEach(m => lines.push(`${indent}  <correspondingMvd basis="${escapeXmlV1(m.basis)}" name="${escapeXmlV1(m.name)}"/>`));
+  } else {
+    lines.push(`${indent}  <correspondingMvd basis="" name="" />`);
+  }
+
+  if (er.description) lines.push(...v1Description(er.description, indent + '  '));
 
   if (er.informationUnits && er.informationUnits.length > 0) {
     er.informationUnits.forEach(u => lines.push(v1InformationUnit(u, indent + '  ')));
@@ -1132,13 +1163,6 @@ const v1ErXml = (er, authorsList, creationDate, copyright, indent, isRoot = true
       lines.push(`${indent}    </er>`);
       lines.push(`${indent}  </subEr>`);
     });
-  }
-  if ((!er.informationUnits || er.informationUnits.length === 0) && (!er.subERs || er.subERs.length === 0)) {
-    lines.push(`${indent}  <informationUnit id="iu-placeholder" name="Placeholder" dataType="String" isMandatory="false" definition="Placeholder"/>`);
-  }
-  if (er.description) lines.push(...v1Description(er.description, indent + '  '));
-  if (er.correspondingMvd && er.correspondingMvd.length > 0) {
-    er.correspondingMvd.forEach(m => lines.push(`${indent}  <correspondingMvd basis="${escapeXmlV1(m.basis)}" name="${escapeXmlV1(m.name)}"/>`));
   }
 
   if (isRoot) lines.push(`${indent}</er>`);
@@ -1155,7 +1179,7 @@ const v1ErXml = (er, authorsList, creationDate, copyright, indent, isRoot = true
  *   - <localProjectPhase> instead of <localProjectStage>
  *   - Descriptions use <description><content>text</content></description>
  */
-export const generateIdmXmlV1 = ({ headerData, bpmnXml, bpmnSvg, erDataMap, erHierarchy, dataObjects = [] }) => {
+export const generateIdmXmlV1 = ({ headerData, bpmnXml, bpmnSvg, erDataMap, erHierarchy, dataObjects = [], bpmnFilePath = 'Diagram/Diagram(1).bpmn' }) => {
   const idmGuid = ensureUUID(headerData?.idmGuid);
   const ucGuid = ensureUUID(headerData?.ucGuid);
   const bcmGuid = ensureUUID(headerData?.bcmGuid);
@@ -1177,15 +1201,20 @@ export const generateIdmXmlV1 = ({ headerData, bpmnXml, bpmnSvg, erDataMap, erHi
   lines.push('<?xml version="1.0" encoding="UTF-8"?>');
   lines.push('<idm>');
 
+  const subTitle = headerData?.subTitle || '';
+
   // IDM specId (v1.0 includes subTitle, localCode, localDocumentStatus attributes)
-  lines.push(`  <specId guid="${idmGuid}" shortTitle="${escapeXmlV1(shortTitle)}" fullTitle="${escapeXmlV1(title)}" subTitle="" idmCode="${escapeXmlV1(idmCode)}" localCode="" documentStatus="${escapeXmlV1(status)}" localDocumentStatus="" version="${escapeXmlV1(version)}" />`);
+  lines.push(`  <specId guid="${idmGuid}" shortTitle="${escapeXmlV1(shortTitle)}" fullTitle="${escapeXmlV1(title)}" subTitle="${escapeXmlV1(subTitle)}" idmCode="${escapeXmlV1(idmCode)}" localCode="" documentStatus="${escapeXmlV1(status)}" localDocumentStatus="" version="${escapeXmlV1(version)}" />`);
 
-  // IDM authoring (v1.0 flat format)
-  lines.push(...v1Authoring(headerData, authorsArray, copyright, creationDate, '  '));
+  // IDM authoring — pass stored changeLogs to preserve original change history
+  const storedChangeLogs = Array.isArray(headerData?.changeLogs) && headerData.changeLogs.length > 0
+    ? headerData.changeLogs : null;
+  lines.push(...v1Authoring(headerData, authorsArray, copyright, creationDate, '  ', storedChangeLogs));
 
-  // Use Case
+  // Use Case — UC shortTitle keeps the original uc_ prefix if present, otherwise uses IDM shortTitle
+  const ucShortTitle = headerData?.ucShortTitle || shortTitle;
   lines.push('  <uc>');
-  lines.push(`    <specId guid="${ucGuid}" shortTitle="${escapeXmlV1(shortTitle)}" fullTitle="${escapeXmlV1(title)}" subTitle="" idmCode="UC-${idmCode.replace('IDM-', '')}" localCode="" documentStatus="${escapeXmlV1(status)}" localDocumentStatus="" version="${escapeXmlV1(version)}" />`);
+  lines.push(`    <specId guid="${ucGuid}" shortTitle="${escapeXmlV1(ucShortTitle)}" fullTitle="${escapeXmlV1(title)}" subTitle="${escapeXmlV1(subTitle)}" idmCode="UC-${idmCode.replace(/^IDM-/i, '')}" localCode="" documentStatus="${escapeXmlV1(status)}" localDocumentStatus="" version="${escapeXmlV1(version)}" />`);
   lines.push(...v1Authoring(headerData, authorsArray, copyright, creationDate, '    '));
 
   // Summary
@@ -1204,12 +1233,28 @@ export const generateIdmXmlV1 = ({ headerData, bpmnXml, bpmnSvg, erDataMap, erHi
   const uses = Array.isArray(headerData?.uses) && headerData.uses.length > 0
     ? headerData.uses
     : (Array.isArray(headerData?.useCategories) && headerData.useCategories.length > 0
-      ? headerData.useCategories.map(cat => ({ verb: 'Perform', noun: cat }))
-      : [{ verb: 'Coordinate', noun: 'Design Model' }]);
+      ? headerData.useCategories.map(cat => ({ verb: '', noun: '', name: cat }))
+      : [{ name: 'Coordinate Design Model' }]);
 
+  const useClassif = headerData?.useClassification;
   uses.forEach(use => {
-    const useName = typeof use === 'object' && use.verb && use.noun ? `${use.verb} ${use.noun}` : (use || '');
-    if (useName) lines.push(`    <use name="${escapeXmlV1(useName)}"/>`);
+    // Build the display name — handle {verb, noun}, {name}, or plain string
+    let useName;
+    if (typeof use === 'object') {
+      useName = (use.verb || use.noun)
+        ? [use.verb, use.noun].filter(Boolean).join(' ')
+        : (use.name || '');
+    } else {
+      useName = String(use || '');
+    }
+    if (!useName) return;
+    if (useClassif && useClassif.name) {
+      lines.push(`    <use name="${escapeXmlV1(useName)}">`);
+      lines.push(`      <classification name="${escapeXmlV1(useClassif.name)}" version="${escapeXmlV1(useClassif.version || '')}" publicationYear="${escapeXmlV1(useClassif.publicationYear || '')}"/>`);
+      lines.push(`    </use>`);
+    } else {
+      lines.push(`    <use name="${escapeXmlV1(useName)}"/>`);
+    }
   });
 
   // Standard Project Phases (v1.0 uses standardProjectPhase)
@@ -1282,38 +1327,25 @@ export const generateIdmXmlV1 = ({ headerData, bpmnXml, bpmnSvg, erDataMap, erHi
   lines.push('  </uc>');
 
   // Business Context Map
+  const bcmIdmCode = idmCode.replace(/^IDM-/i, 'BCM-') || `BCM-${idmCode}`;
+  const pmShortTitle = headerData?.pmShortTitle || shortTitle;
   lines.push('  <businessContextMap>');
-  lines.push(`    <specId guid="${bcmGuid}" shortTitle="Process Map" fullTitle="Business Context Map" subTitle="" idmCode="BCM-${Date.now()}" localCode="" documentStatus="${escapeXmlV1(status)}" localDocumentStatus="" version="${escapeXmlV1(version)}" />`);
+  lines.push(`    <specId guid="${bcmGuid}" shortTitle="${escapeXmlV1(pmShortTitle)}" fullTitle="${escapeXmlV1(title)}" subTitle="${escapeXmlV1(subTitle)}" idmCode="${escapeXmlV1(bcmIdmCode)}" localCode="" documentStatus="${escapeXmlV1(status)}" localDocumentStatus="" version="${escapeXmlV1(version)}" />`);
   lines.push(...v1Authoring(headerData, authorsArray, copyright, creationDate, '    '));
 
   lines.push('    <pm>');
-  lines.push(`      <diagram id="${pmId}" name="Process Map" notation="BPMN 2.0" diagramFilePath="process-map.bpmn">`);
-  if (bpmnXml) {
-    lines.push('        <diagramContent><![CDATA[');
-    lines.push(bpmnXml);
-    lines.push(']]></diagramContent>');
-  }
-  if (bpmnSvg) {
-    // Strip XML declaration so the SVG can be embedded as inline XML nodes.
-    // The XSLT can then copy these nodes directly into HTML output.
-    // Skip everything before <svg — the XML declaration, any DOCTYPE, and
-    // any comments (e.g. "<!-- created with bpmn-js -->") are only valid in
-    // a document prolog and cause parse errors inside another XML document.
-    const svgStart = bpmnSvg.indexOf('<svg');
-    const inlineSvg = (svgStart >= 0 ? bpmnSvg.slice(svgStart) : bpmnSvg).trim();
-    lines.push('        <bpmnSvg>');
-    lines.push(inlineSvg);
-    lines.push('        </bpmnSvg>');
-  }
-  lines.push('      </diagram>');
+  // v1.0: <diagram> references the BPMN file externally via filePath — no embedded content
+  const pmDiagramName = headerData?.pmDiagramName || pmShortTitle;
+  lines.push(`      <diagram id="${pmId}" name="${escapeXmlV1(pmDiagramName)}" filePath="${escapeXmlV1(bpmnFilePath)}" notation="" />`);
 
   if (dataObjects && dataObjects.length > 0) {
-    dataObjects.forEach((dataObj, i) => {
+    dataObjects.forEach((dataObj) => {
       const er = erDataMap?.[dataObj.id];
       if (er) {
-        lines.push(`      <dataObjectAndEr id="DOER-${i + 1}">`);
-        lines.push(`        <associatedDataObject ref="${escapeXmlV1(dataObj.id)}"/>`);
-        lines.push(`        <associatedEr ref="${escapeXmlV1(er.guid || er.id)}"/>`);
+        // v1.0 uses text content for associatedDataObject/associatedEr, NOT ref attributes
+        lines.push(`      <dataObjectAndEr id="${ensureUUID(null)}">`);
+        lines.push(`        <associatedDataObject>${escapeXmlV1(dataObj.id)}</associatedDataObject>`);
+        lines.push(`        <associatedEr>${escapeXmlV1(er.guid || er.id)}</associatedEr>`);
         lines.push('      </dataObjectAndEr>');
       }
     });

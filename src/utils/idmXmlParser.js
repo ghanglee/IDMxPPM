@@ -1044,6 +1044,12 @@ const parseErElement = (erElement) => {
     const idmCode = trimStr(specId.getAttribute('idmCode'));
     const idFromCode = idmCode.startsWith('ER-') ? idmCode.substring(3) : idmCode;
     er.id = er.guid || idFromCode || `ER-${Date.now()}`;
+    // Store these so the v1 exporter can reproduce the original values on round-trip
+    er.idmCode = idmCode;
+    er.subTitle = trimStr(specId.getAttribute('subTitle'));
+    er.documentStatus = trimStr(specId.getAttribute('documentStatus'));
+    er.localCode = trimStr(specId.getAttribute('localCode'));
+    er.localDocumentStatus = trimStr(specId.getAttribute('localDocumentStatus'));
     // idmXML v1.0 uses shortTitle as a machine-readable code (prefixed with "er_",
     // "uc_", "idm_", "pm_", etc.) and fullTitle as the human-readable label.
     // Our own v2.0 exports write the human-readable name into shortTitle directly.

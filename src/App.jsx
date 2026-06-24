@@ -4047,18 +4047,27 @@ const App = () => {
           // not from erDataMap (legacy) which is empty in ER-first mode.
           const zipDataObjects = Object.keys(bundleErDataMap).map(id => ({ id, name: id }));
 
+          // idmXML 1.0 ZIP uses a named root folder matching the project,
+          // with the XML at the root and BPMN in a Diagram/ subfolder.
+          const zipFolderName = fileName;                           // e.g. "idm_Hochrechnung02"
+          const zipXmlName   = `${zipFolderName}.xml`;             // e.g. "idm_Hochrechnung02.xml"
+          const zipBpmnPath  = 'Diagram/Diagram(1).bpmn';
+          const bpmnZipEntry = `${zipFolderName}/${zipBpmnPath}`;  // e.g. "idm_Hochrechnung02/Diagram/Diagram(1).bpmn"
+
           const v1Result = generateIdmXmlV1({
             headerData,
-            bpmnXml: currentBpmnXml,
+            bpmnXml: null,        // BPMN goes in separate file — NOT embedded in XML
             erDataMap: bundleErDataMap,
             erHierarchy,
-            dataObjects: zipDataObjects
+            dataObjects: zipDataObjects,
+            bpmnFilePath: zipBpmnPath  // relative path stored in <diagram filePath="...">
           });
 
           const zipV1 = new JSZip();
-          zipV1.file('idm-specification.xml', v1Result.xml);
+          const zipV1Folder = zipV1.folder(zipFolderName);
+          zipV1Folder.file(zipXmlName, v1Result.xml);
           if (currentBpmnXml) {
-            zipV1.file('process-map.bpmn', currentBpmnXml);
+            zipV1Folder.file(zipBpmnPath, currentBpmnXml);
           }
           const zipV1Filename = `${fileName}.zip`;
           const zipV1Blob = await zipV1.generateAsync({ type: 'blob', compression: 'DEFLATE' });
