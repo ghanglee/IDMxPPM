@@ -116,19 +116,28 @@ const enhanceHtmlWithBpmn = (htmlContent, bpmnSvg) => {
     }
   `;
 
-  // Insert BPMN section after Use Case section (before Exchange Requirements)
-  // Look for the Exchange Requirements heading
-  const erHeadingMatch = htmlContent.match(/<h2[^>]*>Exchange Requirements<\/h2>/i);
+  // Insert BPMN section before the Exchange Requirements heading.
+  // Match both the English-only form and the German+English combined form used by
+  // stylesheets like the KillianReyer XSLT ("Informationsanforderungen / Exchange Requirements").
+  const erHeadingMatch = htmlContent.match(
+    /<h2[^>]*>[^<]*(?:Exchange Requirements|Informationsanforderungen)[^<]*<\/h2>/i
+  );
   if (erHeadingMatch) {
     const insertIndex = htmlContent.indexOf(erHeadingMatch[0]);
     htmlContent = htmlContent.slice(0, insertIndex) + bpmnSection + htmlContent.slice(insertIndex);
   } else {
-    // If no ER section, insert before closing body tag
     htmlContent = htmlContent.replace('</body>', bpmnSection + '</body>');
   }
 
-  // Add styles to head
-  htmlContent = htmlContent.replace('</style>', bpmnStyles + '</style>');
+  // Inject BPMN styles — try </style> first (XSLT output may have inline <style>),
+  // fall back to </head>, fall back to <body>.
+  if (htmlContent.includes('</style>')) {
+    htmlContent = htmlContent.replace('</style>', bpmnStyles + '</style>');
+  } else if (htmlContent.includes('</head>')) {
+    htmlContent = htmlContent.replace('</head>', `<style>${bpmnStyles}</style></head>`);
+  } else {
+    htmlContent = htmlContent.replace('<body', `<style>${bpmnStyles}</style><body`);
+  }
 
   return htmlContent;
 };
@@ -228,13 +237,22 @@ export const generateStandaloneHtml = async ({
   // When custom XSLT + generated idmXML are both available, apply the XSLT transformation
   // instead of the built-in JS-based HTML generator.
   if (customXsltContent && idmXmlContent) {
-    return await generateHtmlDocument({
+    let html = await generateHtmlDocument({
       headerData,
       erDataMap,
       bpmnSvg,
       customXsltContent,
       idmXmlContent
     });
+    if (enableReview && projectData) {
+      if (html.includes('</style>')) {
+        html = html.replace('</style>', getReviewUIStyles() + '</style>');
+      } else if (html.includes('</head>')) {
+        html = html.replace('</head>', `<style>${getReviewUIStyles()}</style></head>`);
+      }
+      html = html.replace('</body>', generateReviewBlocks(projectData) + '</body>');
+    }
+    return html;
   }
 
   const title = headerData?.title || headerData?.shortTitle || 'IDM Specification';
