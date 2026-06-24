@@ -111,6 +111,7 @@ const App = () => {
   const [erDataMap, setErDataMap] = useState({});
   const [erLibrary, setErLibrary] = useState([]);
   const [reviewComments, setReviewComments] = useState([]);
+  const [passthroughFiles, setPassthroughFiles] = useState({}); // Passthrough files from ZIP import (XSLT, PDF, etc.)
 
   // ER-first architecture state (new)
   const [erHierarchy, setErHierarchy] = useState([]);  // Ordered hierarchical array of ERs (source of truth)
@@ -870,6 +871,7 @@ const App = () => {
       dataObjectErMap: importDataObjectErMap,
       erDataMap: importErDataMap,
       erLibrary: importErLibrary,
+      passthroughFiles: importPassthroughFiles,
       filePath,
       isDirtyAfterImport,
       source // 'project', 'idmXml', 'xppm', etc.
@@ -884,6 +886,7 @@ const App = () => {
     if (importDataObjectErMap) setDataObjectErMap(importDataObjectErMap);
     if (importErDataMap) setErDataMap(importErDataMap);
     if (importErLibrary) setErLibrary(importErLibrary);
+    setPassthroughFiles(importPassthroughFiles || {});
     if (filePath) setCurrentFilePath(filePath);
     setIsDirty(isDirtyAfterImport ?? false);
     setValidationResults(null);
@@ -2803,6 +2806,7 @@ const App = () => {
             dataObjectErMap: dataObjectErMapToImport,
             erDataMap: erDataMapToImport,
             erLibrary: bundleData.erLibrary,
+            passthroughFiles: bundleData.passthroughFiles || {},
             filePath: file.name,
             isDirtyAfterImport,
             source: 'project'
@@ -2826,6 +2830,7 @@ const App = () => {
           if (bundleData.erLibrary) {
             setErLibrary(bundleData.erLibrary);
           }
+          setPassthroughFiles(bundleData.passthroughFiles || {});
           setBpmnXml(bpmnToImport);
           setIsDirty(isDirtyAfterImport);
           if (!hasBpmn) {
@@ -4069,6 +4074,20 @@ const App = () => {
           if (currentBpmnXml) {
             zipV1Folder.file(zipBpmnPath, currentBpmnXml);
           }
+
+          // Include passthrough files (XSLT, PDF, etc.) from the original import
+          const pf = passthroughFiles || {};
+          for (const [pfPath, pfBase64] of Object.entries(pf)) {
+            try {
+              const binaryStr = atob(pfBase64);
+              const bytes = new Uint8Array(binaryStr.length);
+              for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+              zipV1Folder.file(pfPath, bytes);
+            } catch (pfErr) {
+              console.warn(`Failed to add passthrough file ${pfPath}:`, pfErr);
+            }
+          }
+
           const zipV1Filename = `${fileName}.zip`;
           const zipV1Blob = await zipV1.generateAsync({ type: 'blob', compression: 'DEFLATE' });
 

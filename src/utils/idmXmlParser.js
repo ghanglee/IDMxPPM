@@ -191,6 +191,34 @@ const findAllDescendants = (parent, tagName) => {
 };
 
 /**
+ * Parse changeLogs from an authoring element into the standard changeLogs format.
+ * @param {Element} authoringEl - The <authoring> element
+ * @returns {Array} Array of changeLog objects
+ */
+const parseChangeLogs = (authoringEl) => {
+  if (!authoringEl) return [];
+  const changeLogs = getDirectChildren(authoringEl, 'changeLog');
+  const result = [];
+  changeLogs.forEach(log => {
+    const changeEntries = [];
+    getDirectChildren(log, 'change').forEach(ch => {
+      changeEntries.push({
+        changedElement: ch.getAttribute('changedElement') || '',
+        changedFrom: ch.getAttribute('changedFrom') || ''
+      });
+    });
+    result.push({
+      id: log.getAttribute('id') || '',
+      changeDateTime: log.getAttribute('changeDateTime') || '',
+      changeSummary: log.getAttribute('changeSummary') || '',
+      changedBy: log.getAttribute('changedBy') || '',
+      changes: changeEntries
+    });
+  });
+  return result;
+};
+
+/**
  * Parse an idmXML document into application state
  * @param {string} xmlContent - The idmXML content as string
  * @returns {Object} Parsed project data with headerData, bpmnXml, erDataMap
@@ -221,6 +249,21 @@ export const parseIdmXml = (xmlContent) => {
     if (!idmRoot || (idmRoot.localName !== 'idm' && idmRoot.tagName !== 'idm')) {
       throw new Error('Not a valid idmXML file: missing <idm> root element');
     }
+
+    // Scan for <?xml-stylesheet ?> processing instruction before <idm> element
+    for (let i = 0; i < xmlDoc.childNodes.length; i++) {
+      const node = xmlDoc.childNodes[i];
+      if (node.nodeType === 7 && node.nodeName === 'xml-stylesheet') {
+        const hrefMatch = node.data && node.data.match(/href="([^"]+)"/);
+        if (hrefMatch) result.headerData.stylesheetHref = hrefMatch[1];
+        break;
+      }
+    }
+
+    // Store xsi schema location attributes from <idm> root
+    const xsiSchemaLocation = idmRoot.getAttribute('xsi:noNamespaceSchemaLocation') ||
+      idmRoot.getAttributeNS('http://www.w3.org/2001/XMLSchema-instance', 'noNamespaceSchemaLocation');
+    if (xsiSchemaLocation) result.headerData.xsiSchemaLocation = xsiSchemaLocation;
 
     // Parse specId (IDM metadata) - including GUIDs for persistence
     const specId = getFirstChild(idmRoot, 'specId');
@@ -492,11 +535,20 @@ export const parseIdmXml = (xmlContent) => {
     // Parse Use Case (uc) - all namespace-safe
     const uc = getFirstChild(idmRoot, 'uc');
     if (uc) {
-      // Parse UC specId for GUID
+      // Parse UC specId for GUID and round-trip fields
       const ucSpecId = getFirstChild(uc, 'specId');
       if (ucSpecId) {
         result.headerData.ucGuid = ucSpecId.getAttribute('guid') || '';
+        result.headerData.ucShortTitle = ucSpecId.getAttribute('shortTitle') || '';
+        result.headerData.ucIdmCode = ucSpecId.getAttribute('idmCode') || '';
+        result.headerData.ucSubTitle = ucSpecId.getAttribute('subTitle') || '';
+        result.headerData.ucDocumentStatus = ucSpecId.getAttribute('documentStatus') || '';
+        result.headerData.ucVersion = ucSpecId.getAttribute('version') || '';
+        result.headerData.ucLocalCode = ucSpecId.getAttribute('localCode') || '';
+        result.headerData.ucLocalDocumentStatus = ucSpecId.getAttribute('localDocumentStatus') || '';
       }
+      const ucAuthoring = getFirstChild(uc, 'authoring');
+      if (ucAuthoring) result.headerData.ucChangeLogs = parseChangeLogs(ucAuthoring);
 
       // Summary - with optional figures
       const summarySection = getFirstChild(uc, 'summary');
@@ -803,7 +855,16 @@ export const parseIdmXml = (xmlContent) => {
       const bcmSpecId = getFirstChild(bcm, 'specId');
       if (bcmSpecId) {
         result.headerData.bcmGuid = bcmSpecId.getAttribute('guid') || '';
+        result.headerData.bcmShortTitle = bcmSpecId.getAttribute('shortTitle') || '';
+        result.headerData.bcmIdmCode = bcmSpecId.getAttribute('idmCode') || '';
+        result.headerData.bcmSubTitle = bcmSpecId.getAttribute('subTitle') || '';
+        result.headerData.bcmDocumentStatus = bcmSpecId.getAttribute('documentStatus') || '';
+        result.headerData.bcmVersion = bcmSpecId.getAttribute('version') || '';
+        result.headerData.bcmLocalCode = bcmSpecId.getAttribute('localCode') || '';
+        result.headerData.bcmLocalDocumentStatus = bcmSpecId.getAttribute('localDocumentStatus') || '';
       }
+      const bcmAuthoring = getFirstChild(bcm, 'authoring');
+      if (bcmAuthoring) result.headerData.bcmChangeLogs = parseChangeLogs(bcmAuthoring);
     }
 
     const pm = bcm ? getFirstChild(bcm, 'pm') : null;
@@ -811,6 +872,7 @@ export const parseIdmXml = (xmlContent) => {
       const diagram = getFirstChild(pm, 'diagram');
       if (diagram) {
         result.headerData.pmId = diagram.getAttribute('id') || '';
+        result.headerData.pmDiagramName = diagram.getAttribute('name') || '';
         // v2.0 uses 'diagramFilePath', v1.0 actual files use 'filePath'
         const diagramFilePath = diagram.getAttribute('diagramFilePath') || diagram.getAttribute('filePath');
         if (diagramFilePath) {
@@ -842,17 +904,27 @@ export const parseIdmXml = (xmlContent) => {
         });
       }
 
-      // Parse dataObjectAndEr links
+      // Parse dataObjectAndEr links — preserve original UUIDs for round-trip fidelity
       const doErLinks = getDirectChildren(pm, 'dataObjectAndEr');
+      if (doErLinks.length > 0) {
+        result.headerData.dataObjectAndErLinks = [];
+      }
       doErLinks.forEach(link => {
         const doEl = getFirstChild(link, 'associatedDataObject');
         const erEl = getFirstChild(link, 'associatedEr');
         // v2.0 uses ref attribute; fallback to textContent for backward compatibility
-        const doId = doEl?.getAttribute('ref') || doEl?.textContent;
-        const erId = erEl?.getAttribute('ref') || erEl?.textContent;
+        const doId = doEl?.getAttribute('ref') || doEl?.textContent?.trim();
+        const erId = erEl?.getAttribute('ref') || erEl?.textContent?.trim();
         if (doId && erId) {
           result.dataObjectErLinks = result.dataObjectErLinks || {};
           result.dataObjectErLinks[doId] = erId;
+          if (result.headerData.dataObjectAndErLinks) {
+            result.headerData.dataObjectAndErLinks.push({
+              id: link.getAttribute('id') || null,
+              doId,
+              erId
+            });
+          }
         }
       });
     }
@@ -1056,6 +1128,12 @@ const parseErElement = (erElement) => {
     // Detect the code pattern and prefer fullTitle when it is present.
     const shortTitleIsCode = /^(?:er|uc|idm|pm|bcm|req|usecase)_/i.test(er.shortTitle);
     er.name = (shortTitleIsCode ? er.fullTitle : er.shortTitle) || er.fullTitle || er.shortTitle;
+  }
+
+  // Parse ER-level authoring changeLogs for round-trip fidelity
+  const erAuthoring = getFirstChild(erElement, 'authoring');
+  if (erAuthoring) {
+    er.changeLogs = parseChangeLogs(erAuthoring);
   }
 
   // Parse ALL description elements - namespace-safe (merge text, collect all images)

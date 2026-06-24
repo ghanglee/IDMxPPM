@@ -70,6 +70,9 @@ export const importIdmBundle = async (zipData) => {
       }
     }
 
+    // Track the actual BPMN entry path for passthrough exclusion
+    let bpmnEntryPath = null;
+
     // Read BPMN file — try manifest path and known names first, then scan all entries
     const bpmnPaths = [
       manifest?.files?.processMap,
@@ -85,6 +88,7 @@ export const importIdmBundle = async (zipData) => {
           const bpmnContent = await bpmnFile.async('string');
           if (bpmnContent && bpmnContent.trim()) {
             result.bpmnXml = bpmnContent;
+            bpmnEntryPath = bpmnPath;
             console.info(`Loaded BPMN from: ${bpmnPath}`);
           }
           break;
@@ -164,6 +168,7 @@ export const importIdmBundle = async (zipData) => {
                 const bpmnContent = await bpmnFromPath.async('string');
                 if (bpmnContent && bpmnContent.trim()) {
                   result.bpmnXml = bpmnContent;
+                  bpmnEntryPath = candidate;
                   console.info(`Loaded BPMN from idmXML path: ${candidate}`);
                   break;
                 }
@@ -192,6 +197,7 @@ export const importIdmBundle = async (zipData) => {
           const bpmnContent = await bpmnEntry.file.async('string');
           if (bpmnContent && bpmnContent.trim()) {
             result.bpmnXml = bpmnContent;
+            bpmnEntryPath = bpmnEntry.path;
             console.info(`Loaded BPMN by scan: ${bpmnEntry.path}`);
           }
         } catch (bpmnErr) {
@@ -233,6 +239,41 @@ export const importIdmBundle = async (zipData) => {
       result.dataObjectErMap = autoMapDataObjectsToERs(
         result.bpmnXml, result.erHierarchy, result.dataObjectErMap
       );
+    }
+
+    // Collect passthrough files (XSLT, PDF, etc.) — anything that is not the main
+    // XML, main BPMN, images, or manifest/project JSON.  Strip the top-level folder
+    // prefix so paths are portable across imports with different project names.
+    const excludePaths = new Set([
+      xmlEntryPath,
+      bpmnEntryPath,
+      'manifest.json',
+      'project.json'
+    ].filter(Boolean));
+
+    // Determine top-level folder prefix to strip (e.g. "00_Hochrechnung/")
+    const topFolder = xmlEntryPath && xmlEntryPath.includes('/')
+      ? xmlEntryPath.substring(0, xmlEntryPath.indexOf('/') + 1)
+      : '';
+
+    const passthroughFiles = {};
+    for (const { path, file } of allEntries) {
+      if (excludePaths.has(path)) continue;
+      if (isImagePath(path)) continue;  // images are handled separately
+      if (path.endsWith('.bpmn')) continue;
+      if (path.endsWith('.xml') || path.endsWith('.XML')) continue; // skip any extra XML files
+      try {
+        const data = await file.async('base64');
+        const portablePath = topFolder && path.startsWith(topFolder)
+          ? path.slice(topFolder.length)
+          : path;
+        if (portablePath) passthroughFiles[portablePath] = data;
+      } catch (err) {
+        console.warn(`Failed to read passthrough file ${path}:`, err);
+      }
+    }
+    if (Object.keys(passthroughFiles).length > 0) {
+      result.passthroughFiles = passthroughFiles;
     }
 
     return result;
