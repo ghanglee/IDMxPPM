@@ -221,7 +221,50 @@ export const getReviewUIScript = () => `
     return element.querySelector('h1, h2, h3, h4');
   }
 
+  // True when el is an HTML heading element (h1–h4).
+  // Headings can't have children appended inside them; form/thread must go
+  // as siblings immediately after the button.
+  function isHeading(el) {
+    return el && /^H[1-4]$/.test(el.tagName);
+  }
+
+  // Insert child into/after target depending on whether target is a heading.
+  // For headings: insert after the comment button (which sits right after the
+  // heading), so the visual order is: heading → button → form/thread.
+  function appendToTarget(target, child) {
+    if (isHeading(target)) {
+      var btn = target.nextElementSibling;
+      if (btn && btn.classList.contains('add-comment-btn')) {
+        btn.insertAdjacentElement('afterend', child);
+      } else {
+        target.insertAdjacentElement('afterend', child);
+      }
+    } else {
+      target.appendChild(child);
+    }
+  }
+
+  // Locate an existing .comment-thread associated with target.
+  // For headings the thread is a sibling; for divs it's a child.
+  function findExistingThread(target) {
+    if (isHeading(target)) {
+      var sib = target.nextElementSibling;
+      while (sib) {
+        if (sib.classList.contains('comment-thread')) return sib;
+        if (!sib.classList.contains('add-comment-btn') &&
+            sib.id !== 'comment-form-active') break;
+        sib = sib.nextElementSibling;
+      }
+      return null;
+    }
+    return target.querySelector('.comment-thread');
+  }
+
   function attachCommentButtons() {
+    // Track which heading elements already have a button so the h3/h4 pass
+    // below doesn't add duplicates for headings already used as section titles.
+    var taggedHeadings = new Set ? new Set() : { _s: [], has: function(x) { return this._s.indexOf(x) >= 0; }, add: function(x) { this._s.push(x); } };
+
     // Cover page (idmXML title section) — not a div.page.* so normalization
     // never assigns it a class; handle it explicitly here.
     var coverDiv = document.querySelector('div.cover, .cover');
@@ -230,6 +273,7 @@ export const getReviewUIScript = () => `
       var coverHeading = findPrimaryHeading(coverDiv);
       addCommentButton(coverDiv, coverDiv.id, 'section',
         coverHeading ? coverHeading.textContent.trim() : 'Cover');
+      if (coverHeading) taggedHeadings.add(coverHeading);
     }
 
     // ER sections (normalized from div.page.er / div.page.suber)
@@ -237,8 +281,10 @@ export const getReviewUIScript = () => `
     for (var i = 0; i < erSections.length; i++) {
       var section = erSections[i];
       var title = section.querySelector('.er-title');
+      var ph = findPrimaryHeading(section);
       addCommentButton(section, section.id, 'er',
         title ? title.textContent.trim() : 'ER');
+      if (ph) taggedHeadings.add(ph);
     }
 
     // Regular sections (normalized from div.page that are not ER/sub-ER).
@@ -251,7 +297,9 @@ export const getReviewUIScript = () => `
         var sectionTitle = heading.textContent.trim();
         var sectionId = sec.id || ('section-' + sectionTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
         sec.id = sectionId;
+        var secPh = findPrimaryHeading(sec);
         addCommentButton(sec, sectionId, 'section', sectionTitle);
+        if (secPh) taggedHeadings.add(secPh);
       }
     }
 
@@ -259,7 +307,24 @@ export const getReviewUIScript = () => `
     var bpmnSection = document.querySelector('.bpmn-section');
     if (bpmnSection) {
       bpmnSection.id = bpmnSection.id || 'bpmn-process-map';
+      var bpmnPh = findPrimaryHeading(bpmnSection);
       addCommentButton(bpmnSection, bpmnSection.id, 'section', 'Process Map (BPMN)');
+      if (bpmnPh) taggedHeadings.add(bpmnPh);
+    }
+
+    // h3 and h4 sub-headings — add individual comment buttons for sub-topics.
+    // Skip any heading that already received a button as a section's primary heading.
+    var subHeadings = document.querySelectorAll('h3, h4');
+    for (var s = 0; s < subHeadings.length; s++) {
+      var h = subHeadings[s];
+      if (taggedHeadings.has(h)) continue;
+      var hText = h.textContent.trim();
+      if (!hText) continue;
+      if (!h.id) {
+        h.id = 'sub-' + h.tagName.toLowerCase() + '-' + s + '-' +
+               hText.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 30);
+      }
+      addCommentButton(h, h.id, 'section', hText);
     }
   }
 
@@ -272,13 +337,17 @@ export const getReviewUIScript = () => `
       e.stopPropagation();
       showCommentForm(targetId, targetType, targetName);
     };
-    // Use findPrimaryHeading so the button lands after the section's OWN heading
-    // rather than after the first heading found anywhere in its subtree.
-    var heading = findPrimaryHeading(element);
-    if (heading) {
-      heading.insertAdjacentElement('afterend', btn);
+    if (isHeading(element)) {
+      // Element is itself a heading — button goes directly after it.
+      element.insertAdjacentElement('afterend', btn);
     } else {
-      element.insertBefore(btn, element.firstChild);
+      // Section div — place button after the section's primary heading.
+      var heading = findPrimaryHeading(element);
+      if (heading) {
+        heading.insertAdjacentElement('afterend', btn);
+      } else {
+        element.insertBefore(btn, element.firstChild);
+      }
     }
   }
 
@@ -299,7 +368,7 @@ export const getReviewUIScript = () => `
         '<button class="comment-submit-btn" id="comment-submit">Submit</button>' +
         '<button class="comment-cancel-btn" id="comment-cancel">Cancel</button>' +
       '</div>';
-    target.appendChild(form);
+    appendToTarget(target, form);
 
     document.getElementById('comment-submit').onclick = function() {
       var text = document.getElementById('comment-text-input').value.trim();
@@ -354,7 +423,7 @@ export const getReviewUIScript = () => `
     var target = document.getElementById(targetId);
     if (!target) return;
 
-    var existing = target.querySelector('.comment-thread');
+    var existing = findExistingThread(target);
     if (existing) existing.remove();
 
     if (!targetComments) {
@@ -388,7 +457,7 @@ export const getReviewUIScript = () => `
       thread.appendChild(div);
     }
 
-    target.appendChild(thread);
+    appendToTarget(target, thread);
 
     var resolveBtns = thread.querySelectorAll('.resolve-btn');
     for (var r = 0; r < resolveBtns.length; r++) {
