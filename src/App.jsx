@@ -3752,8 +3752,12 @@ const App = () => {
     });
     setValidationResults(results);
 
-    // Set default filename from shortTitle, fallback to title, then default
-    const defaultName = (headerData.shortTitle || headerData.title || 'idm-specification')
+    // Set default filename from project title.
+    // v1.0 XML uses shortTitle as a machine code (e.g. "idm_Hochrechnung02") and
+    // fullTitle (stored as headerData.title) as the human-readable name. Prefer
+    // the human-readable title; fall back to shortTitle only when title is absent.
+    const shortTitleIsCode = /^(?:er|uc|idm|pm|bcm|req|usecase)_/i.test(headerData.shortTitle);
+    const defaultName = ((shortTitleIsCode ? null : headerData.shortTitle) || headerData.title || 'idm-specification')
       .replace(/[^a-zA-Z0-9가-힣\s.-]/g, '') // Allow Korean characters, spaces, dots, hyphens
       .trim();
     setExportFilename(defaultName);
@@ -4232,7 +4236,12 @@ const App = () => {
               Object.entries(erDataMap).forEach(([doId, er]) => {
                 if (!exportErDataMapForXslt[doId]) exportErDataMapForXslt[doId] = er;
               });
-              const xmlResult = generateIdmXml({
+              // Use v1.0 generator: no XML namespace on <idm>, specId attributes,
+              // er/subEr/er hierarchy — the structure custom XSLT stylesheets (written
+              // for idmXSD 0.2 / v1.0 source documents) expect. The v2.0 generator
+              // wraps everything in xmlns="idmXML/2.0", which breaks XPath matching
+              // in stylesheets that have no corresponding namespace declaration.
+              const xmlResult = generateIdmXmlV1({
                 headerData,
                 bpmnXml: currentBpmnXml,
                 erDataMap: exportErDataMapForXslt,
