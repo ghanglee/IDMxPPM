@@ -31,6 +31,7 @@ export const importIdmBundle = async (zipData) => {
       dataObjectErMap: {},
       erDataMap: {},
       erLibrary: [],
+      subIdms: [],
       images: {}
     };
 
@@ -139,6 +140,9 @@ export const importIdmBundle = async (zipData) => {
         }
         if (!result.erDataMap || Object.keys(result.erDataMap).length === 0) {
           result.erDataMap = idmData.erDataMap;
+        }
+        if (idmData.subIdms && idmData.subIdms.length > 0) {
+          result.subIdms = idmData.subIdms;
         }
 
         // Capture explicit data-object → ER links from <dataObjectAndEr> elements

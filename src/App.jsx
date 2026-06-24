@@ -116,6 +116,7 @@ const App = () => {
   // ER-first architecture state (new)
   const [erHierarchy, setErHierarchy] = useState([]);  // Ordered hierarchical array of ERs (source of truth)
   const [dataObjectErMap, setDataObjectErMap] = useState({});  // Maps data object IDs to ER IDs
+  const [subIdms, setSubIdms] = useState([]);  // Sub-IDM tree (each is a full IDM node)
   const [selectedErId, setSelectedErId] = useState(null);  // Currently selected ER in hierarchy
   const [newlyAddedErId, setNewlyAddedErId] = useState(null);  // Track newly added ER for scrolling
   const [showDataObjectERModal, setShowDataObjectERModal] = useState(false);  // Modal for new data object ER selection
@@ -872,6 +873,7 @@ const App = () => {
       erDataMap: importErDataMap,
       erLibrary: importErLibrary,
       passthroughFiles: importPassthroughFiles,
+      subIdms: importSubIdms,
       filePath,
       isDirtyAfterImport,
       source // 'project', 'idmXml', 'xppm', etc.
@@ -886,6 +888,7 @@ const App = () => {
     if (importDataObjectErMap) setDataObjectErMap(importDataObjectErMap);
     if (importErDataMap) setErDataMap(importErDataMap);
     if (importErLibrary) setErLibrary(importErLibrary);
+    setSubIdms(importSubIdms || []);
     setPassthroughFiles(importPassthroughFiles || {});
     if (filePath) setCurrentFilePath(filePath);
     setIsDirty(isDirtyAfterImport ?? false);
@@ -2806,6 +2809,7 @@ const App = () => {
             dataObjectErMap: dataObjectErMapToImport,
             erDataMap: erDataMapToImport,
             erLibrary: bundleData.erLibrary,
+            subIdms: bundleData.subIdms || [],
             passthroughFiles: bundleData.passthroughFiles || {},
             filePath: file.name,
             isDirtyAfterImport,
@@ -2830,6 +2834,7 @@ const App = () => {
           if (bundleData.erLibrary) {
             setErLibrary(bundleData.erLibrary);
           }
+          setSubIdms(bundleData.subIdms || []);
           setPassthroughFiles(bundleData.passthroughFiles || {});
           setBpmnXml(bpmnToImport);
           setIsDirty(isDirtyAfterImport);
@@ -3155,6 +3160,7 @@ const App = () => {
               dataObjectErMap: newDataObjectErMap,
               erDataMap: idmData.erDataMap,
               erLibrary: null,
+              subIdms: idmData.subIdms || [],
               filePath: file.name,
               isDirtyAfterImport,
               source: 'idmXml'
@@ -3687,6 +3693,8 @@ const App = () => {
     setValidationResults(null);
     setErLibrary([]);
     setReviewComments([]);
+    setSubIdms([]);
+    setPassthroughFiles({});
     setHasActiveProject(false); // Mark project as closed
     warnedErIdsRef.current.clear(); // Reset validation warnings for next project
   }, []);
@@ -4016,6 +4024,7 @@ const App = () => {
             dataObjectErMap,      // ER-first: maps data object IDs to ER IDs
             erDataMap,            // Legacy: kept for backward compatibility
             erLibrary,
+            subIdms: subIdms.length > 0 ? subIdms : undefined,
             reviewComments: reviewComments.length > 0 ? reviewComments : undefined,
             exportedAt: new Date().toISOString()
           };
@@ -4065,6 +4074,7 @@ const App = () => {
             erDataMap: bundleErDataMap,
             erHierarchy,
             dataObjects: zipDataObjects,
+            subIdms,
             bpmnFilePath: zipBpmnPath  // relative path stored in <diagram filePath="...">
           });
 

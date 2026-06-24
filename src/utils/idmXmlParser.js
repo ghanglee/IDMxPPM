@@ -219,44 +219,30 @@ const parseChangeLogs = (authoringEl) => {
 };
 
 /**
- * Parse an idmXML document into application state
- * @param {string} xmlContent - The idmXML content as string
- * @returns {Object} Parsed project data with headerData, bpmnXml, erDataMap
+ * Parse an <idm> DOM element into application state.
+ * Called recursively for <subIdm> children.
+ * @param {Element} idmRoot - The <idm> element
+ * @param {Document} [xmlDoc] - The owning XML document (needed for PI scanning at top level)
+ * @returns {Object} Parsed project data with headerData, bpmnXml, erDataMap, subIdms
  */
-export const parseIdmXml = (xmlContent) => {
-  try {
-    // Strip UTF-8 BOM (EF BB BF) if present — Windows tools often prepend it
-    // before <?xml...?>, which causes strict XML parsers to throw a parseerror.
-    const cleanXml = xmlContent.replace(/^﻿/, '');
-    const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(cleanXml, 'text/xml');
-
-    // Check for parsing errors
-    const parseError = xmlDoc.querySelector('parsererror');
-    if (parseError) {
-      throw new Error('Invalid XML: ' + parseError.textContent);
-    }
-
+const parseIdmElement = (idmRoot, xmlDoc) => {
     const result = {
       headerData: {},
       bpmnXml: null,
       erDataMap: {},
-      erLibrary: []
+      erLibrary: [],
+      subIdms: []
     };
 
-    // Get root element (should be <idm>) - use documentElement for namespace safety
-    const idmRoot = xmlDoc.documentElement;
-    if (!idmRoot || (idmRoot.localName !== 'idm' && idmRoot.tagName !== 'idm')) {
-      throw new Error('Not a valid idmXML file: missing <idm> root element');
-    }
-
-    // Scan for <?xml-stylesheet ?> processing instruction before <idm> element
-    for (let i = 0; i < xmlDoc.childNodes.length; i++) {
-      const node = xmlDoc.childNodes[i];
-      if (node.nodeType === 7 && node.nodeName === 'xml-stylesheet') {
-        const hrefMatch = node.data && node.data.match(/href="([^"]+)"/);
-        if (hrefMatch) result.headerData.stylesheetHref = hrefMatch[1];
-        break;
+    // Scan for <?xml-stylesheet ?> PI — only present at document level, not inside <subIdm>
+    if (xmlDoc) {
+      for (let i = 0; i < xmlDoc.childNodes.length; i++) {
+        const node = xmlDoc.childNodes[i];
+        if (node.nodeType === 7 && node.nodeName === 'xml-stylesheet') {
+          const hrefMatch = node.data && node.data.match(/href="([^"]+)"/);
+          if (hrefMatch) result.headerData.stylesheetHref = hrefMatch[1];
+          break;
+        }
       }
     }
 
@@ -1079,7 +1065,40 @@ export const parseIdmXml = (xmlContent) => {
       ...result.headerData // Override with parsed values
     };
 
+    // Parse sub-IDMs recursively — <subIdm><idm>...</idm></subIdm>
+    const subIdmContainers = getDirectChildren(idmRoot, 'subIdm');
+    subIdmContainers.forEach(subIdmContainer => {
+      const subIdmEl = getFirstChild(subIdmContainer, 'idm');
+      if (subIdmEl) {
+        result.subIdms.push(parseIdmElement(subIdmEl, null)); // null: no doc-level PI in sub-IDMs
+      }
+    });
+
     return result;
+};
+
+/**
+ * Parse an idmXML document into application state
+ * @param {string} xmlContent - The idmXML content as string
+ * @returns {Object} Parsed project data with headerData, bpmnXml, erDataMap, subIdms
+ */
+export const parseIdmXml = (xmlContent) => {
+  try {
+    const cleanXml = xmlContent.replace(/^﻿/, '');
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(cleanXml, 'text/xml');
+
+    const parseError = xmlDoc.querySelector('parsererror');
+    if (parseError) {
+      throw new Error('Invalid XML: ' + parseError.textContent);
+    }
+
+    const idmRoot = xmlDoc.documentElement;
+    if (!idmRoot || (idmRoot.localName !== 'idm' && idmRoot.tagName !== 'idm')) {
+      throw new Error('Not a valid idmXML file: missing <idm> root element');
+    }
+
+    return parseIdmElement(idmRoot, xmlDoc);
   } catch (error) {
     console.error('Error parsing idmXML:', error);
     throw error;

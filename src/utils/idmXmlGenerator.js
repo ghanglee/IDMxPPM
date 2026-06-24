@@ -1174,12 +1174,13 @@ const v1ErXml = (er, authorsList, creationDate, copyright, indent, isRoot = true
  * Key differences from v2.0:
  *   - No XML namespace on <idm>
  *   - Flat <author> attributes (id, firstName, middleName, lastName, etc.)
- *   - <committee> and <publisher> inside <authoring>
+ *   - No <committee> inside <authoring>
  *   - <standardProjectPhase> instead of <standardProjectStage>
  *   - <localProjectPhase> instead of <localProjectStage>
  *   - Descriptions use <description><content>text</content></description>
+ *   - Sub-IDMs via <subIdm><idm>...</idm></subIdm> (mirrors <subEr> pattern)
  */
-export const generateIdmXmlV1 = ({ headerData, bpmnXml, bpmnSvg, erDataMap, erHierarchy, dataObjects = [], bpmnFilePath = 'Diagram/Diagram(1).bpmn' }) => {
+export const generateIdmXmlV1 = ({ headerData, bpmnXml, bpmnSvg, erDataMap, erHierarchy, dataObjects = [], bpmnFilePath = 'Diagram/Diagram(1).bpmn', subIdms = [] }) => {
   const idmGuid = ensureUUID(headerData?.idmGuid);
   const ucGuid = ensureUUID(headerData?.ucGuid);
   const bcmGuid = ensureUUID(headerData?.bcmGuid);
@@ -1410,6 +1411,29 @@ export const generateIdmXmlV1 = ({ headerData, bpmnXml, bpmnSvg, erDataMap, erHi
       });
       lines.push('  </er>');
     }
+  }
+
+  // Sub-IDMs: recursively generate and embed with <subIdm><idm>...</idm></subIdm>
+  if (subIdms && subIdms.length > 0) {
+    subIdms.forEach(sub => {
+      const subResult = generateIdmXmlV1({
+        headerData: sub.headerData,
+        bpmnXml: null,
+        erDataMap: sub.erDataMap || {},
+        erHierarchy: sub.erHierarchy || [],
+        dataObjects: sub.dataObjects || [],
+        bpmnFilePath: sub.bpmnFilePath || bpmnFilePath,
+        subIdms: sub.subIdms || []
+      });
+      // Strip the XML declaration + PI + root <idm> tag from the sub-output,
+      // then indent every line and wrap in <subIdm>
+      const subLines = subResult.xml.split('\n');
+      const firstIdmLine = subLines.findIndex(l => /^<idm[\s>]/.test(l.trim()));
+      const innerLines = firstIdmLine >= 0 ? subLines.slice(firstIdmLine) : subLines;
+      lines.push('  <subIdm>');
+      innerLines.forEach(l => lines.push('  ' + l));
+      lines.push('  </subIdm>');
+    });
   }
 
   lines.push('</idm>');
