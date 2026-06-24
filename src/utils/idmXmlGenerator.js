@@ -897,7 +897,7 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, da
       if (er) {
         lines.push(`      <dataObjectAndEr id="DOER-${index + 1}">`);
         lines.push(`        <associatedDataObject ref="${escapeXml(dataObj.id)}"/>`);
-        lines.push(`        <associatedEr ref="${escapeXml(er.id)}"/>`);
+        lines.push(`        <associatedEr ref="${escapeXml(er.guid || er.id)}"/>`);
         lines.push('      </dataObjectAndEr>');
       }
     });
@@ -938,9 +938,13 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, da
 
   // Exchange Requirements - per idmXSD V2, only 0..1 er at root level
   // Use erHierarchy directly when available (preserves root ER's own IUs)
-  if (erHierarchy && erHierarchy.length > 0) {
-    // Generate from the ER-first hierarchy (root ER with its IUs and subERs)
+  if (erHierarchy && erHierarchy.length === 1) {
     lines.push(generateErXml(erHierarchy[0], author, '  ', true));
+  } else if (erHierarchy && erHierarchy.length > 1) {
+    // Multiple top-level ERs: promote first ER as root, rest become its subERs
+    const [syntheticRoot, ...rest] = erHierarchy;
+    const mergedRoot = { ...syntheticRoot, subERs: [...(syntheticRoot.subERs || []), ...rest] };
+    lines.push(generateErXml(mergedRoot, author, '  ', true));
   } else if (erDataMap && Object.keys(erDataMap).length > 0) {
     // Fallback: generate synthetic root ER from legacy erDataMap
     lines.push(generateRootErXml(erDataMap, headerData, author));
@@ -1309,7 +1313,7 @@ export const generateIdmXmlV1 = ({ headerData, bpmnXml, bpmnSvg, erDataMap, erHi
       if (er) {
         lines.push(`      <dataObjectAndEr id="DOER-${i + 1}">`);
         lines.push(`        <associatedDataObject ref="${escapeXmlV1(dataObj.id)}"/>`);
-        lines.push(`        <associatedEr ref="${escapeXmlV1(er.id)}"/>`);
+        lines.push(`        <associatedEr ref="${escapeXmlV1(er.guid || er.id)}"/>`);
         lines.push('      </dataObjectAndEr>');
       }
     });
@@ -1318,10 +1322,20 @@ export const generateIdmXmlV1 = ({ headerData, bpmnXml, bpmnSvg, erDataMap, erHi
   lines.push('  </businessContextMap>');
 
   // Exchange Requirements
-  if (erHierarchy && erHierarchy.length > 0) {
+  if (erHierarchy && erHierarchy.length === 1) {
+    // Single root ER — emit directly (preserves its own IUs and nested subERs)
     lines.push(v1ErXml(erHierarchy[0], authorsArray, creationDate, copyright, '  ', true));
+  } else if (erHierarchy && erHierarchy.length > 1) {
+    // Multiple top-level ERs — wrap in a synthetic root so none are silently dropped.
+    // The first ER in the array is used as the root (its existing subERs are preserved).
+    const [syntheticRoot, ...rest] = erHierarchy;
+    const mergedRoot = {
+      ...syntheticRoot,
+      subERs: [...(syntheticRoot.subERs || []), ...rest]
+    };
+    lines.push(v1ErXml(mergedRoot, authorsArray, creationDate, copyright, '  ', true));
   } else if (erDataMap && Object.keys(erDataMap).length > 0) {
-    // Fallback: wrap all ERs under a synthetic root
+    // Fallback: wrap all ERs from legacy erDataMap under a synthetic root
     const allERs = Object.values(erDataMap).filter(Boolean);
     if (allERs.length > 0) {
       const rootGuid = ensureUUID(headerData?.rootErGuid);

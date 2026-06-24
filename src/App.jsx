@@ -4043,12 +4043,16 @@ const App = () => {
             if (!bundleErDataMap[dataObjectId]) bundleErDataMap[dataObjectId] = er;
           });
 
+          // Build the dataObjects list from bundleErDataMap (ER-first),
+          // not from erDataMap (legacy) which is empty in ER-first mode.
+          const zipDataObjects = Object.keys(bundleErDataMap).map(id => ({ id, name: id }));
+
           const v1Result = generateIdmXmlV1({
             headerData,
             bpmnXml: currentBpmnXml,
             erDataMap: bundleErDataMap,
             erHierarchy,
-            dataObjects
+            dataObjects: zipDataObjects
           });
 
           const zipV1 = new JSZip();
