@@ -158,20 +158,14 @@ function createWindow() {
                 detail: result.error
               });
             } else if (result.hasUpdate) {
-              const isSameVersion = result.latestVersion === result.currentVersion;
               const publishedStr = result.publishedAt
                 ? `\nReleased: ${new Date(result.publishedAt).toLocaleString()}`
                 : '';
-              const detail = isSameVersion
-                ? `Version ${result.currentVersion} has been updated since your build.${publishedStr}\nWould you like to download the latest release?`
-                : `You are running version ${result.currentVersion}.${publishedStr}\nWould you like to download the latest release?`;
               const { response } = await dialog.showMessageBox({
                 type: 'info',
                 title: 'Update Available',
-                message: isSameVersion
-                  ? `A newer build of v${result.latestVersion} is available`
-                  : `Version ${result.latestVersion} is available`,
-                detail,
+                message: `Version ${result.latestVersion} is available`,
+                detail: `You are running version ${result.currentVersion}.${publishedStr}\nWould you like to download the latest release?`,
                 buttons: ['Download', 'Later'],
                 defaultId: 0,
                 cancelId: 1
@@ -588,8 +582,7 @@ function fetchLatestRelease() {
           }
           const downloadUrl = installerUrl || release.html_url || 'https://github.com/ghanglee/IDMxPPM/releases';
           const versionChanged = !!(latestVersion && latestVersion !== currentVersion);
-          const newerBuild = !!(publishedAt && buildDate && new Date(publishedAt) > new Date(buildDate));
-          const hasUpdate = versionChanged || newerBuild;
+          const hasUpdate = versionChanged;
           resolve({ currentVersion, latestVersion, publishedAt, buildDate, downloadUrl, hasUpdate, error: null });
         } catch {
           resolve({ currentVersion, latestVersion: null, publishedAt: null, buildDate, downloadUrl: null, hasUpdate: false, error: 'Failed to parse release info' });
