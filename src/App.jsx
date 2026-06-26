@@ -1618,6 +1618,62 @@ const App = () => {
     }
   }, [erHierarchy, headerData, findErById]);
 
+  // Add a file as a sub-IDM (.idm/.json, .zip, or .xml)
+  const handleAddSubIdm = useCallback(async (file) => {
+    if (!file) return;
+    try {
+      const name = file.name.toLowerCase();
+      let subIdmData = null;
+
+      if (name.endsWith('.zip')) {
+        const bytes = await file.arrayBuffer();
+        const bundleData = await importIdmBundle(bytes);
+        subIdmData = {
+          headerData: bundleData.headerData || {},
+          erDataMap: bundleData.erDataMap || {},
+          erHierarchy: bundleData.erHierarchy || [],
+          subIdms: bundleData.subIdms || []
+        };
+      } else if (name.endsWith('.idm') || name.endsWith('.json')) {
+        const text = await readFileAsText(file);
+        const project = JSON.parse(text);
+        subIdmData = {
+          headerData: project.headerData || {},
+          erDataMap: project.erDataMap || {},
+          erHierarchy: project.erHierarchy || [],
+          subIdms: project.subIdms || []
+        };
+      } else if (name.endsWith('.xml')) {
+        const text = await readFileAsText(file);
+        if (isIdmXml(text)) {
+          const idmData = parseIdmXml(text);
+          subIdmData = {
+            headerData: idmData.headerData || {},
+            erDataMap: idmData.erDataMap || {},
+            erHierarchy: idmData.erHierarchy || [],
+            subIdms: idmData.subIdms || []
+          };
+        }
+      }
+
+      if (subIdmData) {
+        setSubIdms(prev => [...prev, subIdmData]);
+        setIsDirty(true);
+        showToast(`Sub-IDM "${subIdmData.headerData?.shortTitle || subIdmData.headerData?.title || file.name}" added.`);
+      } else {
+        showToast('Could not parse file as an IDM project.');
+      }
+    } catch (err) {
+      console.error('Sub-IDM import error:', err);
+      showToast(`Failed to import sub-IDM: ${err.message}`);
+    }
+  }, [showToast]);
+
+  const handleRemoveSubIdm = useCallback((index) => {
+    setSubIdms(prev => prev.filter((_, i) => i !== index));
+    setIsDirty(true);
+  }, []);
+
   // Import ER from erXML file — adds as sub-ER of selected ER, or as root if none exists
   const handleImportErXml = useCallback((file) => {
     if (!file) return;
@@ -5247,6 +5303,9 @@ const App = () => {
                     onOutdent={handleOutdentEr}
                     onImportER={handleImportErXml}
                     onExportER={handleExportErXml}
+                    subIdms={subIdms}
+                    onAddSubIdm={handleAddSubIdm}
+                    onRemoveSubIdm={handleRemoveSubIdm}
                     bpmnActorsList={bpmnActorsList}
                     reviewComments={reviewComments}
                     onMarkCommentAddressed={(commentId) => {

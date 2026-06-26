@@ -1641,6 +1641,9 @@ const ContentPane = ({
   onImportER,
   onExportER,
   selectedErId = null,           // Currently selected ER for operations
+  subIdms = [],
+  onAddSubIdm,
+  onRemoveSubIdm,
   bpmnActorsList = [],           // BPMN Pools/Lanes for actor linking
   reviewComments = [],           // Review comments from imported HTML
   onMarkCommentAddressed,        // Callback to mark a comment as addressed
@@ -1657,6 +1660,8 @@ const ContentPane = ({
   const erItemRefs = useRef({});
   // Ref for hidden file input (ER import)
   const erImportFileRef = useRef(null);
+  // Ref for hidden file input (Sub-IDM import)
+  const subIdmFileRef = useRef(null);
   // Ref to track newly added actor for auto-focus
   const newActorIdRef = useRef(null);
   // State for actor-to-BPMN link modal
@@ -2728,6 +2733,54 @@ const ContentPane = ({
             ))}
           </div>
         )}
+      </Section>
+
+      {/* SUB-IDMs Section */}
+      <Section title={`Sub-IDMs${subIdms.length > 0 ? ` (${subIdms.length})` : ''}`} defaultExpanded={subIdms.length > 0}>
+        {subIdms.length > 0 && (
+          <div className="sub-idm-list">
+            {subIdms.map((sub, index) => (
+              <div key={index} className="sub-idm-entry">
+                <div className="sub-idm-info">
+                  <span className="sub-idm-title">
+                    {sub.headerData?.shortTitle || sub.headerData?.title || `Sub-IDM ${index + 1}`}
+                  </span>
+                  {sub.headerData?.version != null && sub.headerData.version !== '' && (
+                    <span className="sub-idm-version">v{sub.headerData.version}</span>
+                  )}
+                  {sub.erHierarchy?.length > 0 && (
+                    <span className="sub-idm-meta">{sub.erHierarchy.length} ER{sub.erHierarchy.length !== 1 ? 's' : ''}</span>
+                  )}
+                </div>
+                <button
+                  className="actor-remove-btn"
+                  onClick={() => onRemoveSubIdm?.(index)}
+                  title="Remove sub-IDM"
+                >×</button>
+              </div>
+            ))}
+          </div>
+        )}
+        <button
+          className="pane-add-btn"
+          style={{ marginTop: subIdms.length > 0 ? '8px' : '0' }}
+          onClick={() => subIdmFileRef.current?.click()}
+        >+ Add Sub-IDM</button>
+        <input
+          ref={subIdmFileRef}
+          type="file"
+          accept=".idm,.zip,.xml,.json"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file && onAddSubIdm) onAddSubIdm(file);
+            e.target.value = '';
+          }}
+        />
+        <span className="pane-hint" style={{ marginTop: '4px' }}>
+          Import an IDM project (.idm, .zip) or idmXML (.xml) to attach it as a sub-IDM.
+          Sub-IDMs are included when exporting to idmXML 1.0 ZIP.
+        </span>
       </Section>
     </div>
   );

@@ -2087,6 +2087,56 @@
 }
 
 /* ============================================================================
+   Sub-IDMs
+   ============================================================================ */
+
+.sub-idm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sub-idm-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  gap: 8px;
+}
+
+.sub-idm-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.sub-idm-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sub-idm-version,
+.sub-idm-meta {
+  font-size: 10px;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ============================================================================
    Responsive
    ============================================================================ */
 
