@@ -1041,19 +1041,28 @@ export const generateErXmlStandalone = (er, authorName = 'IDMxPPM User') => {
 const escapeXmlV1 = escapeXml; // same escaping rules
 
 /** v1.0 description element: <description><content>text</content></description> */
-const v1Description = (text, indent) =>
-  text
-    ? [`${indent}<description>`, `${indent}  <content>${escapeXmlV1(text)}</content>`, `${indent}</description>`]
-    : [];
+const v1Description = (text, images, indent) => {
+  if (!text && (!images || images.length === 0)) return [];
+  const lines = [];
+  lines.push(`${indent}<description>`);
+  if (text) lines.push(`${indent}  <content>${escapeXmlV1(text)}</content>`);
+  if (images && images.length > 0) {
+    images.forEach(img => {
+      if (!img.filePath) return; // skip inline base64 — should have been extracted before calling
+      const caption = img.caption || img.name || '';
+      lines.push(`${indent}  <image caption="${escapeXmlV1(caption)}" filePath="${escapeXmlV1(img.filePath)}"/>`);
+    });
+  }
+  lines.push(`${indent}</description>`);
+  return lines;
+};
 
-/** v1.0 examples element */
-const v1Examples = (text, indent) => {
-  if (!text) return [];
+/** v1.0 examples element (text + optional images) */
+const v1Examples = (text, images, indent) => {
+  if (!text && (!images || images.length === 0)) return [];
   return [
     `${indent}<examples>`,
-    `${indent}  <description>`,
-    `${indent}    <content>${escapeXmlV1(text)}</content>`,
-    `${indent}  </description>`,
+    ...v1Description(text, images, indent + '  '),
     `${indent}</examples>`
   ];
 };
@@ -1106,14 +1115,19 @@ const v1Authoring = (headerData, authorsList, copyright, creationDate, indent, s
 /** v1.0 informationUnit (recursive) */
 const v1InformationUnit = (unit, indent) => {
   const lines = [];
+  const hasDefinitionFigures = unit.definitionFigures && unit.definitionFigures.filter(f => f.filePath).length > 0;
   const hasExamples = unit.examples || (unit.exampleImages && unit.exampleImages.length > 0);
   const hasExternal = unit.correspondingExternalElements && unit.correspondingExternalElements.length > 0;
   const hasSubUnits = unit.subInformationUnits && unit.subInformationUnits.length > 0;
-  const hasChildren = hasExamples || hasExternal || hasSubUnits;
+  const hasChildren = hasDefinitionFigures || hasExamples || hasExternal || hasSubUnits;
 
   if (hasChildren) {
     lines.push(`${indent}<informationUnit id="${escapeXmlV1(unit.id)}" name="${escapeXmlV1(unit.name || '')}" dataType="${escapeXmlV1(unit.dataType || 'String')}" isMandatory="${unit.isMandatory ? 'true' : 'false'}" definition="${escapeXmlV1(unit.definition || '')}">`);
-    if (hasExamples) lines.push(...v1Examples(unit.examples || '', indent + '  '));
+    if (hasDefinitionFigures) {
+      // Definition figures emitted as a <description> child (images only, no duplicate text)
+      lines.push(...v1Description('', unit.definitionFigures, indent + '  '));
+    }
+    if (hasExamples) lines.push(...v1Examples(unit.examples || '', unit.exampleImages || [], indent + '  '));
     if (hasExternal) {
       unit.correspondingExternalElements.forEach(m => {
         const basis = m.basis === 'Other' && m.customBasis ? m.customBasis : m.basis;
@@ -1150,7 +1164,9 @@ const v1ErXml = (er, authorsList, creationDate, copyright, indent, isRoot = true
     lines.push(`${indent}  <correspondingMvd basis="" name="" />`);
   }
 
-  if (er.description) lines.push(...v1Description(er.description, indent + '  '));
+  if (er.description || (er.descriptionFigures && er.descriptionFigures.length > 0)) {
+    lines.push(...v1Description(er.description || '', er.descriptionFigures || [], indent + '  '));
+  }
 
   if (er.informationUnits && er.informationUnits.length > 0) {
     er.informationUnits.forEach(u => lines.push(v1InformationUnit(u, indent + '  ')));
@@ -1237,12 +1253,12 @@ export const generateIdmXmlV1 = ({ headerData, bpmnXml, bpmnSvg, erDataMap, erHi
 
   // Summary
   lines.push('    <summary>');
-  lines.push(...v1Description(headerData?.summary || title, '      '));
+  lines.push(...v1Description(headerData?.summary || title, headerData?.summaryFigures || [], '      '));
   lines.push('    </summary>');
 
   // Aim and Scope
   lines.push('    <aimAndScope>');
-  lines.push(...v1Description(headerData?.aimAndScope || headerData?.objectives || 'Define exchange requirements for BIM processes', '      '));
+  lines.push(...v1Description(headerData?.aimAndScope || headerData?.objectives || 'Define exchange requirements for BIM processes', headerData?.aimAndScopeFigures || [], '      '));
   lines.push('    </aimAndScope>');
 
   lines.push(`    <language>${escapeXmlV1(language)}</language>`);
@@ -1333,12 +1349,12 @@ export const generateIdmXmlV1 = ({ headerData, bpmnXml, bpmnSvg, erDataMap, erHi
   // Benefits / Limitations
   if (headerData?.benefits) {
     lines.push('    <benefits>');
-    lines.push(...v1Description(headerData.benefits, '      '));
+    lines.push(...v1Description(headerData.benefits, headerData.benefitsFigures || [], '      '));
     lines.push('    </benefits>');
   }
   if (headerData?.limitations) {
     lines.push('    <limitations>');
-    lines.push(...v1Description(headerData.limitations, '      '));
+    lines.push(...v1Description(headerData.limitations, headerData.limitationsFigures || [], '      '));
     lines.push('    </limitations>');
   }
 

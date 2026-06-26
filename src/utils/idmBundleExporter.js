@@ -84,7 +84,7 @@ const extractImagesFromEr = (er, images) => {
  * @param {Array} erHierarchy - ER hierarchy (source of truth)
  * @returns {Object} { images, erDataMapWithPaths, headerDataWithPaths, erHierarchyWithPaths }
  */
-const extractImages = (erDataMap, headerData, erHierarchy) => {
+export const extractImages = (erDataMap, headerData, erHierarchy) => {
   const images = [];
 
   // Deep clone to avoid mutating original data
@@ -192,7 +192,7 @@ const sanitizeFilename = (name) => {
 /**
  * Convert base64 data URL to binary array buffer
  */
-const base64ToArrayBuffer = (dataUrl) => {
+export const base64ToArrayBuffer = (dataUrl) => {
   const parsed = parseDataUri(dataUrl);
   const base64 = parsed ? parsed.base64Data : dataUrl.split(',')[1];
   const binaryString = atob(base64);

@@ -273,13 +273,44 @@ async function checkInstallerCleanup() {
   const ext = process.platform === 'win32' ? '.exe' : '.dmg';
   const searchDirs = [app.getPath('downloads'), app.getPath('desktop')];
 
+  // macOS: also try the download folder configured in Safari or Chrome
+  if (process.platform === 'darwin') {
+    try {
+      const { spawnSync } = require('child_process');
+      const r = spawnSync('defaults', ['read', 'com.apple.safari', 'DownloadsPath'], { encoding: 'utf8', timeout: 1000 });
+      if (r.status === 0 && r.stdout) {
+        const safariDir = r.stdout.trim().replace(/^~/, app.getPath('home'));
+        if (safariDir && !searchDirs.includes(safariDir)) searchDirs.push(safariDir);
+      }
+    } catch {}
+    try {
+      const chromePrefsPath = path.join(app.getPath('appData'), 'Google/Chrome/Default/Preferences');
+      const prefs = JSON.parse(fs.readFileSync(chromePrefsPath, 'utf-8'));
+      const chromeDir = prefs?.download?.default_directory;
+      if (chromeDir && !searchDirs.includes(chromeDir)) searchDirs.push(chromeDir);
+    } catch {}
+  }
+
+  // Safety filter: never offer to remove anything in /Applications, the running app,
+  // or any parent directory of the running executable — defence-in-depth on top of the
+  // allowlist guard above.
+  const isSafeToOffer = (p) => {
+    const resolved = path.resolve(p);
+    if (process.platform === 'darwin') {
+      if (resolved.startsWith('/Applications' + path.sep)) return false;
+    }
+    if (resolved === exePath) return false;
+    if (exePath.startsWith(resolved + path.sep)) return false;
+    return true;
+  };
+
   const installerFiles = searchDirs.flatMap(dir => {
     try {
       return fs.readdirSync(dir)
         .filter(f => f.endsWith(ext) && namePattern.test(f))
         .map(f => path.join(dir, f));
     } catch { return []; }
-  }).filter(p => !keepList.includes(p));
+  }).filter(p => !keepList.includes(p) && isSafeToOffer(p));
 
   if (installerFiles.length === 0) return;
 
@@ -289,7 +320,7 @@ async function checkInstallerCleanup() {
       type: 'question',
       title: 'Remove Installer?',
       message: `Move "${path.basename(installerPath)}" to Trash?`,
-      detail: 'This installer file was used to install xPPM neo-Seoul and is no longer needed. You can safely remove it.',
+      detail: `Location: ${installerPath}\n\nThis is the installer file used to set up xPPM neo-Seoul. It is no longer needed and can be safely removed.\n\nNote: This does NOT remove the installed app — only the installer file.`,
       buttons: ['Move to Trash', 'Keep'],
       defaultId: 0,
       cancelId: 1

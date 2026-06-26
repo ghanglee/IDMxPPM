@@ -18,7 +18,7 @@ import { useServerConnection } from './hooks/useServerConnection';
 import { api } from './utils/apiClient';
 import { generateIdmXml, generateIdmXmlV1, generateErXmlStandalone } from './utils/idmXmlGenerator';
 import JSZip from 'jszip';
-import { downloadIdmBundle, exportIdmBundle } from './utils/idmBundleExporter';
+import { downloadIdmBundle, exportIdmBundle, extractImages, base64ToArrayBuffer } from './utils/idmBundleExporter';
 import { importIdmBundle, isZipBundle, autoMapDataObjectsToERs } from './utils/idmBundleImporter';
 import { validateProject, getValidationStatusLabel } from './utils/validation';
 import { parseIdmXml, isIdmXml, detectIdmXmlVersion, getFirstChild, getDirectChildren, parseErElement } from './utils/idmXmlParser';
@@ -4068,11 +4068,15 @@ const App = () => {
           const zipBpmnPath  = 'Diagram/Diagram(1).bpmn';
           const bpmnZipEntry = `${zipFolderName}/${zipBpmnPath}`;  // e.g. "idm_Hochrechnung02/Diagram/Diagram(1).bpmn"
 
+          // Extract images (base64 → file paths) before generating XML
+          const { images: v1Images, erHierarchyWithPaths: v1ErHierarchyWithPaths, headerDataWithPaths: v1HeaderDataWithPaths } =
+            extractImages(bundleErDataMap, headerData, erHierarchy);
+
           const v1Result = generateIdmXmlV1({
-            headerData,
+            headerData: v1HeaderDataWithPaths,
             bpmnXml: null,        // BPMN goes in separate file — NOT embedded in XML
             erDataMap: bundleErDataMap,
-            erHierarchy,
+            erHierarchy: v1ErHierarchyWithPaths,
             dataObjects: zipDataObjects,
             subIdms,
             bpmnFilePath: zipBpmnPath  // relative path stored in <diagram filePath="...">
@@ -4084,6 +4088,16 @@ const App = () => {
           if (currentBpmnXml) {
             zipV1Folder.file(zipBpmnPath, currentBpmnXml);
           }
+
+          // Add extracted images to ZIP
+          v1Images.forEach(img => {
+            try {
+              const bytes = base64ToArrayBuffer(img.data);
+              zipV1Folder.file(img.fileName, bytes);
+            } catch (imgErr) {
+              console.warn(`Failed to add image ${img.fileName}:`, imgErr);
+            }
+          });
 
           // Include passthrough files (XSLT, PDF, etc.) from the original import
           const pf = passthroughFiles || {};
