@@ -238,10 +238,14 @@ const App = () => {
   const [updateStatus, setUpdateStatus] = useState('idle'); // 'idle' | 'checking' | 'up-to-date' | 'available' | 'error'
   const [updateInfo, setUpdateInfo] = useState(null);
 
-  // Auto-check for updates on startup (after 5s to let the app settle)
+  // Auto-check for updates on startup and whenever the window regains focus
   useEffect(() => {
     if (!window.electronAPI?.checkForUpdates) return;
-    const timer = setTimeout(async () => {
+    let lastChecked = 0;
+    const runCheck = async () => {
+      const now = Date.now();
+      if (now - lastChecked < 60 * 60 * 1000) return; // at most once per hour
+      lastChecked = now;
       const result = await window.electronAPI.checkForUpdates();
       if (!result || result.error) return;
       setUpdateInfo(result);
@@ -249,8 +253,13 @@ const App = () => {
         setUpdateStatus('available');
         showToast(`Version ${result.latestVersion} is available — open Help > Check for Updates… to download.`, 12000);
       }
-    }, 1000);
-    return () => clearTimeout(timer);
+    };
+    const timer = setTimeout(runCheck, 1000);
+    window.addEventListener('focus', runCheck);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('focus', runCheck);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
