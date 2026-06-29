@@ -1101,7 +1101,7 @@ const DescriptionWithFigures = ({
             onClick={handleAddFigure}
             title="Add figure to this description"
           >
-            <AddIcon size={12} />
+            <AddIcon size={12} /> Fig
           </button>
           <input
             ref={fileInputRef}

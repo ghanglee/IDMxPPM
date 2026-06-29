@@ -1067,6 +1067,42 @@ const ERPanel = ({
     }
   }, [selectedItem, selectedIULocation, erHierarchy, onUpdateER]);
 
+  // Immediately commit a figure-array change to erHierarchy and update the snapshot.
+  // Used by onFiguresChange in the detail panel so figures are persisted to erHierarchy
+  // right after the async file read completes — not deferred until blur/save.
+  const commitFigureChange = useCallback((field, figs) => {
+    if (!selectedItem || !onUpdateER) return;
+
+    const newData = { ...selectedItem.data, [field]: figs };
+    // Update local detail-panel state
+    setSelectedItem(prev => prev ? { ...prev, data: newData } : prev);
+    // Update snapshot so hasUnsavedDetailChanges() doesn't fire a false positive
+    selectedItemSnapshotRef.current = JSON.stringify(newData);
+
+    if (selectedItem.type === 'er' || selectedItem.type === 'subEr') {
+      onUpdateER(selectedItem.id, { [field]: figs });
+    } else if (selectedItem.type === 'iu') {
+      const parentErId = selectedItem.erParent || selectedIULocation?.parentErId;
+      if (!parentErId) return;
+      const updateIURecursive = (ius) => ius.map(iu =>
+        iu.id === selectedItem.id
+          ? { ...iu, [field]: figs }
+          : { ...iu, subInformationUnits: iu.subInformationUnits ? updateIURecursive(iu.subInformationUnits) : [] }
+      );
+      const findAndUpdate = (ers) => {
+        for (const er of ers) {
+          if (er.id === parentErId || er.guid === parentErId) {
+            onUpdateER(er.id, { informationUnits: updateIURecursive(er.informationUnits || []) });
+            return true;
+          }
+          if (er.subERs?.length > 0 && findAndUpdate(er.subERs)) return true;
+        }
+        return false;
+      };
+      findAndUpdate(erHierarchy);
+    }
+  }, [selectedItem, selectedIULocation, onUpdateER, erHierarchy]);
+
   // After a mapping is applied via the search modal, commitCurrentEdit runs once
   // selectedItem has been updated with the new mapping data.
   useEffect(() => {
@@ -3223,9 +3259,7 @@ const ERPanel = ({
                       onChange={(val) => {
                         setSelectedItem(prev => ({ ...prev, data: { ...prev.data, definition: val } }));
                       }}
-                      onFiguresChange={(figs) => {
-                        setSelectedItem(prev => ({ ...prev, data: { ...prev.data, definitionFigures: figs } }));
-                      }}
+                      onFiguresChange={(figs) => commitFigureChange('definitionFigures', figs)}
                       onBlur={() => { if (hasUnsavedDetailChanges()) commitCurrentEdit(); }}
                       placeholder="Describe this information unit..."
                       rows={6}
@@ -3239,9 +3273,7 @@ const ERPanel = ({
                       onChange={(val) => {
                         setSelectedItem(prev => ({ ...prev, data: { ...prev.data, examples: val } }));
                       }}
-                      onFiguresChange={(figs) => {
-                        setSelectedItem(prev => ({ ...prev, data: { ...prev.data, exampleImages: figs } }));
-                      }}
+                      onFiguresChange={(figs) => commitFigureChange('exampleImages', figs)}
                       onBlur={() => { if (hasUnsavedDetailChanges()) commitCurrentEdit(); }}
                       placeholder="e.g., Wall-001, Level-1"
                       rows={3}
@@ -3477,9 +3509,7 @@ const ERPanel = ({
                       onChange={(val) => {
                         setSelectedItem(prev => ({ ...prev, data: { ...prev.data, description: val } }));
                       }}
-                      onFiguresChange={(figs) => {
-                        setSelectedItem(prev => ({ ...prev, data: { ...prev.data, descriptionFigures: figs } }));
-                      }}
+                      onFiguresChange={(figs) => commitFigureChange('descriptionFigures', figs)}
                       onBlur={() => { if (hasUnsavedDetailChanges()) commitCurrentEdit(); }}
                       placeholder="Brief description of this Exchange Requirement..."
                       rows={4}
@@ -3493,9 +3523,7 @@ const ERPanel = ({
                       onChange={(val) => {
                         setSelectedItem(prev => ({ ...prev, data: { ...prev.data, examples: val } }));
                       }}
-                      onFiguresChange={(figs) => {
-                        setSelectedItem(prev => ({ ...prev, data: { ...prev.data, exampleImages: figs } }));
-                      }}
+                      onFiguresChange={(figs) => commitFigureChange('exampleImages', figs)}
                       onBlur={() => { if (hasUnsavedDetailChanges()) commitCurrentEdit(); }}
                       placeholder="Examples for this Exchange Requirement..."
                       rows={3}
