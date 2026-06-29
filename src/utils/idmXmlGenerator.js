@@ -67,16 +67,15 @@ const generateImagesXml = (images, indent = '      ') => {
     const caption = img.caption || img.name || `Figure ${index + 1}`;
     const mimeType = img.type || 'image/png';
 
-    // If base64 data is available (standalone export), embed it inline
     if (img.data && isDataUri(img.data)) {
+      // Embed base64 inline (standard idmXML 2.0 standalone export)
       const parsed = parseDataUri(img.data);
       const base64Data = parsed ? parsed.base64Data : '';
       lines.push(`${indent}<image caption="${escapeXml(caption)}" mimeType="${escapeXml(mimeType)}" encoding="base64">${base64Data}</image>`);
-    } else {
-      // filePath-only (ZIP bundle export where images are separate files)
-      const filePath = img.filePath || img.name || `images/figure_${index + 1}.png`;
-      lines.push(`${indent}<image caption="${escapeXml(caption)}" filePath="${escapeXml(filePath)}"/>`);
     }
+    // filePath-only figures are skipped here: this function is only used for standalone
+    // idmXML 2.0 export where external file references cannot be resolved.
+    // The v1 ZIP generator uses v1Description() which handles filePath references directly.
   });
 
   return lines;

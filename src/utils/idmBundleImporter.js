@@ -218,11 +218,20 @@ export const importIdmBundle = async (zipData) => {
         const data = await file.async('base64');
         const mimeType = getMimeType(path);
         const dataUri = buildDataUri(mimeType, data);
-        // Store under both the original path and the forward-slash-normalized path
-        // so that lookups work regardless of which separator the idmXML used.
+        // Store under the original path and forward-slash-normalized path.
         result.images[path] = dataUri;
         const normalized = normalizeZipPath(path);
         if (normalized !== path) result.images[normalized] = dataUri;
+        // Also store under the path with its leading folder segment stripped.
+        // idmXML 1.0 ZIPs wrap everything under a top-level folder
+        // (e.g. "MyIDM/images/uc_fig0.png") but <image filePath> only contains
+        // the relative portion ("images/uc_fig0.png"), so the lookup would
+        // otherwise miss every image.
+        const slashIdx = normalized.indexOf('/');
+        if (slashIdx !== -1) {
+          const relPath = normalized.slice(slashIdx + 1);
+          if (!result.images[relPath]) result.images[relPath] = dataUri;
+        }
       } catch (err) {
         console.warn(`Failed to load image ${path}:`, err);
       }
