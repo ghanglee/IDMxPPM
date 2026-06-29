@@ -5748,6 +5748,15 @@ const App = () => {
                     </div>
                   </div>
 
+                  {/* LOIN XML */}
+                  <div className={`export-format-option ${exportFormat === 'loin' ? 'selected' : ''}`} data-format="loin" onClick={() => setExportFormat('loin')}>
+                    <input type="radio" name="exportFormat" value="loin" checked={exportFormat === 'loin'} onChange={(e) => setExportFormat(e.target.value)} />
+                    <div className="export-format-content">
+                      <span className="export-format-title">LOIN XML (.xml)</span>
+                      {exportFormat === 'loin' && <span className="export-format-desc">Level of Information Need — EN 17412 / ISO 7817-1. Exports Information Units with external element mappings as object type requirements.</span>}
+                    </div>
+                  </div>
+
                   {/* Save to Server */}
                   {serverConnection.isConnected && serverConnection.isAuthenticated && (
                     <div className={`export-format-option export-format-server ${exportFormat === 'server' ? 'selected' : ''}`} data-format="server" onClick={() => setExportFormat('server')}>
