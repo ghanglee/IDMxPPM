@@ -421,6 +421,16 @@ const restoreErHierarchyImageData = (erHierarchy, images) => {
       });
     }
 
+    // Restore ER example images
+    if (er.exampleImages && er.exampleImages.length > 0) {
+      er.exampleImages = er.exampleImages.map(img => {
+        if (img.filePath && images[img.filePath]) {
+          return { ...img, data: images[img.filePath] };
+        }
+        return img;
+      });
+    }
+
     if (er.informationUnits) {
       const processUnit = (unit) => {
         // Restore IU definition figures

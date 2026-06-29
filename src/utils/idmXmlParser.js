@@ -1116,6 +1116,8 @@ const parseErElement = (erElement) => {
     name: '',
     description: '',
     descriptionFigures: [],
+    examples: '',
+    exampleImages: [],
     informationUnits: [],
     subERs: []
   };
@@ -1196,6 +1198,47 @@ const parseErElement = (erElement) => {
       });
     });
     er.description = descTexts.join('\n');
+  }
+
+  // Parse ER examples — mirrors the IU examples parsing
+  const erExamplesEl = getFirstChild(erElement, 'examples');
+  if (erExamplesEl) {
+    const exDescs = getDirectChildren(erExamplesEl, 'description');
+    const exTexts = [];
+    exDescs.forEach(desc => {
+      const titleText = trimStr(desc.getAttribute('title'));
+      if (titleText) {
+        exTexts.push(titleText);
+      } else {
+        const contentText = trimStr(desc.textContent);
+        if (contentText && contentText.length < 10000) exTexts.push(contentText);
+      }
+    });
+    if (exTexts.length > 0) er.examples = exTexts.join('\n');
+
+    const exImages = getDirectChildren(erExamplesEl, 'image');
+    const exDescImages = exDescs.flatMap(d => getDirectChildren(d, 'image'));
+    [...exImages, ...exDescImages].forEach((img, index) => {
+      const caption = img.getAttribute('caption') || `Image ${index + 1}`;
+      const mimeType = img.getAttribute('mimeType') || 'image/png';
+      const encoding = img.getAttribute('encoding');
+      const filePath = img.getAttribute('filePath');
+      if (isBase64Encoding(encoding)) {
+        const base64Data = img.textContent?.trim() || '';
+        if (base64Data) {
+          er.exampleImages.push({
+            id: `img-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            name: caption, caption, type: mimeType,
+            data: buildDataUri(mimeType, base64Data)
+          });
+        }
+      } else if (filePath) {
+        er.exampleImages.push({
+          id: `img-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          name: filePath, caption, type: mimeType, filePath
+        });
+      }
+    });
   }
 
   // Parse information units - namespace-safe

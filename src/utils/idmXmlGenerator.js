@@ -273,6 +273,24 @@ const generateErXml = (er, authorName, indent = '  ', isRoot = true) => {
     lines.push(...generateDescriptionXml(er.description || '', er.descriptionFigures || [], indent + '  '));
   }
 
+  // examples (optional) — mirrors the IU examples pattern
+  const hasErExamples = er.examples || (er.exampleImages && er.exampleImages.length > 0);
+  if (hasErExamples) {
+    lines.push(`${indent}  <examples>`);
+    if (er.examples && er.exampleImages && er.exampleImages.length > 0) {
+      lines.push(`${indent}    <description title="${escapeXml(er.examples)}">`);
+      lines.push(...generateImagesXml(er.exampleImages, indent + '      '));
+      lines.push(`${indent}    </description>`);
+    } else if (er.examples) {
+      lines.push(`${indent}    <description title="${escapeXml(er.examples)}"/>`);
+    } else {
+      lines.push(`${indent}    <description title="">`);
+      lines.push(...generateImagesXml(er.exampleImages, indent + '      '));
+      lines.push(`${indent}    </description>`);
+    }
+    lines.push(`${indent}  </examples>`);
+  }
+
   // ISO 29481-3 Clause 10 / idmXSD v2.0:
   // An ER must have at least one informationUnit OR subEr.
   // ERs with only sub-ERs are valid (IUs inherited transitively).
@@ -1165,6 +1183,10 @@ const v1ErXml = (er, authorsList, creationDate, copyright, indent, isRoot = true
 
   if (er.description || (er.descriptionFigures && er.descriptionFigures.length > 0)) {
     lines.push(...v1Description(er.description || '', er.descriptionFigures || [], indent + '  '));
+  }
+
+  if (er.examples || (er.exampleImages && er.exampleImages.filter(f => f.filePath).length > 0)) {
+    lines.push(...v1Examples(er.examples || '', er.exampleImages || [], indent + '  '));
   }
 
   if (er.informationUnits && er.informationUnits.length > 0) {

@@ -31,6 +31,19 @@ const extractImagesFromEr = (er, images) => {
     });
   }
 
+  // Extract ER example images
+  if (cloned.exampleImages && cloned.exampleImages.length > 0) {
+    cloned.exampleImages = cloned.exampleImages.map((img, imgIndex) => {
+      if (img.data && isDataUri(img.data)) {
+        const ext = getExtension(img.type || 'image/png');
+        const fileName = `images/er_${sanitizeFilename(cloned.id || 'unknown')}_ex_img${imgIndex}.${ext}`;
+        images.push({ fileName, data: img.data, type: img.type || 'image/png', caption: img.caption || img.name });
+        return { ...img, filePath: fileName, data: undefined };
+      }
+      return img;
+    });
+  }
+
   const processUnit = (unit, path) => {
     // Extract IU definition figures
     if (unit.definitionFigures && unit.definitionFigures.length > 0) {
