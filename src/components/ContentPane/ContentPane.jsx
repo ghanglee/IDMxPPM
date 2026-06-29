@@ -1097,11 +1097,11 @@ const DescriptionWithFigures = ({
           <label>{label} {required && <span className="required">*</span>}</label>
           <button
             type="button"
-            className="pane-add-btn-small"
+            className="er-fig-add-btn"
             onClick={handleAddFigure}
             title="Add figure to this description"
           >
-            <AddIcon size={12} /> Fig
+            <AddIcon size={10} /> Fig
           </button>
           <input
             ref={fileInputRef}
