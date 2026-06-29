@@ -1667,6 +1667,7 @@ const ContentPane = ({
   // State for actor-to-BPMN link modal
   const [linkModalState, setLinkModalState] = useState(null); // { actorIndex, subActorIndex? }
   const [mergeModalState, setMergeModalState] = useState(null); // { item, sourceActorIndex, sourceSubActorIndex?, isSubActorLink }
+  const [selectedSubIdmIndex, setSelectedSubIdmIndex] = useState(null);
 
   // Determine which optional fields have data and should be visible
   const getInitialVisibleFields = useCallback((data) => {
@@ -1795,6 +1796,106 @@ const ContentPane = ({
         <button className="content-pane-close" onClick={onClose} title="Close">
           <CloseIcon size={16} />
         </button>
+      </div>
+    );
+  };
+
+  // =========================================================================
+  // IDM HEADER (formerly Basic Information)
+  // =========================================================================
+  // IDM HIERARCHY PANEL — sticky, rendered outside the scrollable body
+  // =========================================================================
+  const renderIdmHierarchyPanel = () => {
+    const rootTitle = headerData.shortTitle || headerData.title || 'Untitled IDM';
+    return (
+      <div className="idm-hierarchy-panel">
+        <input
+          ref={subIdmFileRef}
+          type="file"
+          accept=".idm,.zip,.xml,.json"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file && onAddSubIdm) onAddSubIdm(file);
+            e.target.value = '';
+          }}
+        />
+        <div className="idm-hierarchy-panel-header">
+          <span className="idm-hierarchy-panel-title">IDM Hierarchy</span>
+          <div className="er-hierarchy-toolbar" style={{ margin: 0 }}>
+            <button
+              className="er-hierarchy-btn"
+              onClick={() => subIdmFileRef.current?.click()}
+              title="Add sub-IDM"
+            >
+              <AddIcon size={14} />
+            </button>
+            <button
+              className="er-hierarchy-btn"
+              disabled={selectedSubIdmIndex === null}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (selectedSubIdmIndex !== null) {
+                  onRemoveSubIdm?.(selectedSubIdmIndex);
+                  setSelectedSubIdmIndex(null);
+                }
+              }}
+              title="Remove selected sub-IDM"
+            >
+              <DeleteIcon size={14} />
+            </button>
+          </div>
+        </div>
+        <div className="idm-hierarchy-tree">
+          {/* Root: current IDM */}
+          <div className="idm-tree-node idm-tree-root">
+            <div className="idm-tree-node-icon">
+              <SpecificationIcon size={13} />
+            </div>
+            <div className="idm-tree-node-label">
+              <span className="idm-tree-node-title">{rootTitle}</span>
+              {subIdms.length > 0 && (
+                <span className="idm-tree-node-badge">{subIdms.length} sub-IDM{subIdms.length !== 1 ? 's' : ''}</span>
+              )}
+            </div>
+          </div>
+          {/* Children: sub-IDMs */}
+          {subIdms.map((sub, index) => {
+            const subTitle = sub.headerData?.shortTitle || sub.headerData?.title || `Sub-IDM ${index + 1}`;
+            const isSelected = selectedSubIdmIndex === index;
+            return (
+              <div
+                key={index}
+                className={`idm-tree-node idm-tree-child${isSelected ? ' idm-tree-selected' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedSubIdmIndex(prev => prev === index ? null : index);
+                }}
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  alert(`"${subTitle}" is a referenced sub-IDM and cannot be edited here.\n\nReason: xPPM neo-Seoul intentionally protects sub-IDMs from in-place edits to preserve the integrity of the original IDM definition. Editing it here would silently diverge from the source file.\n\nTo edit it, open the original file as an independent IDM project in xPPM neo-Seoul.`);
+                }}
+              >
+                <div className="idm-tree-child-indent" />
+                <div className="idm-tree-node-icon">
+                  <SpecificationIcon size={13} />
+                </div>
+                <div className="idm-tree-node-label">
+                  <span className="idm-tree-node-title">{subTitle}</span>
+                  {sub.headerData?.version != null && sub.headerData.version !== '' && (
+                    <span className="idm-tree-node-badge">v{sub.headerData.version}</span>
+                  )}
+                  {sub.erHierarchy?.length > 0 && (
+                    <span className="idm-tree-node-badge">{sub.erHierarchy.length} ER{sub.erHierarchy.length !== 1 ? 's' : ''}</span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          {subIdms.length === 0 && (
+            <div className="idm-tree-empty">No sub-IDMs — click "+" to import one.</div>
+          )}
+        </div>
       </div>
     );
   };
@@ -2735,53 +2836,6 @@ const ContentPane = ({
         )}
       </Section>
 
-      {/* SUB-IDMs Section */}
-      <Section title={`Sub-IDMs${subIdms.length > 0 ? ` (${subIdms.length})` : ''}`} defaultExpanded={subIdms.length > 0}>
-        {subIdms.length > 0 && (
-          <div className="sub-idm-list">
-            {subIdms.map((sub, index) => (
-              <div key={index} className="sub-idm-entry">
-                <div className="sub-idm-info">
-                  <span className="sub-idm-title">
-                    {sub.headerData?.shortTitle || sub.headerData?.title || `Sub-IDM ${index + 1}`}
-                  </span>
-                  {sub.headerData?.version != null && sub.headerData.version !== '' && (
-                    <span className="sub-idm-version">v{sub.headerData.version}</span>
-                  )}
-                  {sub.erHierarchy?.length > 0 && (
-                    <span className="sub-idm-meta">{sub.erHierarchy.length} ER{sub.erHierarchy.length !== 1 ? 's' : ''}</span>
-                  )}
-                </div>
-                <button
-                  className="actor-remove-btn"
-                  onClick={() => onRemoveSubIdm?.(index)}
-                  title="Remove sub-IDM"
-                >×</button>
-              </div>
-            ))}
-          </div>
-        )}
-        <button
-          className="pane-add-btn"
-          style={{ marginTop: subIdms.length > 0 ? '8px' : '0' }}
-          onClick={() => subIdmFileRef.current?.click()}
-        >+ Add Sub-IDM</button>
-        <input
-          ref={subIdmFileRef}
-          type="file"
-          accept=".idm,.zip,.xml,.json"
-          style={{ display: 'none' }}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file && onAddSubIdm) onAddSubIdm(file);
-            e.target.value = '';
-          }}
-        />
-        <span className="pane-hint" style={{ marginTop: '4px' }}>
-          Import an IDM project (.idm, .zip) or idmXML (.xml) to attach it as a sub-IDM.
-          Sub-IDMs are included when exporting to idmXML 1.0 ZIP.
-        </span>
-      </Section>
     </div>
   );
 
@@ -3257,6 +3311,7 @@ const ContentPane = ({
   return (
     <div className="content-pane">
       {renderHeader()}
+      {type === 'specification' && renderIdmHierarchyPanel()}
       {type === 'specification' && renderIdmHeader()}
       {type === 'useCase' && renderUseCase()}
       {type === 'exchangeReq' && renderExchangeReq()}
