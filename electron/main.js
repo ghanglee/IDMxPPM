@@ -608,18 +608,36 @@ ipcMain.handle('app:checkForUpdates', () => fetchLatestRelease());
 // runs the embedded XX compiler internally. We spawn xslt3 as a child process,
 // pass the XSLT and XML as temp files, and capture the HTML from stdout.
 // This supports XSLT 1.0, 2.0, and 3.0 stylesheets.
-ipcMain.handle('xslt:transform', async (event, { xmlContent, xsltContent }) => {
+ipcMain.handle('xslt:transform', async (event, { xmlContent, xsltContent, bpmnXml }) => {
   const os = require('os');
   const { fork } = require('child_process');
   const stamp = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const tmpXsl = path.join(os.tmpdir(), `xslt-${stamp}.xsl`);
-  const tmpXml = path.join(os.tmpdir(), `xslt-src-${stamp}.xml`);
+  // Put the source XML in its own directory so document() can resolve sibling paths
+  // (e.g. "Diagram/Diagram(1).bpmn") relative to the XML file rather than os.tmpdir().
+  const tmpDir = path.join(os.tmpdir(), `xslt-src-${stamp}`);
+  const tmpXml = path.join(tmpDir, 'source.xml');
+  let bpmnTmpPath = null;
   try {
+    fs.mkdirSync(tmpDir, { recursive: true });
     fs.writeFileSync(tmpXsl, xsltContent, 'utf-8');
     fs.writeFileSync(tmpXml, xmlContent, 'utf-8');
-    const xslt3 = require.resolve('xslt3');
-    // fork() uses Electron's embedded Node.js runtime, not process.execPath
-    // (which points to the Electron binary and would launch a window instead).
+
+    // If BPMN XML is provided, write it next to the XML at the path the XSLT expects.
+    // Extract filePath from <diagram filePath="..."> in the XML (default: Diagram/Diagram(1).bpmn).
+    if (bpmnXml) {
+      const fpMatch = xmlContent.match(/diagram[^>]+filePath="([^"]+)"/);
+      const bpmnRelPath = fpMatch ? fpMatch[1].replace(/\\/g, '/') : 'Diagram/Diagram(1).bpmn';
+      bpmnTmpPath = path.join(tmpDir, ...bpmnRelPath.split('/'));
+      fs.mkdirSync(path.dirname(bpmnTmpPath), { recursive: true });
+      fs.writeFileSync(bpmnTmpPath, bpmnXml, 'utf-8');
+    }
+
+    // require.resolve() inside a packaged app returns a path inside app.asar (a virtual
+    // archive). fork() spawns a real child process that can't read from inside the ASAR.
+    // asarUnpack extracts xslt3/saxon-js to app.asar.unpacked — rewrite the path so
+    // fork() gets the real filesystem location.
+    const xslt3 = require.resolve('xslt3').replace(/\.asar([/\\])/g, '.asar.unpacked$1');
     const html = await new Promise((resolve, reject) => {
       const child = fork(xslt3, [`-xsl:${tmpXsl}`, `-s:${tmpXml}`], { silent: true });
       let stdout = '', stderr = '';
@@ -636,7 +654,7 @@ ipcMain.handle('xslt:transform', async (event, { xmlContent, xsltContent }) => {
     return { success: false, error: err.message };
   } finally {
     try { fs.unlinkSync(tmpXsl); } catch {}
-    try { fs.unlinkSync(tmpXml); } catch {}
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
   }
 });
 

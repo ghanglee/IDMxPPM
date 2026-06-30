@@ -50,7 +50,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   cacheWrite: (key, data) => ipcRenderer.invoke('cache:write', key, data),
 
   // XSLT 2.0/3.0 transformation via Saxon-JS in the main process
-  transformXslt: (xmlContent, xsltContent) => ipcRenderer.invoke('xslt:transform', { xmlContent, xsltContent }),
+  transformXslt: (xmlContent, xsltContent, bpmnXml) => ipcRenderer.invoke('xslt:transform', { xmlContent, xsltContent, bpmnXml }),
 
   // 플랫폼 정보
   platform: process.platform

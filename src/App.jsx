@@ -3198,6 +3198,13 @@ const App = () => {
             idmData.headerData = idmData.headerData || {};
             idmData.headerData.idmXsdVersion = versionInfo.version;
             idmData.headerData.idmXsdVersionConfidence = versionInfo.confidence;
+            if (idmData.bpmnFilePath && !idmData.headerData.bpmnFilePath) {
+              idmData.headerData.bpmnFilePath = idmData.bpmnFilePath;
+            }
+            if (idmData.headerData.importedActorsList === undefined) {
+              idmData.headerData.importedActorsList = Array.isArray(idmData.headerData.actorsList)
+                ? JSON.parse(JSON.stringify(idmData.headerData.actorsList)) : [];
+            }
 
             // Build dataObjectErMap from explicit dataObjectAndEr links in the XML
             const newDataObjectErMap = {};
@@ -4130,7 +4137,10 @@ const App = () => {
           // with the XML at the root and BPMN in a Diagram/ subfolder.
           const zipFolderName = fileName;                           // e.g. "idm_Hochrechnung02"
           const zipXmlName   = `${zipFolderName}.xml`;             // e.g. "idm_Hochrechnung02.xml"
-          const zipBpmnPath  = 'Diagram/Diagram(1).bpmn';
+          // Preserve original filePath separator style from the imported XML (may be backslash on Windows).
+          // Use forward slashes for the actual ZIP entry path (JSZip requires this).
+          const origBpmnFilePath = headerData?.bpmnFilePath || 'Diagram/Diagram(1).bpmn';
+          const zipBpmnPath = origBpmnFilePath.replace(/\\/g, '/');
           const bpmnZipEntry = `${zipFolderName}/${zipBpmnPath}`;  // e.g. "idm_Hochrechnung02/Diagram/Diagram(1).bpmn"
 
           // Extract images (base64 → file paths) before generating XML
@@ -4144,12 +4154,13 @@ const App = () => {
             erHierarchy: v1ErHierarchyWithPaths,
             dataObjects: zipDataObjects,
             subIdms,
-            bpmnFilePath: zipBpmnPath  // relative path stored in <diagram filePath="...">
+            bpmnFilePath: origBpmnFilePath  // preserve original path style (may have backslash)
           });
 
           const zipV1 = new JSZip();
           const zipV1Folder = zipV1.folder(zipFolderName);
-          zipV1Folder.file(zipXmlName, v1Result.xml);
+          // Write with UTF-8 BOM and CRLF line endings — Windows IDM tools expect this format.
+          zipV1Folder.file(zipXmlName, '﻿' + v1Result.xml.replace(/\n/g, '\r\n'));
           if (currentBpmnXml) {
             zipV1Folder.file(zipBpmnPath, currentBpmnXml);
           }
@@ -4412,6 +4423,7 @@ const App = () => {
             erDataMap: htmlErDataMap,
             erHierarchy,
             bpmnSvg,
+            bpmnXml: currentBpmnXml,
             customXsltContent,
             idmXmlContent,
             dataObjectErMap,
@@ -4726,6 +4738,13 @@ const App = () => {
           idmData.headerData = idmData.headerData || {};
           idmData.headerData.idmXsdVersion = versionInfo.version;
           idmData.headerData.idmXsdVersionConfidence = versionInfo.confidence;
+          if (idmData.bpmnFilePath && !idmData.headerData.bpmnFilePath) {
+            idmData.headerData.bpmnFilePath = idmData.bpmnFilePath;
+          }
+          if (idmData.headerData.importedActorsList === undefined) {
+            idmData.headerData.importedActorsList = Array.isArray(idmData.headerData.actorsList)
+              ? JSON.parse(JSON.stringify(idmData.headerData.actorsList)) : [];
+          }
 
           // Apply pre-loaded BPMN from main process if not already embedded
           if (!idmData.bpmnXml && data.bpmnContent) {

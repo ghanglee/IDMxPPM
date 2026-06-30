@@ -1236,7 +1236,7 @@ export const generateIdmXmlV1 = ({ headerData, bpmnXml, bpmnSvg, erDataMap, erHi
   const idmCode = headerData?.idmCode || `IDM-${Date.now()}`;
 
   const lines = [];
-  lines.push('<?xml version="1.0" encoding="UTF-8"?>');
+  lines.push('<?xml version="1.0" encoding="utf-8"?>');
 
   // Emit stylesheet PI if stored from original import
   if (headerData?.stylesheetHref) {
@@ -1317,7 +1317,7 @@ export const generateIdmXmlV1 = ({ headerData, bpmnXml, bpmnSvg, erDataMap, erHi
     ? headerData.projectStagesIso
     : (Array.isArray(headerData?.projectStages) && headerData.projectStages.length > 0
       ? headerData.projectStages
-      : ['design']);
+      : []);
 
   const emittedStages = new Set();
   isoStages.forEach(stage => {
@@ -1346,9 +1346,15 @@ export const generateIdmXmlV1 = ({ headerData, bpmnXml, bpmnSvg, erDataMap, erHi
     });
   }
 
-  // Actors (v1.0: no actorType, classification has no id)
-  if (headerData?.actorsList && headerData.actorsList.length > 0) {
-    headerData.actorsList.forEach((actor, i) => {
+  // Actors (v1.0: no actorType, classification has no id).
+  // Use importedActorsList when present: this is the snapshot taken at import time,
+  // which excludes actors auto-synced from BPMN pools after import. Preserves round-trip
+  // fidelity with v1 files — actors the old tool wrote are the only ones re-emitted.
+  const v1Actors = headerData?.importedActorsList !== undefined
+    ? headerData.importedActorsList
+    : (headerData?.actorsList || []);
+  if (v1Actors.length > 0) {
+    v1Actors.forEach((actor, i) => {
       const actorId = actor.id || `actor-${i + 1}`;
       const actorName = actor.name || 'Unnamed Actor';
       const hasChildren = actor.role || (actor.subActors && actor.subActors.length > 0);

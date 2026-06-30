@@ -135,6 +135,15 @@ export const importIdmBundle = async (zipData) => {
         if (!result.headerData || Object.keys(result.headerData).length === 0) {
           result.headerData = idmData.headerData;
         }
+        // Store original bpmnFilePath (may use backslash from Windows IDM tools) and
+        // a snapshot of the parsed actor list for round-trip fidelity on v1 export.
+        if (idmData.bpmnFilePath && !result.headerData.bpmnFilePath) {
+          result.headerData.bpmnFilePath = idmData.bpmnFilePath;
+        }
+        if (result.headerData.importedActorsList === undefined) {
+          result.headerData.importedActorsList = Array.isArray(idmData.headerData?.actorsList)
+            ? JSON.parse(JSON.stringify(idmData.headerData.actorsList)) : [];
+        }
         if (!result.erHierarchy || result.erHierarchy.length === 0) {
           if (idmData.erHierarchy) result.erHierarchy = idmData.erHierarchy;
         }

@@ -21,12 +21,13 @@ export const generateHtmlDocument = async ({
   headerData,
   erDataMap,
   bpmnSvg,
+  bpmnXml,
   customXsltContent,
   idmXmlContent
 }) => {
   const xsltContent = customXsltContent || defaultIdmXslt;
 
-  let htmlContent = await transformXmlWithXslt(idmXmlContent, xsltContent);
+  let htmlContent = await transformXmlWithXslt(idmXmlContent, xsltContent, bpmnXml);
 
   htmlContent = enhanceHtmlWithBpmn(htmlContent, bpmnSvg);
   htmlContent = enhanceHtmlWithImages(htmlContent, erDataMap);
@@ -40,7 +41,7 @@ export const generateHtmlDocument = async ({
  * XSLT 2.0 / 3.0 uses Saxon-JS (lazy-loaded — only downloaded when needed).
  * Returns a Promise<string> in all cases.
  */
-const transformXmlWithXslt = async (xmlContent, xsltContent) => {
+const transformXmlWithXslt = async (xmlContent, xsltContent, bpmnXml) => {
   const parser = new DOMParser();
 
   const xmlDoc = parser.parseFromString(xmlContent, 'text/xml');
@@ -62,7 +63,7 @@ const transformXmlWithXslt = async (xmlContent, xsltContent) => {
     // which supports XSLT 2.0 and 3.0 natively. The browser-only fallback would
     // require the separate SaxonJS2.js browser build; in Electron we use IPC instead.
     if (window.electronAPI?.transformXslt) {
-      const result = await window.electronAPI.transformXslt(xmlContent, xsltContent);
+      const result = await window.electronAPI.transformXslt(xmlContent, xsltContent, bpmnXml);
       if (!result.success) throw new Error('XSLT transform failed: ' + result.error);
       return result.html;
     }
@@ -227,6 +228,7 @@ export const generateStandaloneHtml = async ({
   erDataMap,
   erHierarchy,
   bpmnSvg,
+  bpmnXml,
   customXsltContent,
   idmXmlContent,
   dataObjectErMap,
@@ -241,6 +243,7 @@ export const generateStandaloneHtml = async ({
       headerData,
       erDataMap,
       bpmnSvg,
+      bpmnXml,
       customXsltContent,
       idmXmlContent
     });
