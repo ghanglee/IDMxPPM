@@ -1,6 +1,6 @@
 {
   "name": "xppm-neo-seoul",
-  "version": "1.5.8",
+  "version": "1.5.9",
   "description": "xPPM neo-Seoul: Information Delivery Manual authoring tool based on the eXtended Process to Product Modeling method. Cross-platform IDM authoring tool for AEC industry - ISO 29481-1 & ISO 29481-3 compliant",
   "main": "electron/main.js",
   "author": "Building Informatics Group (BIG), Yonsei University",
@@ -56,7 +56,27 @@
     "asarUnpack": [
       "node_modules/xslt3/**",
       "node_modules/saxon-js/**",
-      "node_modules/axios/**"
+      "node_modules/axios/**",
+      "node_modules/form-data/**",
+      "node_modules/asynckit/**",
+      "node_modules/call-bind-apply-helpers/**",
+      "node_modules/combined-stream/**",
+      "node_modules/delayed-stream/**",
+      "node_modules/dunder-proto/**",
+      "node_modules/es-define-property/**",
+      "node_modules/es-errors/**",
+      "node_modules/es-object-atoms/**",
+      "node_modules/es-set-tostringtag/**",
+      "node_modules/function-bind/**",
+      "node_modules/get-intrinsic/**",
+      "node_modules/get-proto/**",
+      "node_modules/gopd/**",
+      "node_modules/has-symbols/**",
+      "node_modules/has-tostringtag/**",
+      "node_modules/hasown/**",
+      "node_modules/math-intrinsics/**",
+      "node_modules/mime-db/**",
+      "node_modules/mime-types/**"
     ],
     "extraResources": [
       {
