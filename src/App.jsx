@@ -276,8 +276,11 @@ const App = () => {
     (async () => {
       const currentVersion = await window.electronAPI.getAppVersion();
       if (!currentVersion) return;
+      // No stored version at all (lastSeenVersion === null) still counts as "changed" —
+      // that's exactly what happens the first time THIS check ships (the previous
+      // build never wrote the key), which is precisely the upgrade we need to report.
       const lastSeenVersion = localStorage.getItem('xppm_lastSeenVersion');
-      if (lastSeenVersion && lastSeenVersion !== currentVersion) {
+      if (lastSeenVersion !== currentVersion) {
         showToast(`Installation completed — now running xPPM neo-Seoul v${currentVersion}.`, 8000);
       }
       localStorage.setItem('xppm_lastSeenVersion', currentVersion);
