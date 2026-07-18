@@ -42,6 +42,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Check GitHub Releases for a newer version
   checkForUpdates: () => ipcRenderer.invoke('app:checkForUpdates'),
 
+  // Currently running app version (no network call)
+  getAppVersion: () => ipcRenderer.invoke('app:getVersion'),
+
   // Open user manual from local resources
   openManual: () => ipcRenderer.invoke('shell:openManual'),
 

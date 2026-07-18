@@ -600,6 +600,7 @@ function fetchLatestRelease() {
 }
 
 ipcMain.handle('app:checkForUpdates', () => fetchLatestRelease());
+ipcMain.handle('app:getVersion', () => app.getVersion());
 
 // XSLT transformation via the xslt3 CLI (part of the saxon-js ecosystem).
 //

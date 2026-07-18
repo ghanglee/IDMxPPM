@@ -130,6 +130,7 @@ const App = () => {
 
   // Toast notification state
   const [toastMessage, setToastMessage] = useState(null);
+  const [toastAction, setToastAction] = useState(null); // { label, onClick } | null — makes the toast clickable
   const toastTimerRef = useRef(null);
   const warnedErIdsRef = useRef(new Set()); // Track ERs already warned about to avoid repeated alerts
 
@@ -251,7 +252,11 @@ const App = () => {
       setUpdateInfo(result);
       if (result.hasUpdate) {
         setUpdateStatus('available');
-        showToast(`Version ${result.latestVersion} is available — open Help > Check for Updates… to download.`, 12000);
+        showToast(
+          `Version ${result.latestVersion} is available.`,
+          15000,
+          { label: 'Download', onClick: () => window.electronAPI?.openExternal(result.downloadUrl) }
+        );
       }
     };
     const timer = setTimeout(runCheck, 1000);
@@ -260,6 +265,23 @@ const App = () => {
       clearTimeout(timer);
       window.removeEventListener('focus', runCheck);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Detect that this launch is the first one after installing a newer build
+  // (the running version differs from the one recorded on the previous launch)
+  // and confirm it to the user, since a silent update leaves them unsure it worked.
+  useEffect(() => {
+    if (!window.electronAPI?.getAppVersion) return;
+    (async () => {
+      const currentVersion = await window.electronAPI.getAppVersion();
+      if (!currentVersion) return;
+      const lastSeenVersion = localStorage.getItem('xppm_lastSeenVersion');
+      if (lastSeenVersion && lastSeenVersion !== currentVersion) {
+        showToast(`Installation completed — now running xPPM neo-Seoul v${currentVersion}.`, 8000);
+      }
+      localStorage.setItem('xppm_lastSeenVersion', currentVersion);
+    })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -984,10 +1006,14 @@ const App = () => {
     return null;
   }, [selectedErId, dataObjectErMap]);
 
-  const showToast = useCallback((message, duration = 4000) => {
+  const showToast = useCallback((message, duration = 4000, action = null) => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToastMessage(message);
-    toastTimerRef.current = setTimeout(() => setToastMessage(null), duration);
+    setToastAction(action);
+    toastTimerRef.current = setTimeout(() => {
+      setToastMessage(null);
+      setToastAction(null);
+    }, duration);
   }, []);
 
   // Helper: Find ER by ID in hierarchy (recursive) - defined early for use in handleDataObjectSelect
@@ -6978,10 +7004,18 @@ const App = () => {
 
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="toast-notification" onClick={() => setToastMessage(null)}>
+        <div
+          className={`toast-notification${toastAction ? ' toast-clickable' : ''}`}
+          onClick={() => {
+            if (toastAction) toastAction.onClick();
+            setToastMessage(null);
+            setToastAction(null);
+          }}
+        >
           <span className="toast-icon">&#9432;</span>
           <span className="toast-text">{toastMessage}</span>
-          <button className="toast-close" onClick={(e) => { e.stopPropagation(); setToastMessage(null); }}>&times;</button>
+          {toastAction && <span className="toast-action">{toastAction.label}</span>}
+          <button className="toast-close" onClick={(e) => { e.stopPropagation(); setToastMessage(null); setToastAction(null); }}>&times;</button>
           <style>{`
             .toast-notification {
               position: fixed;
@@ -7006,6 +7040,11 @@ const App = () => {
             }
             .toast-icon { font-size: 16px; color: var(--accent-primary, #3b82f6); flex-shrink: 0; }
             .toast-text { flex: 1; }
+            .toast-action {
+              background: var(--accent-primary, #3b82f6); color: #fff;
+              font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 4px;
+              flex-shrink: 0; white-space: nowrap;
+            }
             .toast-close {
               background: none; border: none; color: var(--text-muted, #94a3b8);
               font-size: 18px; cursor: pointer; padding: 0 4px; line-height: 1;
