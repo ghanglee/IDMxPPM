@@ -575,10 +575,11 @@ function buildResult(specName, specGuid, description, purpose, milestone, sendin
     bcmGuid: generateUUID(),
     language: 'EN',
     aimAndScope: purpose || description || '',
-    aimScope: purpose || description || '',
-    use: '',
+    uses: [],
     summary: description || purpose || '',
     actorsList: [],
+    targetPhases: milestone || '',
+    projectStagesIso: [],
   };
 
   // Add actors
@@ -599,30 +600,32 @@ function buildResult(specName, specGuid, description, purpose, milestone, sendin
     });
   }
 
-  // Parse milestone into target phases
+  // Map the free-text milestone to the canonical ISO 22263 stage names idmXmlGenerator
+  // expects in headerData.projectStagesIso (see idmXmlGenerator.js's validStagesV2).
+  // headerData.targetPhases (set above) keeps the original free-text label for display.
   if (milestone) {
-    const phases = milestone.split(',').map(s => s.trim().toLowerCase());
-    const iso22263 = {};
     const phaseMap = {
+      'concept': 'inception',
       'inception': 'inception',
+      'feasibility': 'brief',
       'brief': 'brief',
       'design': 'design',
       'preliminary design': 'design',
       'detailed design': 'design',
       'production': 'production',
       'construction': 'production',
-      'handover': 'handover',
-      'operation': 'operation',
-      'operation and maintenance': 'operation',
-      'end-of-life': 'endOfLife',
-      'demolition': 'endOfLife',
+      'handover': 'production',
+      'operation': 'maintenance',
+      'operation and maintenance': 'maintenance',
+      'maintenance': 'maintenance',
+      'end-of-life': 'demolition',
+      'demolition': 'demolition',
     };
-    for (const p of phases) {
-      const mapped = phaseMap[p];
-      if (mapped) iso22263[mapped] = true;
-    }
-    if (Object.keys(iso22263).length > 0) {
-      headerData.targetPhases = { iso22263 };
+    for (const stage of milestone.split(',').map(s => s.trim().toLowerCase())) {
+      const mapped = phaseMap[stage];
+      if (mapped && !headerData.projectStagesIso.includes(mapped)) {
+        headerData.projectStagesIso.push(mapped);
+      }
     }
   }
 

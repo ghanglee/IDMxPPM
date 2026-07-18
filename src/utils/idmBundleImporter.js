@@ -6,7 +6,8 @@
 
 import JSZip from 'jszip';
 import { parseIdmXml } from './idmXmlParser';
-import { getMimeType, buildDataUri } from './filePathUtils.js';
+import { importXppm } from './xppmImporter.js';
+import { getMimeType, buildDataUri, normalizePath, basename } from './filePathUtils.js';
 
 /**
  * Import an IDM bundle from a ZIP file
@@ -116,8 +117,12 @@ export const importIdmBundle = async (zipData) => {
       if (f) { xmlEntry = f; xmlEntryPath = p; break; }
     }
     if (!xmlEntry) {
+      // Also match a raw .xppm file — people often just zip up the original
+      // xPPM export folder (the .xppm file plus its Diagram/ and Image/
+      // siblings) as-is to send it, rather than repackaging it as this app's
+      // own idmXML export.
       const found = allEntries.find(({ path }) =>
-        path.endsWith('.xml') &&
+        (path.endsWith('.xml') || path.endsWith('.xppm')) &&
         !path.toLowerCase().endsWith('.xsd') &&
         !path.toLowerCase().includes('xslt')
       );
@@ -130,7 +135,28 @@ export const importIdmBundle = async (zipData) => {
         // before <?xml...?>, which makes strict XML parsers throw a parseerror.
         const rawXml = await xmlEntry.async('string');
         const xmlContent = rawXml.replace(/^﻿/, '');
-        const idmData = parseIdmXml(xmlContent);
+
+        // idmXML 1.0 ZIPs (this app's own "zip" export, and legacy xPPM bundles)
+        // use the same unnamespaced, <subEr><er>-nested, text-content-link structure
+        // as a plain .xppm file — the ZIP just adds Diagram/images alongside it.
+        // Route those through the xPPM importer (proven correct for that structure)
+        // instead of the idmXML 2.0 parser, which expects a namespaced <idm> root.
+        const isV2 = xmlContent.includes('idmXML/2.0') || xmlContent.includes('29481/-3/ed-2');
+        let idmData;
+        if (isV2) {
+          idmData = parseIdmXml(xmlContent);
+        } else {
+          const xppmResult = importXppm(xmlContent, null);
+          idmData = {
+            headerData: xppmResult.headerData,
+            bpmnXml: xppmResult.bpmnXml,
+            bpmnFilePath: xppmResult.bpmnFilePath,
+            erHierarchy: xppmResult.erHierarchy,
+            erDataMap: xppmResult.erDataMap,
+            subIdms: [],
+            dataObjectErLinks: xppmResult.dataObjectErMap
+          };
+        }
 
         if (!result.headerData || Object.keys(result.headerData).length === 0) {
           result.headerData = idmData.headerData;
@@ -364,6 +390,20 @@ export const autoMapDataObjectsToERs = (bpmnXml, erHierarchy, existingMap = {}) 
 };
 
 /**
+ * Resolve a figure's stored filePath against the extracted `images` map.
+ * A raw .xppm file (zipped up as-is, with its original Diagram/Image folders)
+ * carries Windows-style backslash paths (e.g. "Image\Image(1).png"), while the
+ * `images` map is keyed with forward-slash zip paths — so a plain lookup misses.
+ * Try the normalized path, the raw path, and the bare filename, in that order.
+ */
+const resolveImageDataUri = (filePath, images) => {
+  if (!filePath || !images) return null;
+  const normalized = normalizePath(filePath);
+  const base = basename(filePath);
+  return images[normalized] || images[filePath] || images[base] || null;
+};
+
+/**
  * Restore base64 image data in ER data map from extracted images
  */
 const restoreImageData = (erDataMap, images) => {
@@ -373,8 +413,9 @@ const restoreImageData = (erDataMap, images) => {
     // Restore ER description figures
     if (er.descriptionFigures && er.descriptionFigures.length > 0) {
       er.descriptionFigures = er.descriptionFigures.map(img => {
-        if (img.filePath && images[img.filePath]) {
-          return { ...img, data: images[img.filePath] };
+        const resolved = resolveImageDataUri(img.filePath, images);
+        if (resolved) {
+          return { ...img, data: resolved };
         }
         return img;
       });
@@ -386,8 +427,9 @@ const restoreImageData = (erDataMap, images) => {
       // Restore IU definition figures
       if (unit.definitionFigures && unit.definitionFigures.length > 0) {
         unit.definitionFigures = unit.definitionFigures.map(img => {
-          if (img.filePath && images[img.filePath]) {
-            return { ...img, data: images[img.filePath] };
+          const resolved = resolveImageDataUri(img.filePath, images);
+          if (resolved) {
+            return { ...img, data: resolved };
           }
           return img;
         });
@@ -395,8 +437,9 @@ const restoreImageData = (erDataMap, images) => {
       // Restore IU example images
       if (unit.exampleImages && unit.exampleImages.length > 0) {
         unit.exampleImages = unit.exampleImages.map(img => {
-          if (img.filePath && images[img.filePath]) {
-            return { ...img, data: images[img.filePath] };
+          const resolved = resolveImageDataUri(img.filePath, images);
+          if (resolved) {
+            return { ...img, data: resolved };
           }
           return img;
         });
@@ -423,8 +466,9 @@ const restoreErHierarchyImageData = (erHierarchy, images) => {
     // Restore ER description figures
     if (er.descriptionFigures && er.descriptionFigures.length > 0) {
       er.descriptionFigures = er.descriptionFigures.map(img => {
-        if (img.filePath && images[img.filePath]) {
-          return { ...img, data: images[img.filePath] };
+        const resolved = resolveImageDataUri(img.filePath, images);
+        if (resolved) {
+          return { ...img, data: resolved };
         }
         return img;
       });
@@ -433,8 +477,9 @@ const restoreErHierarchyImageData = (erHierarchy, images) => {
     // Restore ER example images
     if (er.exampleImages && er.exampleImages.length > 0) {
       er.exampleImages = er.exampleImages.map(img => {
-        if (img.filePath && images[img.filePath]) {
-          return { ...img, data: images[img.filePath] };
+        const resolved = resolveImageDataUri(img.filePath, images);
+        if (resolved) {
+          return { ...img, data: resolved };
         }
         return img;
       });
@@ -445,8 +490,9 @@ const restoreErHierarchyImageData = (erHierarchy, images) => {
         // Restore IU definition figures
         if (unit.definitionFigures && unit.definitionFigures.length > 0) {
           unit.definitionFigures = unit.definitionFigures.map(img => {
-            if (img.filePath && images[img.filePath]) {
-              return { ...img, data: images[img.filePath] };
+            const resolved = resolveImageDataUri(img.filePath, images);
+            if (resolved) {
+              return { ...img, data: resolved };
             }
             return img;
           });
@@ -454,8 +500,9 @@ const restoreErHierarchyImageData = (erHierarchy, images) => {
         // Restore IU example images
         if (unit.exampleImages && unit.exampleImages.length > 0) {
           unit.exampleImages = unit.exampleImages.map(img => {
-            if (img.filePath && images[img.filePath]) {
-              return { ...img, data: images[img.filePath] };
+            const resolved = resolveImageDataUri(img.filePath, images);
+            if (resolved) {
+              return { ...img, data: resolved };
             }
             return img;
           });
@@ -493,10 +540,11 @@ const restoreHeaderImageData = (headerData, images) => {
   figureSections.forEach(section => {
     if (headerData[section] && headerData[section].length > 0) {
       headerData[section] = headerData[section].map(fig => {
-        if (fig.filePath && images[fig.filePath]) {
+        const resolved = resolveImageDataUri(fig.filePath, images);
+        if (resolved) {
           return {
             ...fig,
-            data: images[fig.filePath]
+            data: resolved
           };
         }
         return fig;

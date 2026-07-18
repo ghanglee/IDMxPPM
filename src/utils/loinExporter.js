@@ -254,7 +254,7 @@ const PSET_ENTITY_MAP = {
  *
  * @param {Object} params
  * @param {Object} params.headerData - IDM header (title, shortTitle, etc.)
- * @param {Object} params.useCaseData - Use case data (actors, phases, aimScope, summary)
+ * @param {Object} params.useCaseData - Use case data: { actors, uses: [{verb, noun}], aimScope, targetPhases (free text), summary }
  * @param {Array} params.erHierarchy - ER hierarchy tree
  * @returns {{ xml: string, specCount: number, skippedCount: number, totalIUs: number, mappedIUs: number }}
  */
@@ -419,17 +419,19 @@ export function generateLoinXml({ headerData, useCaseData, erHierarchy }) {
   const actors = useCaseData?.actors || [];
   const sendingActor = actors.length > 0 ? (actors[0].name || '') : '';
   const receivingActor = actors.length > 1 ? (actors[1].name || '') : '';
-  const purpose = useCaseData?.aimScope || useCaseData?.use || '';
 
-  // Get project phases
-  const phases = useCaseData?.targetPhases || useCaseData?.projectPhases || {};
-  const selectedPhases = [];
-  if (phases.iso22263) {
-    for (const [phase, selected] of Object.entries(phases.iso22263)) {
-      if (selected) selectedPhases.push(phase);
-    }
-  }
-  const milestone = selectedPhases.join(', ') || '';
+  // Purpose: prefer the BIM use(s) (verb+noun, e.g. "Visualize Bridge") since LOIN's
+  // purpose is a short category label, not a paragraph — fall back to aim-and-scope.
+  const usesText = Array.isArray(useCaseData?.uses)
+    ? useCaseData.uses
+        .filter(u => u && (u.verb || u.noun))
+        .map(u => [u.verb, u.noun].filter(Boolean).join(' '))
+        .join(', ')
+    : '';
+  const purpose = usesText || useCaseData?.aimScope || '';
+
+  // Milestone: free-text target phases as entered in the header panel (e.g. "Design, Handover")
+  const milestone = (useCaseData?.targetPhases || '').trim();
 
   // Build XML
   const loinGuid = headerData?.idmGuid || generateUUID();

@@ -4474,10 +4474,10 @@ const App = () => {
             headerData,
             useCaseData: {
               actors: headerData.actorsList || [],
-              aimScope: headerData.aimScope || '',
-              use: headerData.use || '',
+              uses: headerData.uses || [],
+              aimScope: headerData.aimAndScope || '',
               summary: headerData.summary || '',
-              targetPhases: headerData.targetPhases || {},
+              targetPhases: headerData.targetPhases || '',
             },
             erHierarchy
           });
@@ -5079,58 +5079,76 @@ const App = () => {
           isLoadingProjectRef.current = true;
           // Pass bpmnContent from main process (pre-loaded alongside the xPPM file)
           const xppmResult = importXppm(data.content, data.bpmnContent || null);
+          console.info(
+            `[xppm import] title="${xppmResult.headerData?.fullTitle || ''}" ` +
+            `actors=${xppmResult.headerData?.actorsList?.length || 0} ` +
+            `ERs=${Object.keys(xppmResult.erDataMap || {}).length} ` +
+            `dataObjectLinks=${Object.keys(xppmResult.dataObjectErMap || {}).length} ` +
+            `bpmn=${!!xppmResult.bpmnXml}`
+          );
 
-          // Apply pre-loaded images from the main process to ER figures
-          if (data.imageMap && Object.keys(data.imageMap).length > 0) {
-            let appliedCount = 0;
-            const applyImages = (figures) => {
-              if (!figures?.length) return;
-              for (const fig of figures) {
-                if (fig.filePath && !fig.data) {
-                  const normalized = normalizePath(fig.filePath);
-                  const baseName = fpBasename(fig.filePath);
-                  // Try: normalized path, raw path, basename-only
-                  const match = data.imageMap[normalized] || data.imageMap[fig.filePath] || data.imageMap[baseName];
-                  if (match) {
-                    fig.data = match;
-                    fig.needsLoading = false;
-                    appliedCount++;
+          // Apply pre-loaded images from the main process to ER figures.
+          // Non-fatal: a bad/missing image must never discard the header/ER data already parsed above.
+          try {
+            if (data.imageMap && Object.keys(data.imageMap).length > 0) {
+              let appliedCount = 0;
+              const applyImages = (figures) => {
+                if (!figures?.length) return;
+                for (const fig of figures) {
+                  if (fig.filePath && !fig.data) {
+                    const normalized = normalizePath(fig.filePath);
+                    const baseName = fpBasename(fig.filePath);
+                    // Try: normalized path, raw path, basename-only
+                    const match = data.imageMap[normalized] || data.imageMap[fig.filePath] || data.imageMap[baseName];
+                    if (match) {
+                      fig.data = match;
+                      fig.needsLoading = false;
+                      appliedCount++;
+                    }
                   }
                 }
-              }
-            };
-            // Apply to header figures
-            const hd = xppmResult.headerData || {};
-            applyImages(hd.summaryFigures);
-            applyImages(hd.aimAndScopeFigures);
-            applyImages(hd.benefitsFigures);
-            applyImages(hd.limitationsFigures);
-            // Apply to ER figures recursively
-            const applyErImages = (ers) => {
-              if (!ers) return;
-              const erList = Array.isArray(ers) ? ers : Object.values(ers);
-              for (const er of erList) {
-                applyImages(er.descriptionFigures);
-                if (er.informationUnits) {
-                  const applyIuImages = (units) => {
-                    for (const iu of units) {
-                      applyImages(iu.definitionFigures);
-                      applyImages(iu.exampleImages);
-                      if (iu.subInformationUnits) applyIuImages(iu.subInformationUnits);
-                    }
-                  };
-                  applyIuImages(er.informationUnits);
+              };
+              // Apply to header figures
+              const hd = xppmResult.headerData || {};
+              applyImages(hd.summaryFigures);
+              applyImages(hd.aimAndScopeFigures);
+              applyImages(hd.benefitsFigures);
+              applyImages(hd.limitationsFigures);
+              // Apply to ER figures recursively
+              const applyErImages = (ers) => {
+                if (!ers) return;
+                const erList = Array.isArray(ers) ? ers : Object.values(ers);
+                for (const er of erList) {
+                  applyImages(er.descriptionFigures);
+                  if (er.informationUnits) {
+                    const applyIuImages = (units) => {
+                      for (const iu of units) {
+                        applyImages(iu.definitionFigures);
+                        applyImages(iu.exampleImages);
+                        if (iu.subInformationUnits) applyIuImages(iu.subInformationUnits);
+                      }
+                    };
+                    applyIuImages(er.informationUnits);
+                  }
+                  if (er.subErs?.length) applyErImages(er.subErs);
+                  if (er.subERs?.length) applyErImages(er.subERs);
                 }
-                if (er.subErs?.length) applyErImages(er.subErs);
-                if (er.subERs?.length) applyErImages(er.subERs);
-              }
-            };
-            if (xppmResult.erDataMap) applyErImages(xppmResult.erDataMap);
-            if (xppmResult.erHierarchy) applyErImages(xppmResult.erHierarchy);
+              };
+              if (xppmResult.erDataMap) applyErImages(xppmResult.erDataMap);
+              if (xppmResult.erHierarchy) applyErImages(xppmResult.erHierarchy);
+              console.info(`[xppm import] applied ${appliedCount} pre-loaded image(s)`);
+            }
+          } catch (imageErr) {
+            console.error('[xppm import] Applying pre-loaded images failed (continuing with parsed data):', imageErr);
           }
 
-          // Resolve external references (BPMN if still missing, plus all image filePaths)
-          await resolveExternalReferences(xppmResult, data.filePath);
+          // Resolve external references (BPMN if still missing, plus all image filePaths).
+          // Non-fatal: if this throws (e.g. an IPC/path error), the header/ER data parsed above must still be committed.
+          try {
+            await resolveExternalReferences(xppmResult, data.filePath);
+          } catch (resolveErr) {
+            console.error('[xppm import] resolveExternalReferences failed (continuing with parsed data):', resolveErr);
+          }
 
           // Use ER hierarchy directly from the xPPM importer (preserves root ER + sub-ER nesting)
           const erHierarchyToImport = xppmResult.erHierarchy || [];
@@ -5173,8 +5191,8 @@ const App = () => {
 
           setTimeout(() => { isLoadingProjectRef.current = false; }, 2000);
         } catch (err) {
-          console.error('Failed to parse xPPM file:', err);
-          alert('Failed to parse xPPM file: ' + err.message);
+          console.error('[xppm import] Failed to parse xPPM file:', err?.stack || err);
+          alert('Failed to parse xPPM file: ' + err.message + '\n\nSee the DevTools console for details.');
           isLoadingProjectRef.current = false;
         }
         })();
