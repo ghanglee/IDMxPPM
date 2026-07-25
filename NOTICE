@@ -1,0 +1,59 @@
+xPPM neo-Seoul / IDMxPPM
+An open-source Information Delivery Manual (IDM) authoring tool compliant with
+ISO 29481-1 and ISO 29481-3.
+
+Copyright (C) 2026 Building Informatics Group (BIG), Yonsei University.
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU General Public License in the LICENSE file for
+more details.
+
+
+================================================================================
+ADDITIONAL PERMISSION UNDER GNU GPL VERSION 3 SECTION 7
+================================================================================
+
+As a special exception, the copyright holders of this program give you
+permission to combine this program with the Saxon-JS and xslt3 software
+libraries published by Saxonica Limited (together, "Saxon-JS"), and to convey
+the resulting combined work — including in the binary application installers
+distributed for this program — under the terms of the GNU General Public
+License version 3, notwithstanding that Saxon-JS is distributed under Saxonica's
+own proprietary license and that that license imposes conditions (such as a
+prohibition on reverse engineering) which the GNU GPL would not otherwise
+permit.
+
+You must comply with the terms of the GNU GPL version 3 in all respects for all
+of the code used other than Saxon-JS. If you modify this file, you may extend
+this exception to your version of the file, but you are not obligated to do so.
+If you do not wish to do so, delete this exception statement from your version.
+
+This exception applies only to the combination with Saxon-JS as described above
+and does not grant any rights in Saxon-JS itself, which remains subject to
+Saxonica's license (reproduced in THIRD-PARTY-NOTICES.md).
+
+
+================================================================================
+THIRD-PARTY ATTRIBUTION NOTICES
+================================================================================
+
+This program incorporates third-party open-source and proprietary components.
+Their licenses and required notices are reproduced in THIRD-PARTY-NOTICES.md,
+which is distributed with the source and inside the application installers.
+
+In particular:
+
+- bpmn-js (Camunda Services GmbH) is used under a license that REQUIRES the
+  "bpmn.io" project watermark shown on rendered BPMN diagrams to remain fully
+  visible and unobscured. This watermark must not be removed or hidden.
+
+- Saxon-JS and xslt3 (Saxonica Limited) are proprietary; redistribution is
+  permitted only as part of this application and subject to Saxonica's license
+  conditions, including the reproduction of Saxonica's copyright notice and
+  disclaimer (see THIRD-PARTY-NOTICES.md).

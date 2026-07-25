@@ -184,14 +184,28 @@ This program is free software: you can redistribute it and/or modify it under th
 
 See [LICENSE](LICENSE) for the full license text.
 
+**Saxon-JS linking exception.** This application uses the proprietary Saxon-JS /
+`xslt3` XSLT engine from Saxonica, whose license forbids reverse engineering and
+so is not, by itself, GPL-compatible. Under an additional permission granted per
+GPL v3 §7, the copyright holders permit this GPL program to be combined with and
+distributed alongside Saxon-JS. The exact wording is in the [NOTICE](NOTICE)
+file, and the required Saxonica copyright and disclaimer are reproduced in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+
 ### Commercial License
 
 For proprietary use without GPL obligations, a commercial license is available. Contact [glee@yonsei.ac.kr](mailto:glee@yonsei.ac.kr) for licensing inquiries.
 
+Note: under either license, the bundled third-party components keep their own
+terms — in particular Saxon-JS (Saxonica) is proprietary, and bpmn-js requires
+the bpmn.io watermark to remain visible. See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+
 ## Acknowledgments
 
-- **BPMN Editor**: Powered by [bpmn.io](https://bpmn.io) - Copyright (c) 2014-present Camunda Services GmbH, licensed under the bpmn.io License
+- **BPMN Editor**: Powered by [bpmn.io](https://bpmn.io) - Copyright (c) 2014-present Camunda Services GmbH, licensed under the bpmn.io License. The bpmn.io watermark is kept visible as required.
+- **XSLT engine**: [Saxon-JS](https://www.saxonica.com/saxon-js/index.xml) - Copyright Saxonica Limited, used under the Saxonica license.
 - **buildingSMART**: For the bSDD API and IFC standards
+- Full third-party license notices: [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)
 
 ## Author
 
