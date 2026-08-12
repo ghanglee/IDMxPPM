@@ -4,6 +4,7 @@
  */
 
 import { isBase64Encoding, buildDataUri } from './filePathUtils.js';
+import { toIso8601DateTime } from './dateTime.js';
 
 /**
  * ISO 3166-1 alpha-3 to alpha-2 mapping for region code normalization.
@@ -209,7 +210,7 @@ const parseChangeLogs = (authoringEl) => {
     });
     result.push({
       id: log.getAttribute('id') || '',
-      changeDateTime: log.getAttribute('changeDateTime') || '',
+      changeDateTime: toIso8601DateTime(log.getAttribute('changeDateTime') || ''),
       changeSummary: log.getAttribute('changeSummary') || '',
       changedBy: log.getAttribute('changedBy') || '',
       changes: changeEntries
@@ -286,7 +287,7 @@ const parseIdmElement = (idmRoot, xmlDoc) => {
           });
           const changeLogEntry = {
             id: log.getAttribute('id') || '',
-            changeDateTime: log.getAttribute('changeDateTime') || '',
+            changeDateTime: toIso8601DateTime(log.getAttribute('changeDateTime') || ''),
             changeSummary: log.getAttribute('changeSummary') || '',
             changedBy: log.getAttribute('changedBy') || '',
             changes: changeEntries

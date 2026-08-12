@@ -6,6 +6,7 @@
  */
 
 import { isDataUri, parseDataUri } from './filePathUtils.js';
+import { toIso8601DateTime, hasTimeComponent } from './dateTime.js';
 
 // Generate UUID
 const generateUUID = () => {
@@ -465,7 +466,7 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, da
   if (headerData?.changeLogs && headerData.changeLogs.length > 0) {
     headerData.changeLogs.forEach((log, index) => {
       const logId = log.id || `log-${index + 1}`;
-      const changeDateTime = log.changeDateTime || `${creationDate}T00:00:00`;
+      const changeDateTime = toIso8601DateTime(log.changeDateTime) || `${creationDate}T00:00:00`;
       const changeSummary = log.changeSummary || 'Initial creation';
       const changedBy = log.changedBy || 'author-1';
       lines.push(`    <changeLog id="${escapeXml(logId)}" changeDateTime="${escapeXml(changeDateTime)}" changeSummary="${escapeXml(changeSummary)}" changedBy="${escapeXml(changedBy)}">`);
@@ -481,7 +482,9 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, da
     // Convert legacy revisionHistory to changeLog format
     headerData.revisionHistory.forEach((entry, index) => {
       const logId = `log-${index + 1}`;
-      const changeDateTime = entry.date ? `${entry.date}T00:00:00` : `${creationDate}T00:00:00`;
+      const changeDateTime = entry.date
+        ? (hasTimeComponent(entry.date) ? toIso8601DateTime(entry.date) : `${entry.date}T00:00:00`)
+        : `${creationDate}T00:00:00`;
       const changeSummary = entry.description || 'Modified';
       lines.push(`    <changeLog id="${escapeXml(logId)}" changeDateTime="${escapeXml(changeDateTime)}" changeSummary="${escapeXml(changeSummary)}" changedBy="author-1"/>`);
     });
@@ -1097,13 +1100,13 @@ const v1Authoring = (headerData, authorsList, copyright, creationDate, indent, s
     storedChangeLogs.forEach(log => {
       const hasCh = log.changes && log.changes.length > 0;
       if (hasCh) {
-        lines.push(`${indent}  <changeLog id="${escapeXmlV1(log.id)}" changeDateTime="${escapeXmlV1(log.changeDateTime)}" changeSummary="${escapeXmlV1(log.changeSummary || '')}" changedBy="${escapeXmlV1(log.changedBy)}">`);
+        lines.push(`${indent}  <changeLog id="${escapeXmlV1(log.id)}" changeDateTime="${escapeXmlV1(toIso8601DateTime(log.changeDateTime))}" changeSummary="${escapeXmlV1(log.changeSummary || '')}" changedBy="${escapeXmlV1(log.changedBy)}">`);
         log.changes.forEach(ch => {
           lines.push(`${indent}    <change changedElement="${escapeXmlV1(ch.changedElement)}" changedFrom="${escapeXmlV1(ch.changedFrom)}" />`);
         });
         lines.push(`${indent}  </changeLog>`);
       } else {
-        lines.push(`${indent}  <changeLog id="${escapeXmlV1(log.id)}" changeDateTime="${escapeXmlV1(log.changeDateTime)}" changeSummary="${escapeXmlV1(log.changeSummary || '')}" changedBy="${escapeXmlV1(log.changedBy)}"/>`);
+        lines.push(`${indent}  <changeLog id="${escapeXmlV1(log.id)}" changeDateTime="${escapeXmlV1(toIso8601DateTime(log.changeDateTime))}" changeSummary="${escapeXmlV1(log.changeSummary || '')}" changedBy="${escapeXmlV1(log.changedBy)}"/>`);
       }
     });
   } else {

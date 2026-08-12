@@ -201,7 +201,7 @@ const parseModificationHistory = (authoring) => {
     const summary = log.getAttribute('changeSummary') || '';
 
     if (dateStr) {
-      const date = dateStr.split(' ')[0]; // Extract just the date part
+      const date = dateStr.split('T')[0].split(' ')[0]; // Extract just the date part (ISO 'T' or legacy space)
       const changes = log.querySelectorAll('change');
       const changeElements = Array.from(changes).map(c => c.getAttribute('changedElement')).filter(Boolean);
 
