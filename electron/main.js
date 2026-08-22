@@ -542,8 +542,27 @@ function getBuildDate() {
   }
 }
 
+// Compare two dotted version strings numerically.
+// Returns > 0 when a is newer than b, < 0 when older, 0 when equal. Tolerates a
+// differing number of segments ("1.7" vs "1.6.4") and ignores any pre-release
+// suffix ("1.7.0-beta.1" is treated as 1.7.0).
+function compareVersions(a, b) {
+  const segments = v => String(v).trim().replace(/^v/, '').split('-')[0].split('.')
+    .map(n => parseInt(n, 10) || 0);
+  const av = segments(a);
+  const bv = segments(b);
+  for (let i = 0; i < Math.max(av.length, bv.length); i++) {
+    const diff = (av[i] || 0) - (bv[i] || 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
 // Check GitHub Releases for a newer version (shared by IPC handler and menu item)
-// hasUpdate is true if either the version tag changed OR the release was published after the local build.
+// hasUpdate is true only when the published release is strictly newer than the
+// running version. A plain `latest !== current` test also fired when the local
+// build was AHEAD of the latest release — which happens for every pre-release
+// test build — and offered the user a downgrade.
 function fetchLatestRelease() {
   const https = require('https');
   const currentVersion = app.getVersion();
@@ -581,8 +600,7 @@ function fetchLatestRelease() {
             installerUrl = appImage ? appImage.browser_download_url : null;
           }
           const downloadUrl = installerUrl || release.html_url || 'https://github.com/ghanglee/IDMxPPM/releases';
-          const versionChanged = !!(latestVersion && latestVersion !== currentVersion);
-          const hasUpdate = versionChanged;
+          const hasUpdate = !!latestVersion && compareVersions(latestVersion, currentVersion) > 0;
           resolve({ currentVersion, latestVersion, publishedAt, buildDate, downloadUrl, hasUpdate, error: null });
         } catch {
           resolve({ currentVersion, latestVersion: null, publishedAt: null, buildDate, downloadUrl: null, hasUpdate: false, error: 'Failed to parse release info' });

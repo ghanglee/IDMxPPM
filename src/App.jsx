@@ -5956,9 +5956,7 @@ const App = () => {
                   )}
                   {updateStatus === 'available' && updateInfo && (
                     <p className="about-update-status about-update-available">
-                      {updateInfo.latestVersion === updateInfo.currentVersion
-                        ? `A newer build of v${updateInfo.latestVersion} is available`
-                        : `Version ${updateInfo.latestVersion} is available`}
+                      {`Version ${updateInfo.latestVersion} is available`}
                       {updateInfo.publishedAt && (
                         <> (released {new Date(updateInfo.publishedAt).toLocaleDateString()})</>
                       )}
