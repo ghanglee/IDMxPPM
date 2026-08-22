@@ -122,8 +122,10 @@ jobs:
           cache: 'npm'
       - name: Install dependencies
         run: npm ci
-      - name: Build Linux AppImages
-        run: npx vite build && npx electron-builder --linux AppImage --x64 --arm64 --publish never
+      # x64 only. Cross-building an arm64 AppImage on an x64 runner is unverified,
+      # and if-no-files-found:error would fail the whole release if it broke.
+      - name: Build Linux AppImage
+        run: npx vite build && npx electron-builder --linux AppImage --x64 --publish never
       - name: List build output
         run: ls -la release/ || echo "No release/ directory found"
       - uses: actions/upload-artifact@v4
