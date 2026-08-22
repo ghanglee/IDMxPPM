@@ -4030,6 +4030,9 @@ const App = () => {
           finalizeSave(exportSavePath);
           return;
         }
+        // Write failed (permission denied, read-only volume, disk full, …).
+        // Report it instead of silently re-opening the save dialog.
+        throw new Error(`Could not write to ${exportSavePath}\n\n${result.error || 'Unknown error'}`);
       }
 
       // In Electron without a browsed path: show OS save dialog (handles overwrite prompt)
@@ -4048,6 +4051,7 @@ const App = () => {
             finalizeSave(locResult.filePath);
             return;
           }
+          throw new Error(`Could not write to ${locResult.filePath}\n\n${saveResult.error || 'Unknown error'}`);
         }
         return; // User cancelled OS dialog — don't fall through to browser download
       }
@@ -4238,6 +4242,8 @@ const App = () => {
               });
               if (saveResult.success) {
                 finalizeSave(locResult.filePath);
+              } else {
+                throw new Error(`Could not write to ${locResult.filePath}\n\n${saveResult.error || 'Unknown error'}`);
               }
             }
             break;
@@ -4609,6 +4615,8 @@ const App = () => {
       const result = await window.electronAPI.saveFile({ content, filePath: currentFilePath });
       if (result.success) {
         setIsDirty(false);
+      } else {
+        alert(`Save failed: could not write to ${currentFilePath}\n\n${result.error || 'Unknown error'}`);
       }
     } else {
       const result = await window.electronAPI.saveProject({
@@ -4618,9 +4626,19 @@ const App = () => {
       if (result.success) {
         setCurrentFilePath(result.filePath);
         setIsDirty(false);
+      } else if (result.error) {
+        alert(`Save failed: ${result.error}`);
       }
     }
   };
+
+  // The menu IPC listeners below are registered once per effect run, so they
+  // capture whatever closure existed at that moment. Keep the latest ones in
+  // refs so File > Save always writes current state, not a stale snapshot.
+  const saveProjectRef = useRef(saveProject);
+  saveProjectRef.current = saveProject;
+  const handleSaveExportRef = useRef(handleSaveExport);
+  handleSaveExportRef.current = handleSaveExport;
 
   // --- Server Integration Handlers ---
 
@@ -5285,10 +5303,10 @@ const App = () => {
       setTimeout(() => { isLoadingProjectRef.current = false; }, 2000);
     });
 
-    window.electronAPI.onMenuSave(() => saveProject(false));
-    window.electronAPI.onMenuSaveAs(() => saveProject(true));
+    window.electronAPI.onMenuSave(() => saveProjectRef.current(false));
+    window.electronAPI.onMenuSaveAs(() => saveProjectRef.current(true));
     window.electronAPI.onMenuServerConnect(() => setShowServerModal(true));
-    window.electronAPI.onMenuExportIdmXML(() => handleSaveExport());
+    window.electronAPI.onMenuExportIdmXML(() => handleSaveExportRef.current());
 
     return () => {
       window.electronAPI.removeAllListeners('file-opened');

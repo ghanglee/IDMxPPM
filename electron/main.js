@@ -685,10 +685,14 @@ ipcMain.handle('dialog:saveProject', async (event, { content, defaultName }) => 
   });
 
   if (!result.canceled && result.filePath) {
-    fs.writeFileSync(result.filePath, content, 'utf-8');
+    try {
+      fs.writeFileSync(result.filePath, content, 'utf-8');
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
     return { success: true, filePath: result.filePath };
   }
-  return { success: false };
+  return { success: false, canceled: true };
 });
 
 // 파일 저장 (기존 경로에)
