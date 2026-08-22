@@ -79,6 +79,28 @@ function escXml(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 }
 
+// Coerce a header/use-case field into plain text.
+// Fields such as targetPhases hold different shapes depending on which importer produced
+// the project: free text from the header panel, an array of stage names, or a stage map
+// ({ iso22263, aiaB101, ribaPow }) from the xPPM/IDS importers. Use objects arrive as
+// { verb, noun } (either part may be empty), the same shapes idmXmlGenerator handles.
+function toPlainText(value) {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (Array.isArray(value)) {
+    return value.map(toPlainText).filter(Boolean).join(', ');
+  }
+  if (typeof value === 'object') {
+    if (value.verb !== undefined || value.noun !== undefined) {
+      return [toPlainText(value.verb), toPlainText(value.noun)].filter(Boolean).join(' ');
+    }
+    if (value.name !== undefined) return toPlainText(value.name);
+    return Object.values(value).map(toPlainText).filter(Boolean).join(', ');
+  }
+  return '';
+}
+
 // Generate a UUID
 function generateUUID() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
@@ -417,26 +439,22 @@ export function generateLoinXml({ headerData, useCaseData, erHierarchy }) {
 
   // Extract context from use case data
   const actors = useCaseData?.actors || [];
-  const sendingActor = actors.length > 0 ? (actors[0].name || '') : '';
-  const receivingActor = actors.length > 1 ? (actors[1].name || '') : '';
+  const sendingActor = actors.length > 0 ? toPlainText(actors[0]?.name) : '';
+  const receivingActor = actors.length > 1 ? toPlainText(actors[1]?.name) : '';
 
   // Purpose: prefer the BIM use(s) (verb+noun, e.g. "Visualize Bridge") since LOIN's
   // purpose is a short category label, not a paragraph — fall back to aim-and-scope.
-  const usesText = Array.isArray(useCaseData?.uses)
-    ? useCaseData.uses
-        .filter(u => u && (u.verb || u.noun))
-        .map(u => [u.verb, u.noun].filter(Boolean).join(' '))
-        .join(', ')
-    : '';
-  const purpose = usesText || useCaseData?.aimScope || '';
+  const usesText = toPlainText(useCaseData?.uses);
+  const purpose = usesText || toPlainText(useCaseData?.aimScope);
 
-  // Milestone: free-text target phases as entered in the header panel (e.g. "Design, Handover")
-  const milestone = (useCaseData?.targetPhases || '').trim();
+  // Milestone: target phases, either free text from the header panel ("Design, Handover")
+  // or a stage map/array from an importer — both flatten to a comma-separated label.
+  const milestone = toPlainText(useCaseData?.targetPhases);
 
   // Build XML
-  const loinGuid = headerData?.idmGuid || generateUUID();
-  const loinName = headerData?.shortTitle || headerData?.fullTitle || 'IDM Specification';
-  const description = headerData?.fullTitle || '';
+  const loinGuid = toPlainText(headerData?.idmGuid) || generateUUID();
+  const loinName = toPlainText(headerData?.shortTitle) || toPlainText(headerData?.fullTitle) || 'IDM Specification';
+  const description = toPlainText(headerData?.fullTitle);
 
   let xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n`;
   xml += `<LOINSpecification globalId="${escXml(loinGuid)}" name="${escXml(loinName)}">\n`;

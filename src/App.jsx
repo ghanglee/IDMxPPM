@@ -4518,7 +4518,9 @@ const App = () => {
           });
 
           if (loinResult.specCount === 0) {
-            alert(`None of the ${loinResult.totalIUs} Information Unit(s) in this project have external element mappings.\n\nLOIN export requires at least one Information Unit with an external element mapping (e.g., IFC, CityGML, bSDD, UniFormat, or other schemas).\n\nAdd external element mappings via the External Element section in the ER detail panel.`);
+            alert(loinResult.totalIUs === 0
+              ? `No Information Units found.\n\nLOIN export requires at least one Information Unit with an external element mapping (e.g., IFC, CityGML, bSDD, UniFormat, or other schemas).\n\nAdd Information Units to your Exchange Requirements first.`
+              : `None of the ${loinResult.totalIUs} Information Unit(s) in this project have external element mappings.\n\nLOIN export requires at least one Information Unit with an external element mapping (e.g., IFC, CityGML, bSDD, UniFormat, or other schemas).\n\nAdd external element mappings via the External Element section in the ER detail panel.`);
             return;
           }
 
