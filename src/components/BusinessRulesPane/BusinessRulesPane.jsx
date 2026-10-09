@@ -605,7 +605,7 @@ const BusinessRulesPane = ({
             )}
           </div>
 
-          {/* Column 2: constraints */}
+          {/* Column 2: constraints (list on top, details below - like the business rules column) */}
           <div className="brp-col brp-col-constraints">
             <div className="brp-col-head">
               <span>Constraints</span>
@@ -623,7 +623,7 @@ const BusinessRulesPane = ({
                 <button onClick={() => setIuFilter(null)} title="Clear filter">×</button>
               </div>
             )}
-            <div className="brp-list">
+            <div className="brp-list brp-list-constraints">
               {visibleConstraints.length === 0 && <div className="brp-hint brp-pad">No constraints here yet.</div>}
               {visibleConstraints.map(({ constraint, erId, erName }) => {
                 const key = keyOf(erId, constraint.id);
@@ -647,10 +647,8 @@ const BusinessRulesPane = ({
                 );
               })}
             </div>
+            <div className="brp-detail">{renderConstraintEditor()}</div>
           </div>
-
-          {/* Column 3: constraint editor */}
-          <div className="brp-col brp-col-editor">{renderConstraintEditor()}</div>
         </div>
       </div>
     </div>

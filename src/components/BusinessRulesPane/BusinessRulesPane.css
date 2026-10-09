@@ -36,8 +36,11 @@
 .brp-col { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--border-primary); }
 .brp-col:last-child { border-right: none; }
 .brp-col-rules { width: 380px; flex-shrink: 0; }
-.brp-col-constraints { width: 280px; flex-shrink: 0; }
-.brp-col-editor { flex: 1; min-width: 0; overflow-y: auto; }
+.brp-col-constraints { flex: 1; min-width: 0; }
+
+/* Constraints column: list on top, selected constraint below (mirrors the rules column) */
+.brp-list.brp-list-constraints { flex: 0 1 36%; min-height: 120px; }
+.brp-detail { flex: 1 1 auto; min-height: 0; overflow-y: auto; border-top: 1px solid var(--border-primary); }
 
 .brp-col-head {
   display: flex;
