@@ -410,6 +410,7 @@
 /* ER Hierarchy Toolbar */
 .er-hierarchy-toolbar {
   display: flex;
+  flex-wrap: wrap; /* more buttons than fit in the 320px pane: wrap instead of overflowing */
   align-items: center;
   gap: 4px;
   padding: 6px 8px;
@@ -1153,7 +1154,7 @@
 
 .pane-checkbox-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr)); /* minmax(0,..): 1fr would grow to the nowrap text width and overflow the pane */
   gap: 4px 8px;
 }
 
@@ -2266,4 +2267,43 @@
   .pane-checkbox-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Business rules section (Use Case pane) */
+.pane-business-rule-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  font-size: 12px;
+}
+.pane-business-rule-list li {
+  padding: 3px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pane-business-rule-id {
+  display: inline-block;
+  min-width: 34px;
+  margin-right: 4px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.pane-business-rule-btn {
+  width: 100%;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.pane-business-rule-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-primary);
+}
+
+.pane-checkbox-item {
+  min-width: 0;
 }

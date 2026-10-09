@@ -1125,16 +1125,34 @@ export const parseIdmXml = (xmlContent) => {
 };
 
 /**
- * Parse a business rule (uc/businessRule) into { id, name, description, reference }.
- * Multiple <reference> elements are joined by newlines.
+ * Parse a business rule (uc/businessRule) into { id, name, statements, images, reference }.
+ * Rev 12: <statement xml:lang> (1..*), <image> (0..*), <reference> (0..*, joined by newlines).
+ * Older files (Rev 11): proposition/description/@title becomes one untagged statement.
  */
 const parseBusinessRule = (brEl, index) => {
+  const XML_NS = 'http://www.w3.org/XML/1998/namespace';
+  const statements = getDirectChildren(brEl, 'statement')
+    .map(st => ({
+      id: `st-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      text: trimStr(st.textContent),
+      lang: trimStr(st.getAttributeNS(XML_NS, 'lang') || st.getAttribute('xml:lang'))
+    }))
+    .filter(st => st.text);
+
   const proposition = getFirstChild(brEl, 'proposition');
-  const descriptions = proposition ? getDirectChildren(proposition, 'description') : [];
-  const description = descriptions
-    .map(d => trimStr(d.getAttribute('title')) || trimStr(d.textContent))
-    .filter(Boolean)
-    .join('\n\n');
+  if (proposition) {
+    getDirectChildren(proposition, 'description').forEach(d => {
+      const text = trimStr(d.getAttribute('title')) || trimStr(d.textContent);
+      if (text) statements.push({ id: `st-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, text, lang: '' });
+    });
+  }
+
+  const images = parseFigures(brEl);
+  // Images under the old proposition/description move to the rule itself
+  if (proposition) {
+    getDirectChildren(proposition, 'description').forEach(d => images.push(...parseFigures(d)));
+  }
+
   const reference = getDirectChildren(brEl, 'reference')
     .map(r => trimStr(r.textContent))
     .filter(Boolean)
@@ -1142,7 +1160,8 @@ const parseBusinessRule = (brEl, index) => {
   return {
     id: trimStr(brEl.getAttribute('id')) || `BR-${index + 1}`,
     name: trimStr(brEl.getAttribute('name')),
-    description,
+    statements,
+    images,
     reference
   };
 };

@@ -25,7 +25,8 @@ import { parseIdmXml, isIdmXml, detectIdmXmlVersion, getFirstChild, getDirectChi
 import { readFileAsText } from './utils/pdfExporter';
 import { defaultIdmXslt } from './utils/defaultIdmXslt';
 import { generateStandaloneHtml } from './utils/htmlExporter';
-import { flattenIUs, pruneDanglingIuRefs, migrateLegacyConstraints, hasContentBeyondV1 } from './utils/constraintUtils';
+import { flattenIUs, pruneDanglingIuRefs, migrateLegacyConstraints, migrateBusinessRules, hasContentBeyondV1 } from './utils/constraintUtils';
+import BusinessRulesPane from './components/BusinessRulesPane/BusinessRulesPane';
 import { generateIdsXml } from './utils/idsExporter';
 import { validateIdsXml, formatValidationReport } from './utils/idsValidator';
 import { generateLoinXml } from './utils/loinExporter';
@@ -1424,6 +1425,22 @@ const App = () => {
     }, 300);
   }, [erHierarchy]);
   useEffect(() => () => clearTimeout(pruneTimerRef.current), []);
+
+  // Business rules stored before Rev 12 (single description) become statements
+  useEffect(() => {
+    const migrated = migrateBusinessRules(headerData.businessRules || []);
+    if (!migrated.changed) return;
+    setHeaderData(prev => ({ ...prev, businessRules: migrateBusinessRules(prev.businessRules || []).rules }));
+    setIsDirty(true);
+  }, [headerData.businessRules]);
+
+  // The Business Rules & Constraints dialog can be opened from the Use Case and ER panes
+  const [showBusinessRules, setShowBusinessRules] = useState(false);
+  const [businessRulesIuId, setBusinessRulesIuId] = useState(null);
+  const handleOpenBusinessRules = useCallback((iuId = null) => {
+    setBusinessRulesIuId(typeof iuId === 'string' ? iuId : null);
+    setShowBusinessRules(true);
+  }, []);
 
   const handleBusinessRulesChange = useCallback((rules) => {
     setHeaderData(prev => ({ ...prev, businessRules: rules }));
@@ -5452,6 +5469,7 @@ const App = () => {
                     onAddSubIdm={handleAddSubIdm}
                     onRemoveSubIdm={handleRemoveSubIdm}
                     bpmnActorsList={bpmnActorsList}
+                    onOpenBusinessRules={handleOpenBusinessRules}
                     reviewComments={reviewComments}
                     onMarkCommentAddressed={(commentId) => {
                       setReviewComments(prev => prev.map(c =>
@@ -5567,8 +5585,7 @@ const App = () => {
                     newlyAddedErId={newlyAddedErId}
                     onClearNewlyAddedErId={() => setNewlyAddedErId(null)}
                     businessRules={headerData.businessRules || []}
-                    onBusinessRulesChange={handleBusinessRulesChange}
-                    onReplaceErHierarchy={handleReplaceErHierarchy}
+                    onOpenBusinessRules={handleOpenBusinessRules}
                   />
                 )}
 
@@ -6129,6 +6146,19 @@ const App = () => {
           onKeepOldRootAsSub={handleRootSwitchKeepOldAsSub}
           onCancel={handleRootSwitchCancel}
         />
+
+        {/* Business Rules & Constraints dialog (opened from the Use Case and ER panes) */}
+        {showBusinessRules && (
+          <BusinessRulesPane
+            businessRules={headerData.businessRules || []}
+            onBusinessRulesChange={handleBusinessRulesChange}
+            erHierarchy={erHierarchy}
+            onReplaceErHierarchy={handleReplaceErHierarchy}
+            selectedErId={selectedErId}
+            initialIuId={businessRulesIuId}
+            onClose={() => setShowBusinessRules(false)}
+          />
+        )}
 
         {/* Server Connection Modal */}
         <ServerConnectionModal

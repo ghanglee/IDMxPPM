@@ -2,7 +2,6 @@ import React, { useState, useRef, useCallback, useEffect, useMemo, Component } f
 import './ERPanel.css';
 import { searchSchema, searchSchemaGrouped, searchBsdd, fetchBsddClassProperties, getAvailableSchemas, isSchemaSearchable, RateLimitError } from '../../utils/schemaSearch';
 import { getBsddCacheState, initBsddCache } from '../../utils/bsddCache';
-import BusinessRulesPane from '../BusinessRulesPane/BusinessRulesPane';
 import { parseErElement } from '../../utils/idmXmlParser';
 import { collectConstraints, constraintsReferencingIUs, iuSubtreeIdsById, resolveIuTokens, iuNameMap } from '../../utils/constraintUtils';
 import {
@@ -292,9 +291,8 @@ const ERPanel = ({
   onMoveERAsSubER,               // Callback to move ER as sub-ER of another ER
   newlyAddedErId = null,         // ID of newly added ER (for scrolling)
   onClearNewlyAddedErId,         // Callback to clear newly added ER ID after scrolling
-  businessRules = [],            // uc/businessRule entries (headerData.businessRules)
-  onBusinessRulesChange,         // Callback to replace the business rule list
-  onReplaceErHierarchy,          // Callback to replace the whole ER hierarchy (constraint edits)
+  businessRules = [],            // uc/businessRule entries (headerData.businessRules), shown as a count
+  onOpenBusinessRules,           // Callback to open the Business Rules dialog (optionally focused on an IU id)
 
   // Legacy props (for backward compatibility during migration)
   mode = 'detail',
@@ -380,8 +378,6 @@ const ERPanel = ({
 
   // Sub-ER selection modal state
   const [showSubERModal, setShowSubERModal] = useState(false);
-  const [showBusinessRules, setShowBusinessRules] = useState(false);
-  const [businessRulesIuId, setBusinessRulesIuId] = useState(null);
   const [subERModalTab, setSubERModalTab] = useState('current');
   const erXmlFileRef = useRef(null);
 
@@ -401,19 +397,6 @@ const ERPanel = ({
   // Detail panel resize state (proportion-based)
   const [detailPanelRatio, setDetailPanelRatio] = useState(0.5);
   const resizingRef = useRef(false);
-
-  // Rendered in both the ER-first and the legacy return paths
-  const businessRulesPane = showBusinessRules ? (
-    <BusinessRulesPane
-      businessRules={businessRules}
-      onBusinessRulesChange={onBusinessRulesChange}
-      erHierarchy={erHierarchy}
-      onReplaceErHierarchy={onReplaceErHierarchy}
-      selectedErId={selectedErId}
-      initialIuId={businessRulesIuId}
-      onClose={() => setShowBusinessRules(false)}
-    />
-  ) : null;
   const resizeStartYRef = useRef(0);
   const resizeStartRatioRef = useRef(0);
   const panelContainerRef = useRef(null);
@@ -3198,15 +3181,15 @@ const ERPanel = ({
           <button className="er-toolbar-btn" onClick={handleCollapseAll} title="Collapse All">
             <CollapseAllIcon size={14} />
           </button>
-          {onReplaceErHierarchy && (
+          {onOpenBusinessRules && (
             <>
               <div className="er-toolbar-divider" />
               <button
                 className="er-toolbar-btn"
-                onClick={() => { commitCurrentEdit(); setBusinessRulesIuId(null); setShowBusinessRules(true); }}
+                onClick={() => { commitCurrentEdit(); onOpenBusinessRules(null); }}
                 title="Business rules and constraints"
               >
-                Rules
+                Rules{businessRules.length > 0 ? ` (${businessRules.length})` : ''}
               </button>
             </>
           )}
@@ -3471,10 +3454,10 @@ const ERPanel = ({
                   <div className="er-card-field">
                     <div className="er-card-field-header">
                       <label>Constraints</label>
-                      {onReplaceErHierarchy && (
+                      {onOpenBusinessRules && (
                         <button
                           className="er-link-btn"
-                          onClick={() => { setBusinessRulesIuId(selectedItem.id); setShowBusinessRules(true); }}
+                          onClick={() => { commitCurrentEdit(); onOpenBusinessRules(selectedItem.id); }}
                         >
                           {refs.length > 0 ? 'Edit in Business Rules…' : '+ Add constraint…'}
                         </button>
@@ -3723,8 +3706,6 @@ const ERPanel = ({
           <span>{treeRows.filter(r => r.type === 'er' || r.type === 'subEr').length} ER(s), {treeRows.filter(r => r.type === 'iu').length} IU(s)</span>
           <span className="er-iso-ref">ISO 29481-3</span>
         </div>
-
-        {businessRulesPane}
 
         {/* Mapping Search Modal for ER-first mode */}
         {showMappingSearch && (
@@ -4062,13 +4043,13 @@ const ERPanel = ({
         <button className="er-toolbar-btn" onClick={openSubERModal} title="Add Sub-ER">
           <IndentIcon size={14} /> Sub-ER
         </button>
-        {isErFirstMode && onReplaceErHierarchy && (
+        {isErFirstMode && onOpenBusinessRules && (
           <button
             className="er-toolbar-btn"
-            onClick={() => { setBusinessRulesIuId(null); setShowBusinessRules(true); }}
+            onClick={() => onOpenBusinessRules(null)}
             title="Business rules and constraints"
           >
-            Business rules
+            Business rules{businessRules.length > 0 ? ` (${businessRules.length})` : ''}
           </button>
         )}
         <div className="er-toolbar-divider" />
@@ -4483,8 +4464,6 @@ const ERPanel = ({
         </div>
         </SearchErrorBoundary>
       )}
-
-      {businessRulesPane}
 
       {/* Sub-ER Selection Modal */}
       {showSubERModal && (

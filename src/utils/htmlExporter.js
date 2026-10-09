@@ -4,7 +4,7 @@
  */
 
 import { defaultIdmXslt } from './defaultIdmXslt';
-import { deriveIuConstraints, collectConstraints, iuNameMap, resolveIuTokens } from './constraintUtils.js';
+import { deriveIuConstraints, collectConstraints, iuNameMap, resolveIuTokens, getRuleStatements } from './constraintUtils.js';
 import { getRegionName } from './idmXmlParser';
 import { getReviewUIStyles, getReviewUIScript } from './reviewCommentingUI';
 
@@ -1266,7 +1266,11 @@ const generateBusinessRulesSection = (businessRules, erHierarchy) => {
     html += '<h3>Business Rules</h3><table class="br-table"><thead><tr><th>Name</th><th>Statement</th><th>Reference</th><th>Constraints</th></tr></thead><tbody>';
     rules.forEach(r => {
       const linked = constraints.filter(({ constraint }) => (constraint.businessRuleIds || []).includes(r.id)).map(({ constraint }) => constraint.id);
-      html += `<tr><td>${escapeHtml(r.name || '')}</td><td>${text(r.description)}</td><td>${text(r.reference)}</td><td>${escapeHtml(linked.join(', ')) || '-'}</td></tr>`;
+      const statements = getRuleStatements(r).filter(st => (st.text || '').trim())
+        .map(st => `<div>${st.lang ? `<span class="syn-lang">[${escapeHtml(st.lang)}]</span> ` : ''}${text(st.text)}</div>`).join('');
+      const images = (r.images || []).filter(img => img.data)
+        .map(img => `<figure style="margin:6px 0"><img src="${escapeHtml(img.data)}" alt="${escapeHtml(img.caption || '')}" style="max-width:100%"><figcaption style="font-size:9pt;color:#666">${escapeHtml(img.caption || '')}</figcaption></figure>`).join('');
+      html += `<tr><td>${escapeHtml(r.name || '')}</td><td>${statements}${images}</td><td>${text(r.reference)}</td><td>${escapeHtml(linked.join(', ')) || '-'}</td></tr>`;
     });
     html += '</tbody></table>';
   }

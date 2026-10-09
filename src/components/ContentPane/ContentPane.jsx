@@ -1648,6 +1648,7 @@ const ContentPane = ({
   reviewComments = [],           // Review comments from imported HTML
   onMarkCommentAddressed,        // Callback to mark a comment as addressed
   onRemoveComment,               // Callback to remove a comment
+  onOpenBusinessRules,           // Callback to open the Business Rules dialog
   onClose
 }) => {
   // Determine if using ER-first mode
@@ -2209,6 +2210,24 @@ const ContentPane = ({
           onChange={(fields) => handleOptionalFieldsChange('purpose', fields)}
           label="Add optional fields"
         />
+      </Section>
+
+      {/* BUSINESS RULES Section (opens the Business Rules & Constraints dialog) */}
+      <Section title="Business Rules" count={(headerData.businessRules || []).length} defaultExpanded={true}>
+        {(headerData.businessRules || []).length === 0 ? (
+          <p className="pane-hint">No business rules specified yet.</p>
+        ) : (
+          <ul className="pane-business-rule-list">
+            {(headerData.businessRules || []).map(br => (
+              <li key={br.id}><span className="pane-business-rule-id">{br.id}</span> {br.name || '(unnamed)'}</li>
+            ))}
+          </ul>
+        )}
+        {onOpenBusinessRules && (
+          <button type="button" className="pane-business-rule-btn" onClick={() => onOpenBusinessRules(null)}>
+            Business rules ({(headerData.businessRules || []).length})…
+          </button>
+        )}
       </Section>
 
       {/* ACTOR ROLES Section - IDM 2.0 Schema Compliant */}

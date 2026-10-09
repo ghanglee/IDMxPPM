@@ -2,7 +2,8 @@
  * Business rule / constraint helpers (idmXSD v2.0 Rev 11).
  *
  * Data model
- *   headerData.businessRules = [{ id, name, description, reference }]
+ *   headerData.businessRules = [{ id, name, statements: [{ id, text, lang }], images: [], reference }]
+ *     (Rev 12: one statement per language; reference holds one reference per line)
  *   er.constraints = [{
  *     id,
  *     businessRuleIds: [],        // -> <associatedBusinessRule ref>
@@ -195,6 +196,44 @@ export const retokenizeHierarchy = (erHierarchy) => {
       })
     };
   });
+};
+
+// ─── Business rules (Rev 12: statements per language) ────────────────────────
+
+const BCP47 = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$/;
+
+export const newBusinessRule = (id, name = '') => ({
+  id,
+  name,
+  statements: [{ id: uid(), text: '', lang: '' }],
+  images: [],
+  reference: ''
+});
+
+/** Statements of a rule; a pre-Rev 12 rule with a single `description` becomes one untagged statement. */
+export const getRuleStatements = (br) => {
+  if (Array.isArray(br?.statements)) return br.statements;
+  const legacy = String(br?.description || '').trim();
+  return legacy ? [{ id: uid(), text: legacy, lang: '' }] : [];
+};
+
+/** Convert stored pre-Rev 12 business rules (description) to statements/images. */
+export const migrateBusinessRules = (rules = []) => {
+  let changed = false;
+  const migrated = rules.map(br => {
+    if (Array.isArray(br.statements) && Array.isArray(br.images)) return br;
+    changed = true;
+    const { description: _legacy, ...rest } = br;
+    return { ...rest, statements: getRuleStatements(br), images: Array.isArray(br.images) ? br.images : [] };
+  });
+  return { rules: migrated, changed };
+};
+
+/** Plain-text statement for lists: prefers English, then the first non-empty one. */
+export const primaryStatementText = (br) => {
+  const list = getRuleStatements(br).filter(st => (st.text || '').trim());
+  const en = list.find(st => /^en(-|$)/i.test(st.lang || ''));
+  return (en || list[0])?.text || '';
 };
 
 // ─── Formal rule languages ───────────────────────────────────────────────────
@@ -404,6 +443,24 @@ export const validateConstraintModel = (erHierarchy, businessRules = []) => {
     if (!n) issues.push({ severity: 'error', message: `Business rule ${br.id} has no name` });
     else if (brNames[n]) issues.push({ severity: 'error', message: `Business rule name "${n}" is used more than once` });
     brNames[n] = true;
+
+    // Rev 12: at least one statement, at most one per language (and at most one untagged)
+    const label = n || br.id;
+    const statements = getRuleStatements(br).filter(st => (st.text || '').trim());
+    if (statements.length === 0) {
+      issues.push({ severity: 'error', message: `Business rule "${label}" needs at least one statement` });
+    }
+    const langs = {};
+    statements.forEach(st => {
+      const lang = (st.lang || '').trim();
+      if (lang && !BCP47.test(lang)) {
+        issues.push({ severity: 'error', message: `Business rule "${label}": "${lang}" is not a valid language tag` });
+      }
+      if (langs[lang]) {
+        issues.push({ severity: 'error', message: `Business rule "${label}" has more than one statement${lang ? ` for language "${lang}"` : ' without a language'}` });
+      }
+      langs[lang] = true;
+    });
   });
 
   const perEr = {};

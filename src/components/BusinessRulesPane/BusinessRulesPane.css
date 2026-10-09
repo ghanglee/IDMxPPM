@@ -35,8 +35,8 @@
 
 .brp-col { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--border-primary); }
 .brp-col:last-child { border-right: none; }
-.brp-col-rules { width: 280px; flex-shrink: 0; }
-.brp-col-constraints { width: 300px; flex-shrink: 0; }
+.brp-col-rules { width: 380px; flex-shrink: 0; }
+.brp-col-constraints { width: 280px; flex-shrink: 0; }
 .brp-col-editor { flex: 1; min-width: 0; overflow-y: auto; }
 
 .brp-col-head {
@@ -94,7 +94,7 @@
 }
 .brp-ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.brp-rule-form { padding: 10px 12px; border-top: 1px solid var(--border-primary); overflow-y: auto; max-height: 55%; }
+.brp-rule-form { padding: 10px 12px; border-top: 1px solid var(--border-primary); overflow-y: auto; max-height: 64%; }
 
 .brp-field { margin-bottom: 14px; }
 .brp-field label, .brp-field-head > label { display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; }
@@ -196,3 +196,11 @@
 .brp-issue-error { color: var(--error); background: rgba(241, 76, 76, 0.1); }
 .brp-issue-warning { color: var(--warning); background: rgba(206, 145, 120, 0.12); }
 .brp-inline-issue { margin-top: 4px; padding: 3px 8px; font-size: 12px; border-radius: var(--radius-sm); }
+
+/* Rev 12 statements and images */
+.brp-statement { display: grid; grid-template-columns: minmax(0, 1fr) 88px; gap: 6px; margin-bottom: 8px; }
+.brp-statement-side { display: flex; gap: 2px; align-items: flex-start; }
+.brp-statement .brp-inline-issue { grid-column: 1 / -1; margin-top: 0; }
+.brp-input-invalid { border-color: var(--error) !important; }
+.brp-image { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 6px; align-items: center; margin-bottom: 6px; }
+.brp-image img { width: 56px; height: 40px; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--border-secondary); }

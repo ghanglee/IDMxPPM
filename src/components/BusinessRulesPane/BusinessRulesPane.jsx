@@ -8,6 +8,10 @@ import {
   collectConstraints,
   nextConstraintId,
   nextBusinessRuleId,
+  newBusinessRule,
+  getRuleStatements,
+  migrateBusinessRules,
+  newId,
   tokensToDisplay,
   displayToTokens,
   iuDisplayToken,
@@ -25,7 +29,7 @@ import {
  * re-render the whole application on every keystroke.
  * Exposes insertAtCursor(text) for the "Insert IU reference" helper.
  */
-const DraftField = forwardRef(({ value, onCommit, multiline = false, className = '', placeholder, rows = 3, toDisplay, fromDisplay }, ref) => {
+const DraftField = forwardRef(({ value, onCommit, multiline = false, className = '', placeholder, rows = 3, toDisplay, fromDisplay, listId }, ref) => {
   const shown = toDisplay ? toDisplay(value ?? '') : (value ?? '');
   const [draft, setDraftState] = useState(shown);
   const latest = useRef(shown);
@@ -70,8 +74,99 @@ const DraftField = forwardRef(({ value, onCommit, multiline = false, className =
     onChange: (e) => setDraft(e.target.value),
     onBlur: commit
   };
-  return multiline ? <textarea rows={rows} {...common} /> : <input type="text" {...common} />;
+  return multiline ? <textarea rows={rows} {...common} /> : <input type="text" list={listId} {...common} />;
 });
+
+const BCP47 = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$/;
+const LANG_SUGGESTIONS = ['en', 'en-US', 'en-GB', 'ko', 'ja', 'zh-CN', 'de', 'fr'];
+
+/** Business rule statements (idmXSD Rev 12): one per language, optional BCP 47 tag. */
+const StatementsEditor = ({ statements, onChange }) => {
+  const listId = React.useId();
+  const counts = {};
+  statements.forEach(st => { const k = (st.lang || '').trim(); counts[k] = (counts[k] || 0) + 1; });
+  const update = (id, patch) => onChange(statements.map(st => (st.id === id ? { ...st, ...patch } : st)));
+
+  return (
+    <div className="brp-field">
+      <div className="brp-field-head">
+        <label>Statements</label>
+        <button className="brp-btn" onClick={() => onChange([...statements, { id: newId(), text: '', lang: '' }])}>+ Language</button>
+      </div>
+      {statements.map(st => {
+        const lang = (st.lang || '').trim();
+        const langBad = lang !== '' && !BCP47.test(lang);
+        const dup = counts[lang] > 1;
+        return (
+          <div className="brp-statement" key={st.id}>
+            <DraftField
+              multiline
+              rows={3}
+              className="brp-input brp-textarea"
+              value={st.text}
+              placeholder="The business rule in natural language, e.g. as stated in a legal clause"
+              onCommit={(v) => update(st.id, { text: v })}
+            />
+            <div className="brp-statement-side">
+              <DraftField
+                className={`brp-input ${langBad || dup ? 'brp-input-invalid' : ''}`}
+                value={st.lang || ''}
+                placeholder="lang"
+                listId={listId}
+                onCommit={(v) => update(st.id, { lang: v.trim() })}
+              />
+              {statements.length > 1 && (
+                <button className="brp-icon-btn" title="Remove statement" onClick={() => onChange(statements.filter(x => x.id !== st.id))}>×</button>
+              )}
+            </div>
+            {(langBad || dup) && (
+              <div className="brp-issue-error brp-inline-issue">
+                {langBad ? 'Not a valid BCP 47 language tag (e.g. en, ko, zh-CN)' : `More than one statement ${lang ? `for "${lang}"` : 'without a language'}`}
+              </div>
+            )}
+          </div>
+        );
+      })}
+      <datalist id={listId}>{LANG_SUGGESTIONS.map(l => <option key={l} value={l} />)}</datalist>
+    </div>
+  );
+};
+
+/** Images attached to a business rule (idmXSD Rev 12 businessRule/image). */
+const RuleImagesEditor = ({ images, onChange }) => {
+  const fileRef = useRef(null);
+  const addFiles = (files) => {
+    Array.from(files || []).filter(f => f.type.startsWith('image/')).forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (e) => onChange(prev => [...prev, {
+        id: newId(), name: file.name, caption: file.name.replace(/\.[^.]+$/, ''), type: file.type, data: e.target.result
+      }]);
+      reader.readAsDataURL(file);
+    });
+  };
+  return (
+    <div className="brp-field">
+      <div className="brp-field-head">
+        <label>Images</label>
+        <button className="brp-btn" onClick={() => fileRef.current?.click()}>+ Add image</button>
+        <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
+      </div>
+      {images.length === 0 && <div className="brp-hint">No images.</div>}
+      {images.map(img => (
+        <div className="brp-image" key={img.id}>
+          {img.data ? <img src={img.data} alt={img.caption || ''} /> : <span className="brp-hint">{img.filePath}</span>}
+          <DraftField
+            className="brp-input"
+            value={img.caption || ''}
+            placeholder="Caption"
+            onCommit={(v) => onChange(prev => prev.map(x => (x.id === img.id ? { ...x, caption: v } : x)))}
+          />
+          <button className="brp-icon-btn" title="Remove image" onClick={() => onChange(prev => prev.filter(x => x.id !== img.id))}>×</button>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 const mapEr = (ers, erId, fn) => (ers || []).map(er => {
   if (er.id === erId) return fn(er);
@@ -189,12 +284,15 @@ const BusinessRulesPane = ({
 
   const addBusinessRule = () => {
     const id = nextBusinessRuleId(businessRules);
-    onBusinessRulesChange([...businessRules, { id, name: `Business rule ${id.replace('BR-', '')}`, description: '', reference: '' }]);
+    onBusinessRulesChange([...businessRules, newBusinessRule(id, `Business rule ${id.replace('BR-', '')}`)]);
     setBrFilter(id);
   };
 
   const patchBusinessRule = (id, patch) => {
-    onBusinessRulesChange(businessRules.map(b => (b.id === id ? { ...b, ...patch } : b)));
+    // Old-shape rules (description only) are normalised before the patch is applied
+    onBusinessRulesChange(businessRules.map(b => (b.id === id
+      ? { ...migrateBusinessRules([b]).rules[0], ...(typeof patch === 'function' ? patch(migrateBusinessRules([b]).rules[0]) : patch) }
+      : b)));
   };
 
   const deleteBusinessRule = (id) => {
@@ -509,12 +607,14 @@ const BusinessRulesPane = ({
                   <label>Name *</label>
                   <DraftField className="brp-input" value={selectedBr.name} onCommit={(v) => patchBusinessRule(selectedBr.id, { name: v })} />
                 </div>
-                <div className="brp-field">
-                  <label>Statement</label>
-                  <DraftField multiline rows={4} className="brp-input brp-textarea" value={selectedBr.description}
-                    placeholder="The business rule as stated in the source, e.g. a legal clause"
-                    onCommit={(v) => patchBusinessRule(selectedBr.id, { description: v })} />
-                </div>
+                <StatementsEditor
+                  statements={getRuleStatements(selectedBr)}
+                  onChange={(list) => patchBusinessRule(selectedBr.id, { statements: list })}
+                />
+                <RuleImagesEditor
+                  images={selectedBr.images || []}
+                  onChange={(updater) => patchBusinessRule(selectedBr.id, (b) => ({ images: updater(b.images || []) }))}
+                />
                 <div className="brp-field">
                   <label>Reference (one per line)</label>
                   <DraftField multiline rows={2} className="brp-input brp-textarea" value={selectedBr.reference}
