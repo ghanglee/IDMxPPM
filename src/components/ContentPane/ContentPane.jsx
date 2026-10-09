@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect, memo } from 'react';
+import { ruleLabel } from '../../utils/constraintUtils';
 import {
   CloseIcon,
   SpecificationIcon,
@@ -2219,7 +2220,7 @@ const ContentPane = ({
         ) : (
           <ul className="pane-business-rule-list">
             {(headerData.businessRules || []).map(br => (
-              <li key={br.id}><span className="pane-business-rule-id">{br.id}</span> {br.name || '(unnamed)'}</li>
+              <li key={br.id}><span className="pane-business-rule-id">{ruleLabel(br.id)}</span> {br.name || '(unnamed)'}</li>
             ))}
           </ul>
         )}

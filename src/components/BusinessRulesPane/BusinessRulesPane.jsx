@@ -8,6 +8,7 @@ import {
   collectConstraints,
   nextConstraintId,
   nextBusinessRuleId,
+  ruleLabel,
   newBusinessRule,
   normalizeBusinessRule,
   newId,
@@ -150,7 +151,7 @@ const BusinessRulesPane = ({
   initialIuId = null,
   onClose
 }) => {
-  const [brFilter, setBrFilter] = useState('all'); // 'all' | 'unlinked' | business rule id
+  const [brFilter, setBrFilter] = useState(null); // selected business rule id; null = all constraints
   const [iuFilter, setIuFilter] = useState(initialIuId);
   const [selectedKey, setSelectedKey] = useState(null); // `${erId}::${constraintId}`
   const [showIuPicker, setShowIuPicker] = useState(false);
@@ -193,8 +194,7 @@ const BusinessRulesPane = ({
   // ── Filtering ────────────────────────────────────────────────────────────
   const visibleConstraints = useMemo(() => allConstraints.filter(({ constraint }) => {
     if (iuFilter && !(constraint.informationUnitIds || []).includes(iuFilter)) return false;
-    if (brFilter === 'all') return true;
-    if (brFilter === 'unlinked') return !(constraint.businessRuleIds || []).length;
+    if (!brFilter) return true;
     return (constraint.businessRuleIds || []).includes(brFilter);
   }), [allConstraints, brFilter, iuFilter]);
 
@@ -204,7 +204,6 @@ const BusinessRulesPane = ({
   );
 
   const countFor = (brId) => allConstraints.filter(({ constraint }) => (constraint.businessRuleIds || []).includes(brId)).length;
-  const unlinkedCount = allConstraints.filter(({ constraint }) => !(constraint.businessRuleIds || []).length).length;
 
   // ── Mutations ────────────────────────────────────────────────────────────
   const patchConstraint = (erId, cId, patch) => {
@@ -222,7 +221,7 @@ const BusinessRulesPane = ({
     if (!ownerErId) ownerErId = allERs[0].id;
     const constraint = {
       id: nextConstraintId(erHierarchy),
-      businessRuleIds: brFilter !== 'all' && brFilter !== 'unlinked' ? [brFilter] : [],
+      businessRuleIds: brFilter ? [brFilter] : [],
       informationUnitIds: iuFilter ? [iuFilter] : [],
       description: '',
       expressions: []
@@ -274,7 +273,7 @@ const BusinessRulesPane = ({
       if (pruned.changed) onReplaceErHierarchy(pruned.erHierarchy);
     }
     onBusinessRulesChange(businessRules.filter(b => b.id !== id));
-    setBrFilter('all');
+    setBrFilter(null);
   };
 
   const toggleIu = (constraint, erId, iuId) => {
@@ -376,7 +375,7 @@ const BusinessRulesPane = ({
               const br = businessRules.find(b => b.id === id);
               return (
                 <span key={id} className={`brp-chip ${br ? '' : 'brp-chip-missing'}`}>
-                  {br ? br.name : `(missing) ${id}`}
+                  {br ? `${ruleLabel(br.id)} · ${br.name}` : `(missing) ${id}`}
                   <button onClick={() => patchConstraint(erId, constraint.id, { businessRuleIds: linkedBrIds.filter(x => x !== id) })} title="Remove link">×</button>
                 </span>
               );
@@ -390,7 +389,7 @@ const BusinessRulesPane = ({
                 }}
               >
                 <option value="">+ Link business rule…</option>
-                {unlinkedBrs.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                {unlinkedBrs.map(b => <option key={b.id} value={b.id}>{ruleLabel(b.id)} · {b.name}</option>)}
               </select>
             )}
             {businessRules.length === 0 && <span className="brp-hint">No business rules defined yet — add one in the left column.</span>}
@@ -556,15 +555,16 @@ const BusinessRulesPane = ({
               <button className="brp-btn" onClick={addBusinessRule}>+ Add</button>
             </div>
             <div className="brp-list">
-              <div className={`brp-list-item ${brFilter === 'all' ? 'active' : ''}`} onClick={() => setBrFilter('all')}>
-                <span>All constraints</span><span className="brp-count">{allConstraints.length}</span>
-              </div>
-              <div className={`brp-list-item ${brFilter === 'unlinked' ? 'active' : ''}`} onClick={() => setBrFilter('unlinked')}>
-                <span>Not linked to a rule</span><span className="brp-count">{unlinkedCount}</span>
-              </div>
+              {businessRules.length === 0 && <div className="brp-hint brp-pad">No business rules yet. Use + Add.</div>}
               {businessRules.map(br => (
-                <div key={br.id} className={`brp-list-item ${brFilter === br.id ? 'active' : ''}`} onClick={() => setBrFilter(br.id)}>
-                  <span className="brp-ellipsis" title={br.name}>{br.name || '(unnamed)'}</span>
+                <div
+                  key={br.id}
+                  className={`brp-list-item ${brFilter === br.id ? 'active' : ''}`}
+                  onClick={() => setBrFilter(brFilter === br.id ? null : br.id)}
+                  title={brFilter === br.id ? 'Click again to show all constraints' : 'Show only the constraints of this rule'}
+                >
+                  <span className="brp-rule-no">{ruleLabel(br.id)}</span>
+                  <span className="brp-ellipsis brp-rule-name" title={br.name}>{br.name || '(unnamed)'}</span>
                   <span className="brp-count">{countFor(br.id)}</span>
                 </div>
               ))}
@@ -611,6 +611,12 @@ const BusinessRulesPane = ({
               <span>Constraints</span>
               <button className="brp-btn" onClick={addConstraint} disabled={allERs.length === 0}>+ Add</button>
             </div>
+            {selectedBr && (
+              <div className="brp-filter-chip">
+                Business rule: <strong>{ruleLabel(selectedBr.id)} {selectedBr.name}</strong>
+                <button onClick={() => setBrFilter(null)} title="Show all constraints">×</button>
+              </div>
+            )}
             {iuFilter && (
               <div className="brp-filter-chip">
                 Information unit: <strong>{filterIuName}</strong>
@@ -633,7 +639,10 @@ const BusinessRulesPane = ({
                       </span>
                     </div>
                     <div className="brp-constraint-text">{text || <em>(no description)</em>}</div>
-                    <div className="brp-constraint-er">{erName}</div>
+                    <div className="brp-constraint-er">
+                      {erName}
+                      {(constraint.businessRuleIds || []).length > 0 && ` · ${(constraint.businessRuleIds || []).map(ruleLabel).join(', ')}`}
+                    </div>
                   </div>
                 );
               })}

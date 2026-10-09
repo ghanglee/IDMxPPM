@@ -118,6 +118,12 @@ export const nextConstraintId = (erHierarchy) => {
   return `C-${max + 1}`;
 };
 
+/** Short display number for a rule id: BR-1 / BR-07 -> BR1 / BR7; other ids are shown as they are. */
+export const ruleLabel = (id) => {
+  const m = /^BR[-_ ]?0*(\d+)$/i.exec(String(id || ''));
+  return m ? `BR${m[1]}` : String(id || '');
+};
+
 export const nextBusinessRuleId = (businessRules) => {
   const max = (businessRules || []).reduce((n, br) => Math.max(n, idNumber(br.id, 'BR')), 0);
   return `BR-${max + 1}`;

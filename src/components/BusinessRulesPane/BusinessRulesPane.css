@@ -202,3 +202,7 @@
 .brp-input-invalid { border-color: var(--error) !important; }
 .brp-image { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 6px; align-items: center; margin-bottom: 6px; }
 .brp-image img { width: 56px; height: 40px; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--border-secondary); }
+
+/* Business rules list: rule number + name */
+.brp-rule-no { flex-shrink: 0; min-width: 34px; font-weight: 600; color: var(--text-secondary); }
+.brp-rule-name { flex: 1; min-width: 0; }
