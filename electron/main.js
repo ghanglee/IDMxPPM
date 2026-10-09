@@ -5,6 +5,9 @@ const fs = require('fs');
 // 개발 모드 확인 (Node.js version compatibility)
 const isDev = app && app.isPackaged !== undefined ? !app.isPackaged : process.env.NODE_ENV !== 'production';
 
+// mvdXML import/export is under development and switched off (keep in sync with src/utils/features.js)
+const MVDXML_ENABLED = false;
+
 let mainWindow;
 
 function createWindow() {
@@ -235,11 +238,11 @@ async function handleOpenProject() {
       { name: 'idmXML 1.0 (.zip)', extensions: ['zip', 'idmx'] },
       { name: 'LOIN XML (.xml)', extensions: ['xml'] },
       { name: 'IDS (.ids)', extensions: ['ids'] },
-      { name: 'mvdXML (.mvdxml, .xml)', extensions: ['mvdxml', 'xml'] },
+      ...(MVDXML_ENABLED ? [{ name: 'mvdXML (.mvdxml, .xml)', extensions: ['mvdxml', 'xml'] }] : []),
       { name: 'xPPM Legacy (.xppm)', extensions: ['xppm'] },
       { name: 'BPMN Diagram (.bpmn)', extensions: ['bpmn'] },
       { name: 'Reviewed HTML (.html)', extensions: ['html', 'htm'] },
-      { name: 'All Supported Formats', extensions: ['idm', 'json', 'xml', 'ids', 'mvdxml', 'zip', 'idmx', 'xppm', 'bpmn', 'html', 'htm'] },
+      { name: 'All Supported Formats', extensions: ['idm', 'json', 'xml', 'ids', ...(MVDXML_ENABLED ? ['mvdxml'] : []), 'zip', 'idmx', 'xppm', 'bpmn', 'html', 'htm'] },
       { name: 'All Files', extensions: ['*'] }
     ],
     properties: ['openFile']
@@ -296,19 +299,22 @@ async function handleOpenProject() {
       } else {
         // Unknown XML — ask user
         const { dialog: electronDialog } = require('electron');
+        const choices = [
+          { label: 'As idmXML', type: 'idmxml' },
+          { label: 'As LOIN', type: 'loin' },
+          ...(MVDXML_ENABLED ? [{ label: 'As mvdXML', type: 'mvdxml' }] : []),
+          { label: 'As BPMN', type: 'bpmn' }
+        ];
         const choice = electronDialog.showMessageBoxSync(mainWindow, {
           type: 'question',
           title: 'Unknown XML Format',
-          message: `The file "${path.basename(filePath)}" could not be identified as idmXML, LOIN, IDS, mvdXML, or BPMN.\n\nHow would you like to open it?`,
-          buttons: ['As idmXML', 'As LOIN', 'As mvdXML', 'As BPMN', 'Cancel'],
+          message: `The file "${path.basename(filePath)}" could not be identified as idmXML, LOIN, IDS, ${MVDXML_ENABLED ? 'mvdXML, ' : ''}or BPMN.\n\nHow would you like to open it?`,
+          buttons: [...choices.map(c => c.label), 'Cancel'],
           defaultId: 0,
-          cancelId: 4,
+          cancelId: choices.length,
         });
-        if (choice === 0) type = 'idmxml';
-        else if (choice === 1) type = 'loin';
-        else if (choice === 2) type = 'mvdxml';
-        else if (choice === 3) type = 'bpmn';
-        else return; // Cancel
+        if (choice >= choices.length) return; // Cancel
+        type = choices[choice].type;
       }
     }
     // .json and .idm are treated as 'project' type

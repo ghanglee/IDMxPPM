@@ -35,6 +35,7 @@ import { isIdsXml, parseIdsXml } from './utils/idsImporter';
 import { generateMvdXml } from './utils/mvdXmlExporter';
 import { isMvdXml, parseMvdXml } from './utils/mvdXmlImporter';
 import { validateMvdXml } from './utils/mvdXmlValidator';
+import { FEATURES, MVDXML_DISABLED_MESSAGE } from './utils/features';
 import { importXppm } from './utils/xppmImporter';
 import { normalizePath, basename as fpBasename, bpmnCandidates, imageCandidates } from './utils/filePathUtils.js';
 import {
@@ -3087,6 +3088,11 @@ const App = () => {
         const isIdmXmlContent = isIdmTag && isV2;
         const isXppmContent = isIdmTag && !isV2;
 
+        if (isMvdContent && !FEATURES.mvdXml) {
+          alert(MVDXML_DISABLED_MESSAGE);
+          return;
+        }
+
         if (isMvdContent) {
           // mvdXML detected — validate then route to mvdXML importer
           const mvdValidation = validateMvdXml(content);
@@ -3415,6 +3421,9 @@ const App = () => {
           setIsDirty(true);
           setHasActiveProject(true);
         }
+      } else if (fileName.endsWith('.mvdxml') && !FEATURES.mvdXml) {
+        alert(MVDXML_DISABLED_MESSAGE);
+        return;
       } else if (fileName.endsWith('.mvdxml')) {
         // Validate then parse as mvdXML file
         const mvdValidation = validateMvdXml(content);
@@ -4609,6 +4618,10 @@ const App = () => {
         }
 
         case 'mvd': {
+          if (!FEATURES.mvdXml) {
+            alert(MVDXML_DISABLED_MESSAGE);
+            return;
+          }
           // mvdXML 1.2 (buildingSMART Model View Definition)
           const mvdResult = generateMvdXml({ headerData, erHierarchy });
 
@@ -5083,6 +5096,9 @@ const App = () => {
           alert('Failed to parse IDS file: ' + idsErr.message);
           isLoadingProjectRef.current = false;
         }
+      } else if (data.type === 'mvdxml' && !FEATURES.mvdXml) {
+        alert(MVDXML_DISABLED_MESSAGE);
+        return;
       } else if (data.type === 'mvdxml') {
         // Handle mvdXML import — validate first
         const mvdValidation = validateMvdXml(data.content);
@@ -5886,7 +5902,9 @@ const App = () => {
                     </div>
                   </div>
 
-                  {/* mvdXML 1.2 + inline sub-options */}
+                  {/* mvdXML 1.2 + inline sub-options (hidden while mvdXML is under development) */}
+                  {FEATURES.mvdXml && (
+                  <>
                   <div className={`export-format-option ${exportFormat === 'mvd' ? 'selected' : ''}`} data-format="mvd" onClick={() => setExportFormat('mvd')}>
                     <input type="radio" name="exportFormat" value="mvd" checked={exportFormat === 'mvd'} onChange={(e) => setExportFormat(e.target.value)} />
                     <div className="export-format-content">
@@ -5912,6 +5930,8 @@ const App = () => {
                       )}
                     </div>
                   </div>
+                  </>
+                  )}
 
                   {/* LOIN XML */}
                   <div className={`export-format-option ${exportFormat === 'loin' ? 'selected' : ''}`} data-format="loin" onClick={() => setExportFormat('loin')}>

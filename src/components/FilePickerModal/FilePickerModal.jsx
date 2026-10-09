@@ -1,4 +1,5 @@
 import React, { useRef } from 'react';
+import { FEATURES } from '../../utils/features';
 import './FilePickerModal.css';
 
 /**
@@ -9,7 +10,7 @@ const FilePickerModal = ({ isOpen, onClose, onFileSelected }) => {
   const fileInputRef = useRef(null);
   const selectedFormatRef = useRef(null);
 
-  const fileFormats = [
+  const allFileFormats = [
     {
       id: 'idm',
       name: 'IDM Project',
@@ -70,10 +71,12 @@ const FilePickerModal = ({ isOpen, onClose, onFileSelected }) => {
       id: 'all',
       name: 'All Supported Formats',
       extension: '.*',
-      accept: '.idm,.json,.xml,.ids,.mvdxml,.zip,.idmx,.xppm,.bpmn,.html,.htm',
+      accept: FEATURES.mvdXml ? '.idm,.json,.xml,.ids,.mvdxml,.zip,.idmx,.xppm,.bpmn,.html,.htm' : '.idm,.json,.xml,.ids,.zip,.idmx,.xppm,.bpmn,.html,.htm',
       description: 'Show all supported file types'
     }
   ];
+  // mvdXML is under development: not offered while the feature is off
+  const fileFormats = allFileFormats.filter(f => FEATURES.mvdXml || f.id !== 'mvdxml');
 
   const handleFormatClick = (format) => {
     selectedFormatRef.current = format;
