@@ -3,6 +3,43 @@
  * Validates IDM data against ISO 29481-3 requirements
  */
 
+import { validateConstraintModel } from './constraintUtils.js';
+
+const BCP47_PATTERN = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$/;
+
+/**
+ * Synonym checks (idmXSD v2.0 Rev 10): language tags must be BCP 47, and the same
+ * synonym must not appear twice for one language (also when no language is given).
+ */
+const validateSynonyms = (ers) => {
+  const errors = [];
+  const visitIUs = (ius, erName) => (ius || []).forEach(iu => {
+    const seen = {};
+    (iu.synonyms || []).forEach(syn => {
+      const text = (syn.text || '').trim();
+      const lang = (syn.lang || '').trim();
+      if (!text) return;
+      if (lang && !BCP47_PATTERN.test(lang)) {
+        errors.push({ category: 'informationUnit', field: 'synonyms', path: `er.${erName}.${iu.id}.synonyms`,
+          message: `Information unit "${iu.name}": "${lang}" is not a valid language tag`, severity: 'error' });
+      }
+      const key = `${lang}\u0000${text}`;
+      if (seen[key]) {
+        errors.push({ category: 'informationUnit', field: 'synonyms', path: `er.${erName}.${iu.id}.synonyms`,
+          message: `Information unit "${iu.name}": duplicate synonym "${text}"${lang ? ` (${lang})` : ''}`, severity: 'error' });
+      }
+      seen[key] = true;
+    });
+    visitIUs(iu.subInformationUnits, erName);
+  });
+  const visitERs = (list) => (list || []).forEach(er => {
+    visitIUs(er.informationUnits, er.name || er.id);
+    visitERs(er.subERs);
+  });
+  visitERs(ers);
+  return errors;
+};
+
 /**
  * Validation result object
  * @typedef {Object} ValidationError
@@ -381,6 +418,17 @@ export const validateProject = ({ headerData, bpmnXml, erDataMap, erHierarchy })
     erHierarchy.forEach(er => {
       errors.push(...validateER(er, er.id));
       errors.push(...validateERIdmXsd(er, er.id));
+    });
+    errors.push(...validateSynonyms(erHierarchy));
+    // Business rules and constraints (idmXSD v2.0 Rev 11)
+    validateConstraintModel(erHierarchy, headerData?.businessRules || []).forEach(issue => {
+      errors.push({
+        category: 'er',
+        field: 'constraints',
+        path: 'er.constraints',
+        message: issue.message,
+        severity: issue.severity
+      });
     });
   } else if (hasErDataMap) {
     // Legacy mode: validate from flat erDataMap

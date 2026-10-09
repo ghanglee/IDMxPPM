@@ -6,6 +6,7 @@
  */
 
 import { isDataUri, parseDataUri } from './filePathUtils.js';
+import { iuNameMap, resolveIuTokens } from './constraintUtils.js';
 import { toIso8601DateTime, hasTimeComponent } from './dateTime.js';
 
 // Generate UUID
@@ -235,6 +236,75 @@ const generateInformationUnitXml = (unit, indent = '      ') => {
 };
 
 /**
+ * Generate constraint elements (idmXSD v2.0 Rev 11).
+ * Links are repeatable child elements with a ref attribute; references to IUs or business
+ * rules that no longer exist are omitted so the output stays schema-valid.
+ * ctx: { iuNames: {iuId: name}, brIds: Set<string> }
+ */
+const generateConstraintsXml = (constraints, indent, ctx = {}) => {
+  const lines = [];
+  const iuNames = ctx.iuNames || {};
+  const brIds = ctx.brIds;
+  (constraints || []).forEach((constraint, idx) => {
+    lines.push(`${indent}<constraint id="${escapeXml(constraint.id || `constraint-${idx + 1}`)}">`);
+    (constraint.businessRuleIds || []).forEach(ref => {
+      if (!brIds || brIds.has(ref)) lines.push(`${indent}  <associatedBusinessRule ref="${escapeXml(ref)}"/>`);
+    });
+    (constraint.informationUnitIds || []).forEach(ref => {
+      if (Object.prototype.hasOwnProperty.call(iuNames, ref)) lines.push(`${indent}  <associatedInformationUnit ref="${escapeXml(ref)}"/>`);
+    });
+    const description = resolveIuTokens(constraint.description || '', iuNames);
+    if (description) {
+      lines.push(`${indent}  <description title="${escapeXml(description)}"/>`);
+    }
+    (constraint.expressions || []).forEach(expr => {
+      const lang = expr.language || {};
+      const attrs = [];
+      if (expr.form === 'external' && expr.uri) attrs.push(`uri="${escapeXml(expr.uri)}"`);
+      lines.push(`${indent}  <expression${attrs.length ? ' ' + attrs.join(' ') : ''}>`);
+      const langAttrs = [`name="${escapeXml(lang.name || '')}"`];
+      if (lang.version) langAttrs.push(`version="${escapeXml(lang.version)}"`);
+      if (lang.publicationYear && /^-?\d{4,}$/.test(String(lang.publicationYear).trim())) {
+        langAttrs.push(`publicationYear="${escapeXml(String(lang.publicationYear).trim())}"`);
+      }
+      if (lang.uri) langAttrs.push(`uri="${escapeXml(lang.uri)}"`);
+      lines.push(`${indent}    <formalRuleLanguage ${langAttrs.join(' ')}/>`);
+      const body = String(expr.body || '').trim();
+      if (body && expr.form !== 'external') {
+        if (expr.form === 'xml') {
+          // Embedded markup in its own namespace; names substituted for IU tokens are escaped
+          const escapedNames = {};
+          Object.keys(iuNames).forEach(k => { escapedNames[k] = escapeXml(iuNames[k]); });
+          lines.push(resolveIuTokens(body.replace(/^<\?xml[^>]*\?>\s*/, ''), escapedNames));
+        } else {
+          const text = resolveIuTokens(body, iuNames).replace(/\]\]>/g, ']]]]><![CDATA[>');
+          lines.push(`<![CDATA[${text}]]>`);
+        }
+      }
+      lines.push(`${indent}  </expression>`);
+    });
+    lines.push(`${indent}</constraint>`);
+  });
+  return lines;
+};
+
+/** Generate uc/businessRule elements (idmXSD v2.0). */
+const generateBusinessRulesXml = (businessRules, indent) => {
+  const lines = [];
+  (businessRules || []).forEach((br, idx) => {
+    lines.push(`${indent}<businessRule id="${escapeXml(br.id || `BR-${idx + 1}`)}" name="${escapeXml(br.name || '')}">`);
+    lines.push(`${indent}  <proposition>`);
+    lines.push(`${indent}    <description title="${escapeXml(br.description || '')}"/>`);
+    lines.push(`${indent}  </proposition>`);
+    String(br.reference || '').split(/\r?\n/).map(r => r.trim()).filter(Boolean).forEach(ref => {
+      lines.push(`${indent}  <reference>${escapeXml(ref)}</reference>`);
+    });
+    lines.push(`${indent}</businessRule>`);
+  });
+  return lines;
+};
+
+/**
  * Generate Exchange Requirement XML (recursive for nested subERs)
  * Per ISO 29481-3 Clause 10: ER must have at least one informationUnit or subEr
  *
@@ -244,7 +314,7 @@ const generateInformationUnitXml = (unit, indent = '      ') => {
  * @param {boolean} isRoot - Whether this is the root ER element (not wrapped in subEr)
  * @returns {string} ER XML content
  */
-const generateErXml = (er, authorName, indent = '  ', isRoot = true) => {
+const generateErXml = (er, authorName, indent = '  ', isRoot = true, ctx = {}) => {
   const lines = [];
   const erGuid = ensureUUID(er.guid);
 
@@ -269,16 +339,8 @@ const generateErXml = (er, authorName, indent = '  ', isRoot = true) => {
   lines.push(`${indent}    </author>`);
   lines.push(`${indent}  </authoring>`);
 
-  // constraint (optional)
-  if (er.constraints && er.constraints.length > 0) {
-    er.constraints.forEach((constraint, idx) => {
-      lines.push(`${indent}  <constraint id="${escapeXml(constraint.id || `constraint-${idx + 1}`)}">`);
-      if (constraint.description) {
-        lines.push(`${indent}    <description title="${escapeXml(constraint.description)}"/>`);
-      }
-      lines.push(`${indent}  </constraint>`);
-    });
-  }
+  // constraint (optional) - idmXSD v2.0 Rev 11 child-element form
+  lines.push(...generateConstraintsXml(er.constraints, indent + '  ', ctx));
 
   // correspondingMvd (optional)
   if (er.correspondingMvd && er.correspondingMvd.length > 0) {
@@ -329,7 +391,7 @@ const generateErXml = (er, authorName, indent = '  ', isRoot = true) => {
     er.subERs.forEach(subER => {
       lines.push(`${indent}  <subEr>`);
       lines.push(`${indent}    <er>`);
-      lines.push(generateErXml(subER, authorName, indent + '    ', false));
+      lines.push(generateErXml(subER, authorName, indent + '    ', false, ctx));
       lines.push(`${indent}    </er>`);
       lines.push(`${indent}  </subEr>`);
     });
@@ -773,6 +835,9 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, da
     });
   }
 
+  // Business rules (idmXSD v2.0) - after constructionEntity, before actor
+  lines.push(...generateBusinessRulesXml(headerData?.businessRules, '    '));
+
   // Actors (per idmXSD V2 - must come before benefits/limitations per schema sequence)
   // Actor-to-BPMN shape mapping is now in businessContextMap (shapeAndActor), not in actor element
   if (headerData?.actorsList && headerData.actorsList.length > 0) {
@@ -976,14 +1041,18 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, da
   lines.push('  </businessContextMap>');
 
   // Exchange Requirements - per idmXSD V2, only 0..1 er at root level
+  const constraintCtx = {
+    iuNames: iuNameMap(erHierarchy || []),
+    brIds: new Set((headerData?.businessRules || []).map(b => b.id))
+  };
   // Use erHierarchy directly when available (preserves root ER's own IUs)
   if (erHierarchy && erHierarchy.length === 1) {
-    lines.push(generateErXml(erHierarchy[0], author, '  ', true));
+    lines.push(generateErXml(erHierarchy[0], author, '  ', true, constraintCtx));
   } else if (erHierarchy && erHierarchy.length > 1) {
     // Multiple top-level ERs: promote first ER as root, rest become its subERs
     const [syntheticRoot, ...rest] = erHierarchy;
     const mergedRoot = { ...syntheticRoot, subERs: [...(syntheticRoot.subERs || []), ...rest] };
-    lines.push(generateErXml(mergedRoot, author, '  ', true));
+    lines.push(generateErXml(mergedRoot, author, '  ', true, constraintCtx));
   } else if (erDataMap && Object.keys(erDataMap).length > 0) {
     // Fallback: generate synthetic root ER from legacy erDataMap
     lines.push(generateRootErXml(erDataMap, headerData, author));

@@ -14,6 +14,8 @@
  *   _idsMaterial / _idsClassification / _idsPartOf: generate correct facet types.
  */
 
+import { deriveIuConstraints } from './constraintUtils.js';
+
 // Fallback map: IDM generic data types → IFC defined types
 // Used only when the original IFC type cannot be recovered from iu.definition
 const DATA_TYPE_MAP = {
@@ -494,7 +496,9 @@ function analyzeERForSpecs(er) {
  *                                      Used only when a spec has no per-spec ifcVersion.
  * @returns {{ xml: string, specCount: number, skippedCount: number }}
  */
-export function generateIdsXml({ headerData, erHierarchy, ifcVersion = 'IFC4X3_ADD2' }) {
+export function generateIdsXml({ headerData, erHierarchy: rawErHierarchy, ifcVersion = 'IFC4X3_ADD2' }) {
+  // Constraints are ER-level (idmXSD Rev 11); IDS facets still read per-IU constraint text
+  const erHierarchy = deriveIuConstraints(rawErHierarchy || [], headerData?.businessRules || []);
   const allERs = collectAllERs(erHierarchy || []);
 
   const authorEmail = (() => {

@@ -589,6 +589,12 @@ const parseIdmElement = (idmRoot, xmlDoc) => {
         }
       }
 
+      // Business rules (uc/businessRule)
+      const businessRuleEls = getDirectChildren(uc, 'businessRule');
+      if (businessRuleEls.length > 0) {
+        result.headerData.businessRules = businessRuleEls.map(parseBusinessRule);
+      }
+
       // Actors - support IDM 2.0 structure with actorType, bpmnShapeName, and subActors
       const actorElements = getDirectChildren(uc, 'actor');
       if (actorElements.length > 0) {
@@ -1049,6 +1055,7 @@ const parseIdmElement = (idmRoot, xmlDoc) => {
       benefitsFigures: [],
       limitationsFigures: [],
       actorsList: [],
+      businessRules: [],
       preconditions: '',
       postconditions: '',
       triggeringEvents: '',
@@ -1107,6 +1114,96 @@ export const parseIdmXml = (xmlContent) => {
 };
 
 /**
+ * Parse a business rule (uc/businessRule) into { id, name, description, reference }.
+ * Multiple <reference> elements are joined by newlines.
+ */
+const parseBusinessRule = (brEl, index) => {
+  const proposition = getFirstChild(brEl, 'proposition');
+  const descriptions = proposition ? getDirectChildren(proposition, 'description') : [];
+  const description = descriptions
+    .map(d => trimStr(d.getAttribute('title')) || trimStr(d.textContent))
+    .filter(Boolean)
+    .join('\n\n');
+  const reference = getDirectChildren(brEl, 'reference')
+    .map(r => trimStr(r.textContent))
+    .filter(Boolean)
+    .join('\n');
+  return {
+    id: trimStr(brEl.getAttribute('id')) || `BR-${index + 1}`,
+    name: trimStr(brEl.getAttribute('name')),
+    description,
+    reference
+  };
+};
+
+/**
+ * Parse an ER-level constraint (idmXSD v2.0 Rev 11).
+ * Accepts the Rev 11 child-element form and, for older files, the ed. 2 draft attribute form
+ * (@associatedBusinessRule / @associatedInformationUnit).
+ */
+const parseConstraint = (cEl, index) => {
+  const constraint = {
+    id: trimStr(cEl.getAttribute('id')) || `C-${index + 1}`,
+    businessRuleIds: [],
+    informationUnitIds: [],
+    description: '',
+    expressions: []
+  };
+  const addUnique = (list, v) => { if (v && !list.includes(v)) list.push(v); };
+
+  getDirectChildren(cEl, 'associatedBusinessRule').forEach(e => addUnique(constraint.businessRuleIds, trimStr(e.getAttribute('ref'))));
+  getDirectChildren(cEl, 'associatedInformationUnit').forEach(e => addUnique(constraint.informationUnitIds, trimStr(e.getAttribute('ref'))));
+  // Legacy attribute form
+  addUnique(constraint.businessRuleIds, trimStr(cEl.getAttribute('associatedBusinessRule')));
+  addUnique(constraint.informationUnitIds, trimStr(cEl.getAttribute('associatedInformationUnit')));
+
+  constraint.description = getDirectChildren(cEl, 'description')
+    .map(d => trimStr(d.getAttribute('title')) || trimStr(d.textContent))
+    .filter(Boolean)
+    .join('\n');
+
+  getDirectChildren(cEl, 'expression').forEach(exprEl => {
+    const langEl = getFirstChild(exprEl, 'formalRuleLanguage');
+    const uri = trimStr(exprEl.getAttribute('uri'));
+    const elementChildren = [];
+    let text = '';
+    for (let i = 0; i < exprEl.childNodes.length; i++) {
+      const node = exprEl.childNodes[i];
+      if (node.nodeType === 1) {
+        if (node.localName !== 'formalRuleLanguage') elementChildren.push(node);
+      } else if (node.nodeType === 3 || node.nodeType === 4) {
+        text += node.nodeValue;
+      }
+    }
+    let form = 'text';
+    let body = '';
+    if (elementChildren.length > 0) {
+      form = 'xml';
+      const serializer = new XMLSerializer();
+      body = elementChildren.map(n => serializer.serializeToString(n)).join('\n');
+    } else if (text.trim()) {
+      body = text.trim();
+    } else if (uri) {
+      form = 'external';
+    }
+    constraint.expressions.push({
+      id: `expr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      language: {
+        name: trimStr(langEl?.getAttribute('name')),
+        version: trimStr(langEl?.getAttribute('version')),
+        publicationYear: trimStr(langEl?.getAttribute('publicationYear')),
+        uri: trimStr(langEl?.getAttribute('uri'))
+      },
+      form,
+      body,
+      uri
+    });
+  });
+
+  return constraint;
+};
+
+/**
  * Parse an ER element from XML
  */
 const parseErElement = (erElement) => {
@@ -1120,6 +1217,7 @@ const parseErElement = (erElement) => {
     examples: '',
     exampleImages: [],
     informationUnits: [],
+    constraints: [],
     subERs: []
   };
 
@@ -1241,6 +1339,11 @@ const parseErElement = (erElement) => {
       }
     });
   }
+
+  // Parse constraints (idmXSD v2.0 Rev 11)
+  getDirectChildren(erElement, 'constraint').forEach((cEl, i) => {
+    er.constraints.push(parseConstraint(cEl, i));
+  });
 
   // Parse information units - namespace-safe
   // Skip placeholder IUs that were auto-generated during export for schema compliance

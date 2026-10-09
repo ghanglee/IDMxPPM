@@ -25,6 +25,7 @@ import { parseIdmXml, isIdmXml, detectIdmXmlVersion, getFirstChild, getDirectChi
 import { readFileAsText } from './utils/pdfExporter';
 import { defaultIdmXslt } from './utils/defaultIdmXslt';
 import { generateStandaloneHtml } from './utils/htmlExporter';
+import { flattenIUs, pruneDanglingIuRefs, migrateLegacyConstraints, hasContentBeyondV1 } from './utils/constraintUtils';
 import { generateIdsXml } from './utils/idsExporter';
 import { validateIdsXml, formatValidationReport } from './utils/idsValidator';
 import { generateLoinXml } from './utils/loinExporter';
@@ -1379,6 +1380,45 @@ const App = () => {
     setErHierarchy(prev => updateErInHierarchy(prev, erId, updates));
     setIsDirty(true);
   }, [updateErInHierarchy]);
+
+  // Business rules / constraints (idmXSD v2.0 Rev 11)
+  // 1) Per-IU legacy constraints become ER-level constraints linked to the IU.
+  useEffect(() => {
+    const migrated = migrateLegacyConstraints(erHierarchy, headerData.businessRules || []);
+    if (!migrated.changed) return;
+    setErHierarchy(migrated.erHierarchy);
+    setHeaderData(prev => {
+      const known = new Set((prev.businessRules || []).map(b => b.id));
+      return { ...prev, businessRules: [...(prev.businessRules || []), ...migrated.businessRules.filter(b => !known.has(b.id))] };
+    });
+    setIsDirty(true);
+  }, [erHierarchy, headerData.businessRules]);
+
+  // 2) Any change to an IU keeps constraints consistent: when an IU disappears from the
+  //    hierarchy, constraints that referenced it lose that link. Only ids seen in the previous
+  //    hierarchy are pruned, so a freshly loaded file's own dangling refs are left for validation.
+  const knownIuIdsRef = useRef(new Set());
+  useEffect(() => {
+    const current = new Set(flattenIUs(erHierarchy).map(iu => iu.id));
+    const removed = new Set([...knownIuIdsRef.current].filter(id => !current.has(id)));
+    knownIuIdsRef.current = current;
+    if (removed.size === 0) return;
+    const pruned = pruneDanglingIuRefs(erHierarchy, removed);
+    if (pruned.changed) {
+      setErHierarchy(pruned.erHierarchy);
+      setIsDirty(true);
+    }
+  }, [erHierarchy]);
+
+  const handleBusinessRulesChange = useCallback((rules) => {
+    setHeaderData(prev => ({ ...prev, businessRules: rules }));
+    setIsDirty(true);
+  }, []);
+
+  const handleReplaceErHierarchy = useCallback((nextHierarchy) => {
+    setErHierarchy(nextHierarchy);
+    setIsDirty(true);
+  }, []);
 
   // Move ER up among siblings
   const handleMoveErUp = useCallback((erId) => {
@@ -4190,6 +4230,10 @@ const App = () => {
             bpmnFilePath: origBpmnFilePath  // preserve original path style (may have backslash)
           });
 
+          if (hasContentBeyondV1(erHierarchy, headerData?.businessRules || [])) {
+            showToast('idmXSD v1.0 has no synonyms, business rules or constraints — they were left out of this export. Use idmXML v2.0 to keep them.', 8000);
+          }
+
           const zipV1 = new JSZip();
           const zipV1Folder = zipV1.folder(zipFolderName);
           // Write with UTF-8 BOM and CRLF line endings — Windows IDM tools expect this format.
@@ -5507,6 +5551,9 @@ const App = () => {
                     onMoveERAsSubER={handleMoveErAsSubER}
                     newlyAddedErId={newlyAddedErId}
                     onClearNewlyAddedErId={() => setNewlyAddedErId(null)}
+                    businessRules={headerData.businessRules || []}
+                    onBusinessRulesChange={handleBusinessRulesChange}
+                    onReplaceErHierarchy={handleReplaceErHierarchy}
                   />
                 )}
 

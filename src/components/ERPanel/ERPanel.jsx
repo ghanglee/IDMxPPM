@@ -2,6 +2,8 @@ import React, { useState, useRef, useCallback, useEffect, useMemo, Component } f
 import './ERPanel.css';
 import { searchSchema, searchSchemaGrouped, searchBsdd, fetchBsddClassProperties, getAvailableSchemas, isSchemaSearchable, RateLimitError } from '../../utils/schemaSearch';
 import { getBsddCacheState, initBsddCache } from '../../utils/bsddCache';
+import BusinessRulesPane from '../BusinessRulesPane/BusinessRulesPane';
+import { collectConstraints, constraintsReferencingIUs, iuSubtreeIdsById, resolveIuTokens, iuNameMap } from '../../utils/constraintUtils';
 import {
   DataObjectIcon,
   InfoUnitIcon,
@@ -289,6 +291,9 @@ const ERPanel = ({
   onMoveERAsSubER,               // Callback to move ER as sub-ER of another ER
   newlyAddedErId = null,         // ID of newly added ER (for scrolling)
   onClearNewlyAddedErId,         // Callback to clear newly added ER ID after scrolling
+  businessRules = [],            // uc/businessRule entries (headerData.businessRules)
+  onBusinessRulesChange,         // Callback to replace the business rule list
+  onReplaceErHierarchy,          // Callback to replace the whole ER hierarchy (constraint edits)
 
   // Legacy props (for backward compatibility during migration)
   mode = 'detail',
@@ -309,6 +314,23 @@ const ERPanel = ({
   // Determine if using ER-first mode or legacy mode
   // ER-first mode is active when we have an ER hierarchy OR when a specific ER is selected
   const isErFirstMode = (erHierarchy?.length ?? 0) > 0 || selectedErId !== null;
+
+  // ER-level constraints grouped by the information units they reference
+  const constraintsByIu = useMemo(() => {
+    const map = {};
+    collectConstraints(erHierarchy).forEach(entry => {
+      (entry.constraint.informationUnitIds || []).forEach(iuId => {
+        (map[iuId] = map[iuId] || []).push(entry);
+      });
+    });
+    return map;
+  }, [erHierarchy]);
+  const constraintCountByIu = useMemo(() => {
+    const counts = {};
+    Object.keys(constraintsByIu).forEach(id => { counts[id] = constraintsByIu[id].length; });
+    return counts;
+  }, [constraintsByIu]);
+  const allIuNames = useMemo(() => iuNameMap(erHierarchy), [erHierarchy]);
 
   // Tree table state
   const [expandedNodes, setExpandedNodes] = useState(new Set());
@@ -357,6 +379,8 @@ const ERPanel = ({
 
   // Sub-ER selection modal state
   const [showSubERModal, setShowSubERModal] = useState(false);
+  const [showBusinessRules, setShowBusinessRules] = useState(false);
+  const [businessRulesIuId, setBusinessRulesIuId] = useState(null);
   const [subERModalTab, setSubERModalTab] = useState('current');
   const erXmlFileRef = useRef(null);
 
@@ -376,6 +400,19 @@ const ERPanel = ({
   // Detail panel resize state (proportion-based)
   const [detailPanelRatio, setDetailPanelRatio] = useState(0.5);
   const resizingRef = useRef(false);
+
+  // Rendered in both the ER-first and the legacy return paths
+  const businessRulesPane = showBusinessRules ? (
+    <BusinessRulesPane
+      businessRules={businessRules}
+      onBusinessRulesChange={onBusinessRulesChange}
+      erHierarchy={erHierarchy}
+      onReplaceErHierarchy={onReplaceErHierarchy}
+      selectedErId={selectedErId}
+      initialIuId={businessRulesIuId}
+      onClose={() => setShowBusinessRules(false)}
+    />
+  ) : null;
   const resizeStartYRef = useRef(0);
   const resizeStartRatioRef = useRef(0);
   const panelContainerRef = useRef(null);
@@ -1116,8 +1153,10 @@ const ERPanel = ({
     if (selectedItem.type === 'iu') {
       const parentErId = selectedItem.erParent || selectedIULocation?.parentErId;
       if (parentErId) {
+        // Constraints are ER-level now; never write the legacy per-IU field back
+        const { constraints: _legacyConstraints, ...iuFields } = selectedItem.data || {};
         const updatedIUData = {
-          ...selectedItem.data,
+          ...iuFields,
           name: trim(selectedItem.data?.name),
           definition: trim(selectedItem.data?.definition),
           examples: trim(selectedItem.data?.examples)
@@ -1397,6 +1436,13 @@ const ERPanel = ({
   // Delete Information Unit in ER-first mode
   const handleDeleteIU = useCallback((iuId, erParentId) => {
     if (!isErFirstMode || !onUpdateER) return;
+
+    // Constraints link to IUs by id; warn before cutting those links
+    const affected = constraintsReferencingIUs(erHierarchy, iuSubtreeIdsById(erHierarchy, iuId));
+    if (affected.length > 0) {
+      const list = affected.map(a => a.constraint.id).join(', ');
+      if (!window.confirm(`${affected.length} constraint(s) (${list}) reference this information unit. Deleting it removes the link from them. Continue?`)) return;
+    }
 
     const removeIURecursive = (ius) => {
       return ius
@@ -3147,6 +3193,18 @@ const ERPanel = ({
           <button className="er-toolbar-btn" onClick={handleCollapseAll} title="Collapse All">
             <CollapseAllIcon size={14} />
           </button>
+          {onReplaceErHierarchy && (
+            <>
+              <div className="er-toolbar-divider" />
+              <button
+                className="er-toolbar-btn"
+                onClick={() => { commitCurrentEdit(); setBusinessRulesIuId(null); setShowBusinessRules(true); }}
+                title="Business rules and constraints"
+              >
+                Rules
+              </button>
+            </>
+          )}
         </div>
 
         {/* Information Units and Sub-ERs Section Header */}
@@ -3281,8 +3339,7 @@ const ERPanel = ({
                   {!showBpmnEditor && (
                     <div className="er-tree-cell er-col-constraints">
                       {row.type === 'iu' && (() => {
-                        const c = row.data?.constraints;
-                        const count = Array.isArray(c) ? c.length : (c ? 1 : 0);
+                        const count = constraintCountByIu[row.id] || 0;
                         return count > 0 ? <span className="er-constraint-badge">{count}</span> : '-';
                       })()}
                     </div>
@@ -3402,69 +3459,37 @@ const ERPanel = ({
                       rows={3}
                     />
                   </div>
-                  {/* Constraints
-                      Normalise legacy string format (mvdXML/old imports) to array for display.
-                      On first edit the array is written back, migrating the IU in place. */}
+                  {/* Constraints (read-only here; edited in the Business Rules pane) */}
                   {(() => {
-                    const raw = selectedItem.data?.constraints;
-                    const constraintArr = Array.isArray(raw)
-                      ? raw
-                      : (raw ? [{ id: 'legacy-0', description: raw, businessRule: '' }] : []);
-                    const setConstraints = (updater) => setSelectedItem(prev => ({
-                      ...prev,
-                      data: { ...prev.data, constraints: updater(Array.isArray(prev.data?.constraints) ? prev.data.constraints : []) }
-                    }));
+                    const refs = selectedItem.id ? (constraintsByIu[selectedItem.id] || []) : [];
                     return (
                   <div className="er-card-field">
                     <div className="er-card-field-header">
                       <label>Constraints</label>
-                      <button
-                        className="er-link-btn"
-                        onClick={() => {
-                          const newConstraint = { id: uuid(), description: '', businessRule: '' };
-                          setConstraints(prev => [...prev, newConstraint]);
-                        }}
-                      >
-                        + Add Constraint
-                      </button>
+                      {onReplaceErHierarchy && (
+                        <button
+                          className="er-link-btn"
+                          onClick={() => { setBusinessRulesIuId(selectedItem.id); setShowBusinessRules(true); }}
+                        >
+                          {refs.length > 0 ? 'Edit in Business Rules…' : '+ Add constraint…'}
+                        </button>
+                      )}
                     </div>
-                    {constraintArr.length === 0 ? (
-                      <p className="er-empty-small">No constraints defined</p>
+                    {refs.length === 0 ? (
+                      <p className="er-empty-small">No constraints reference this information unit</p>
                     ) : (
                       <div className="er-constraint-list">
-                        {constraintArr.map((constraint, idx) => (
+                        {refs.map(({ constraint }) => (
                           <div key={constraint.id} className="er-constraint-item">
-                            <div className="er-constraint-index">{idx + 1}</div>
+                            <div className="er-constraint-index">{constraint.id}</div>
                             <div className="er-constraint-fields">
-                              <input
-                                type="text"
-                                value={constraint.description || ''}
-                                onChange={(e) => {
-                                  const v = e.target.value;
-                                  setConstraints(prev => prev.map(c =>
-                                    c.id === constraint.id ? { ...c, description: v } : c
-                                  ));
-                                }}
-                                placeholder="Constraint (e.g., > 0, length ≤ 100, must be unique, Pattern: RAL.*)"
-                                className="er-input-small er-constraint-desc"
-                              />
-                              <input
-                                type="text"
-                                value={constraint.businessRule || ''}
-                                onChange={(e) => {
-                                  const v = e.target.value;
-                                  setConstraints(prev => prev.map(c =>
-                                    c.id === constraint.id ? { ...c, businessRule: v } : c
-                                  ));
-                                }}
-                                placeholder="Business rule reference (optional, e.g., BR-001) → IDS instructions"
-                                className="er-input-small er-constraint-br"
-                              />
+                              {resolveIuTokens(constraint.description || '', allIuNames) || <em>(no description)</em>}
+                              {(constraint.businessRuleIds || []).length > 0 && (
+                                <span className="er-constraint-br-ref">
+                                  {' '}[{(constraint.businessRuleIds || []).map(id => businessRules.find(b => b.id === id)?.name || id).join('; ')}]
+                                </span>
+                              )}
                             </div>
-                            <button
-                              className="er-remove-btn"
-                              onClick={() => setConstraints(prev => prev.filter(c => c.id !== constraint.id))}
-                            >×</button>
                           </div>
                         ))}
                       </div>
@@ -3693,6 +3718,8 @@ const ERPanel = ({
           <span>{treeRows.filter(r => r.type === 'er' || r.type === 'subEr').length} ER(s), {treeRows.filter(r => r.type === 'iu').length} IU(s)</span>
           <span className="er-iso-ref">ISO 29481-3</span>
         </div>
+
+        {businessRulesPane}
 
         {/* Mapping Search Modal for ER-first mode */}
         {showMappingSearch && (
@@ -4030,6 +4057,15 @@ const ERPanel = ({
         <button className="er-toolbar-btn" onClick={openSubERModal} title="Add Sub-ER">
           <IndentIcon size={14} /> Sub-ER
         </button>
+        {isErFirstMode && onReplaceErHierarchy && (
+          <button
+            className="er-toolbar-btn"
+            onClick={() => { setBusinessRulesIuId(null); setShowBusinessRules(true); }}
+            title="Business rules and constraints"
+          >
+            Business rules
+          </button>
+        )}
         <div className="er-toolbar-divider" />
         <button className="er-toolbar-btn" onClick={handleExpandAll} title="Expand All">
           <ExpandAllIcon size={14} />
@@ -4442,6 +4478,8 @@ const ERPanel = ({
         </div>
         </SearchErrorBoundary>
       )}
+
+      {businessRulesPane}
 
       {/* Sub-ER Selection Modal */}
       {showSubERModal && (

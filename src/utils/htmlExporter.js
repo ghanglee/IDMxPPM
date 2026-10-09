@@ -4,6 +4,7 @@
  */
 
 import { defaultIdmXslt } from './defaultIdmXslt';
+import { deriveIuConstraints } from './constraintUtils.js';
 import { getRegionName } from './idmXmlParser';
 import { getReviewUIStyles, getReviewUIScript } from './reviewCommentingUI';
 
@@ -226,7 +227,7 @@ const collectImagesFromUnits = (units, images, erName) => {
 export const generateStandaloneHtml = async ({
   headerData,
   erDataMap,
-  erHierarchy,
+  erHierarchy: rawErHierarchy,
   bpmnSvg,
   bpmnXml,
   customXsltContent,
@@ -236,6 +237,8 @@ export const generateStandaloneHtml = async ({
   projectData,
   enableReview
 }) => {
+  // Constraints are ER-level (idmXSD Rev 11); the IU table shows the ones linked to each IU
+  const erHierarchy = rawErHierarchy ? deriveIuConstraints(rawErHierarchy, headerData?.businessRules || []) : rawErHierarchy;
   // When custom XSLT + generated idmXML are both available, apply the XSLT transformation
   // instead of the built-in JS-based HTML generator.
   if (customXsltContent && idmXmlContent) {
