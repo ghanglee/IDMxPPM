@@ -237,3 +237,6 @@
 .brp-expr-meta { display: flex; gap: 14px; margin: 0 0 4px; font-size: 11px; color: var(--text-secondary); }
 .brp-expr-meta code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .brp-expr-ids { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 6px; }
+
+/* Expression editor: language name next to the title */
+.brp-expr-head .brp-expr-lang-name { flex: 0 1 260px; width: auto; }

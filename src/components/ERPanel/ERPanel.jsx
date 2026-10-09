@@ -3447,7 +3447,7 @@ const ERPanel = ({
                       rows={3}
                     />
                   </div>
-                  {/* Constraints (read-only here; edited in the Business Rules pane) */}
+                  {/* Constraints: click one to open it in the Business Rules & Constraints dialog */}
                   {(() => {
                     const refs = selectedItem.id ? (constraintsByIu[selectedItem.id] || []) : [];
                     return (
@@ -3457,9 +3457,9 @@ const ERPanel = ({
                       {onOpenBusinessRules && (
                         <button
                           className="er-link-btn"
-                          onClick={() => { commitCurrentEdit(); onOpenBusinessRules(selectedItem.id); }}
+                          onClick={() => { commitCurrentEdit(); onOpenBusinessRules({ iuId: selectedItem.id, addNew: true }); }}
                         >
-                          {refs.length > 0 ? 'Edit in Business Rules…' : '+ Add constraint…'}
+                          + Add
                         </button>
                       )}
                     </div>
@@ -3467,8 +3467,16 @@ const ERPanel = ({
                       <p className="er-empty-small">No constraints reference this information unit</p>
                     ) : (
                       <div className="er-constraint-list">
-                        {refs.map(({ constraint }) => (
-                          <div key={constraint.id} className="er-constraint-item">
+                        {refs.map(({ constraint, erId }) => (
+                          <div
+                            key={`${erId}::${constraint.id}`}
+                            className="er-constraint-item er-constraint-item-link"
+                            role="button"
+                            tabIndex={0}
+                            title="Open this constraint"
+                            onClick={() => { commitCurrentEdit(); onOpenBusinessRules?.({ iuId: selectedItem.id, constraintKey: `${erId}::${constraint.id}` }); }}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); commitCurrentEdit(); onOpenBusinessRules?.({ iuId: selectedItem.id, constraintKey: `${erId}::${constraint.id}` }); } }}
+                          >
                             <div className="er-constraint-index">{constraint.id}</div>
                             <div className="er-constraint-fields">
                               {resolveIuTokens(constraint.description || '', allIuNames) || <em>(no description)</em>}

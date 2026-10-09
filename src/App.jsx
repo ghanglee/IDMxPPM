@@ -110,6 +110,12 @@ const App = () => {
   const [selectedDataObject, setSelectedDataObject] = useState(null);
   const [showERPanel, setShowERPanel] = useState(false);
   const [showBPMNEditor, setShowBPMNEditor] = useState(true); // BPMN editor visibility toggle
+  const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth); // for the BPMN auto-collapse
+  useEffect(() => {
+    const onResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
   const [erPanelMode, setErPanelMode] = useState('list');
   const [erDataMap, setErDataMap] = useState({});
   const [erLibrary, setErLibrary] = useState([]);
@@ -1438,8 +1444,14 @@ const App = () => {
   // The Business Rules & Constraints dialog can be opened from the Use Case and ER panes
   const [showBusinessRules, setShowBusinessRules] = useState(false);
   const [businessRulesIuId, setBusinessRulesIuId] = useState(null);
-  const handleOpenBusinessRules = useCallback((iuId = null) => {
-    setBusinessRulesIuId(typeof iuId === 'string' ? iuId : null);
+  const [businessRulesConstraintKey, setBusinessRulesConstraintKey] = useState(null);
+  const [businessRulesAddNew, setBusinessRulesAddNew] = useState(false);
+  // Accepts null, an IU id, or { iuId, constraintKey, addNew }
+  const handleOpenBusinessRules = useCallback((arg = null) => {
+    const opts = arg && typeof arg === 'object' && !arg.nativeEvent ? arg : { iuId: typeof arg === 'string' ? arg : null };
+    setBusinessRulesIuId(opts.iuId || null);
+    setBusinessRulesConstraintKey(opts.constraintKey || null);
+    setBusinessRulesAddNew(!!opts.addNew);
     setShowBusinessRules(true);
   }, []);
 
@@ -5415,6 +5427,22 @@ const App = () => {
 
   const erCount = Object.keys(erDataMap).length;
 
+  // The BPMN editor yields to the panels around it: when an ER detail is open and the window is too
+  // narrow to hold sidebar + left pane + BPMN editor + ER panel, the BPMN editor collapses (the ER
+  // panel then expands into the space). It comes back by itself once there is room again.
+  const LAYOUT_PX = { sidebar: 48, leftPane: 320, erPanel: 450, bpmnMin: 400 };
+  const erDetailOpen = !!(showERPanel && (selectedDataObject || selectedErId));
+  const bpmnNeededWidth = LAYOUT_PX.sidebar + (activePane ? LAYOUT_PX.leftPane : 0) + (erDetailOpen ? LAYOUT_PX.erPanel : 0) + LAYOUT_PX.bpmnMin;
+  const bpmnAutoCollapsed = erDetailOpen && viewportWidth < bpmnNeededWidth;
+  const bpmnVisible = showBPMNEditor && !bpmnAutoCollapsed;
+  const showBpmnWhenRoom = () => {
+    if (bpmnAutoCollapsed) {
+      showToast('Not enough room for the BPMN editor. Widen the window or close a panel to show it.');
+    } else {
+      setShowBPMNEditor(prev => !prev);
+    }
+  };
+
   return (
     <ThemeProvider>
       <div className="app">
@@ -5508,7 +5536,7 @@ const App = () => {
                 )}
 
                 {/* BPMN Editor (shown when project is open and not hidden) */}
-                {showBPMNEditor ? (
+                {bpmnVisible ? (
                   <div className="bpmn-editor-container">
                     <BPMNEditor
                       xml={bpmnXml}
@@ -5560,8 +5588,8 @@ const App = () => {
                   <div className="bpmn-collapsed-placeholder">
                     <button
                       className="bpmn-show-btn"
-                      onClick={() => setShowBPMNEditor(true)}
-                      title="Show BPMN Editor"
+                      onClick={() => (bpmnAutoCollapsed ? showBpmnWhenRoom() : setShowBPMNEditor(true))}
+                      title={bpmnAutoCollapsed ? 'Not enough room for the BPMN editor in this window' : 'Show BPMN Editor'}
                     >
                       <span className="bpmn-show-icon">▶</span>
                       <span className="bpmn-show-text">BPMN</span>
@@ -5585,8 +5613,8 @@ const App = () => {
                     onSelectER={handleSelectER}
                     onModeChange={handleERPanelModeChange}
                     onClose={handleCloseERPanel}
-                    showBpmnEditor={showBPMNEditor}
-                    onToggleBpmn={() => setShowBPMNEditor(prev => !prev)}
+                    showBpmnEditor={bpmnVisible}
+                    onToggleBpmn={showBpmnWhenRoom}
                     // ER-first architecture props
                     erHierarchy={erHierarchy}
                     selectedErId={selectedErId}
@@ -6176,6 +6204,8 @@ const App = () => {
             onReplaceErHierarchy={handleReplaceErHierarchy}
             selectedErId={selectedErId}
             initialIuId={businessRulesIuId}
+            initialConstraintKey={businessRulesConstraintKey}
+            addConstraintOnOpen={businessRulesAddNew}
             onClose={() => setShowBusinessRules(false)}
           />
         )}

@@ -18,9 +18,8 @@ import {
   resolveIuTokens,
   pruneBusinessRuleRefs,
   validateConstraintModel,
-  checkEmbeddedXml,
+  analyzeExpressionText,
   newExpression,
-  FORMAL_LANGUAGES,
   EXPRESSION_FORMS
 } from '../../utils/constraintUtils';
 
@@ -169,11 +168,13 @@ const BusinessRulesPane = ({
   onReplaceErHierarchy,
   selectedErId = null,
   initialIuId = null,
+  initialConstraintKey = null,
+  addConstraintOnOpen = false,
   onClose
 }) => {
   const [brFilter, setBrFilter] = useState(null); // selected business rule id; null = all constraints
   const [iuFilter, setIuFilter] = useState(initialIuId);
-  const [selectedKey, setSelectedKey] = useState(null); // `${erId}::${constraintId}`
+  const [selectedKey, setSelectedKey] = useState(initialConstraintKey); // `${erId}::${constraintId}`
   // View mode is the default. Edit mode is entered with "+ Add" or "Edit"; the snapshot lets Cancel restore.
   const [ruleEdit, setRuleEdit] = useState(null);       // { id, snapshot, isNew } | null
   const [conEdit, setConEdit] = useState(null);         // { origErId, snapshot, isNew } | null
@@ -199,6 +200,16 @@ const BusinessRulesPane = ({
     return displayToTokens(text, [...linked, ...allIUs]);
   };
   const toDisplay = (text) => tokensToDisplay(text, names);
+
+  // Opened from an IU's "+ Add": create the new constraint (linked to that IU) once, in edit mode
+  const addedOnOpenRef = useRef(false);
+  useEffect(() => {
+    if (addConstraintOnOpen && !addedOnOpenRef.current) {
+      addedOnOpenRef.current = true;
+      addConstraint();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleClose = useCallback(() => {
     // Make sure a focused field commits its draft before the pane unmounts
@@ -376,21 +387,20 @@ const BusinessRulesPane = ({
   };
 
   const patchExpressionLanguage = (constraint, erId, expr, langPatch) => {
-    patchExpression(constraint, erId, expr.id, { language: { ...expr.language, ...langPatch } });
+    // A language typed by hand is kept from then on; only an auto-detected one keeps following the text
+    patchExpression(constraint, erId, expr.id, { language: { ...expr.language, ...langPatch }, langAuto: false });
   };
 
-  const chooseLanguagePreset = (constraint, erId, expr, presetName) => {
-    const preset = FORMAL_LANGUAGES.find(l => l.name === presetName);
-    if (!preset) return;
-    patchExpression(constraint, erId, expr.id, {
-      language: {
-        name: preset.name === 'Other' ? '' : preset.name,
-        version: preset.version,
-        publicationYear: preset.publicationYear,
-        uri: preset.uri
-      },
-      form: expr.form === 'external' ? 'external' : preset.form
-    });
+  // The pasted text decides the form (embedded XML / text) and, unless the user typed one, the language.
+  const commitExpressionText = (constraint, erId, expr, body) => {
+    const found = analyzeExpressionText(body);
+    const patch = { body };
+    if (!(expr.form === 'external' && !body.trim())) patch.form = found.form;
+    if (found.language && (!(expr.language?.name || '').trim() || expr.langAuto)) {
+      patch.language = { ...(expr.language || {}), ...found.language };
+      patch.langAuto = true;
+    }
+    patchExpression(constraint, erId, expr.id, patch);
   };
 
   // ── Render helpers ───────────────────────────────────────────────────────
@@ -639,65 +649,39 @@ const BusinessRulesPane = ({
         <div className="brp-field">
           <div className="brp-field-head">
             <label>Formal expressions</label>
-            <select
-              className="brp-select brp-add-select"
-              value=""
-              onChange={(e) => {
-                const preset = FORMAL_LANGUAGES.find(l => l.name === e.target.value);
-                if (preset) patchConstraint(erId, constraint.id, { expressions: [...(constraint.expressions || []), newExpression(preset)] });
-              }}
+            <button
+              className="brp-btn"
+              onClick={() => patchConstraint(erId, constraint.id, { expressions: [...(constraint.expressions || []), newExpression({ name: '', form: 'text' })] })}
             >
-              <option value="">+ Add expression…</option>
-              {FORMAL_LANGUAGES.map(l => <option key={l.name} value={l.name}>{l.name}</option>)}
-            </select>
+              + Add expression
+            </button>
           </div>
-          {(constraint.expressions || []).length === 0 && <div className="brp-hint">No formal expressions. Equivalent formal statements of the same restriction belong in one constraint.</div>}
+          {(constraint.expressions || []).length === 0 && <div className="brp-hint">No formal expressions. Paste a rule (RuleML, LegalRuleML, SPARQL, SHACL, …) with + Add expression.</div>}
           {(constraint.expressions || []).map((expr, idx) => {
-            const presetName = FORMAL_LANGUAGES.some(l => l.name === expr.language?.name) ? expr.language.name : 'Other';
-            const xmlError = expr.form === 'xml' ? checkEmbeddedXml(expr.body) : '';
+            const found = analyzeExpressionText(expr.body);
             return (
               <div className="brp-expr" key={expr.id}>
                 <div className="brp-expr-head">
                   <strong>Expression {idx + 1}</strong>
-                  <select className="brp-select" value={presetName} onChange={(e) => chooseLanguagePreset(constraint, erId, expr, e.target.value)}>
-                    {FORMAL_LANGUAGES.map(l => <option key={l.name} value={l.name}>{l.name}</option>)}
-                  </select>
-                  <select className="brp-select" value={expr.form} onChange={(e) => patchExpression(constraint, erId, expr.id, { form: e.target.value })}>
-                    {EXPRESSION_FORMS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
-                  </select>
+                  <DraftField
+                    className="brp-input brp-expr-lang-name"
+                    placeholder="Language (e.g. RuleML, SPARQL) *"
+                    value={expr.language?.name || ''}
+                    onCommit={(v) => patchExpressionLanguage(constraint, erId, expr, { name: v.trim() })}
+                  />
                   <button
                     className="brp-icon-btn"
                     title="Remove expression"
                     onClick={() => patchConstraint(erId, constraint.id, { expressions: constraint.expressions.filter(x => x.id !== expr.id) })}
                   >×</button>
                 </div>
-                <div className="brp-expr-lang">
-                  <DraftField className="brp-input" placeholder="Language name *" value={expr.language?.name || ''}
-                    onCommit={(v) => patchExpressionLanguage(constraint, erId, expr, { name: v })} />
-                  <DraftField className="brp-input" placeholder="Version" value={expr.language?.version || ''}
-                    onCommit={(v) => patchExpressionLanguage(constraint, erId, expr, { version: v })} />
-                  <DraftField className="brp-input" placeholder="Year" value={expr.language?.publicationYear || ''}
-                    onCommit={(v) => patchExpressionLanguage(constraint, erId, expr, { publicationYear: v })} />
-                  <DraftField className="brp-input" placeholder="Language URI" value={expr.language?.uri || ''}
-                    onCommit={(v) => patchExpressionLanguage(constraint, erId, expr, { uri: v })} />
-                </div>
-                <div className="brp-expr-ids">
-                  <DraftField className="brp-input" placeholder="Expression id (optional)" value={expr.xmlId || ''}
-                    onCommit={(v) => patchExpression(constraint, erId, expr.id, { xmlId: v.trim() })} />
-                  {expr.form !== 'external' && (
-                    <DraftField className="brp-input" placeholder="Source file or URI (optional)" value={expr.uri || ''}
-                      onCommit={(v) => patchExpression(constraint, erId, expr.id, { uri: v.trim() })} />
-                  )}
-                </div>
-                {expr.form === 'external' ? (
-                  <DraftField className="brp-input" placeholder="Path or URI of the rule file, e.g. rules/BR-07.shacl.ttl"
-                    value={expr.uri || ''} onCommit={(v) => patchExpression(constraint, erId, expr.id, { uri: v })} />
+                {expr.form === 'external' && !(expr.body || '').trim() ? (
+                  <DraftField className="brp-input" placeholder="Path or URI of the rule file"
+                    value={expr.uri || ''} onCommit={(v) => patchExpression(constraint, erId, expr.id, { uri: v.trim() })} />
                 ) : (
                   <>
                     <div className="brp-field-head">
-                      <span className="brp-hint">
-                        {expr.form === 'xml' ? 'Markup in its own namespace (e.g. RuleML, LegalRuleML)' : 'Rule text (stored as CDATA)'}
-                      </span>
+                      <span className="brp-hint">Paste the rule text. Its type is recognised automatically.</span>
                       {renderIuInsert(() => exprRefs.current[expr.id], constraint)}
                     </div>
                     <DraftField
@@ -705,13 +689,13 @@ const BusinessRulesPane = ({
                       multiline
                       rows={6}
                       className="brp-input brp-textarea brp-mono"
-                      placeholder={expr.form === 'xml' ? '<Implies xmlns="http://ruleml.org/spec">…</Implies>' : 'ASK { … }'}
+                      placeholder="Paste RuleML, LegalRuleML, SPARQL, SHACL or other rule text here"
                       value={expr.body || ''}
                       toDisplay={toDisplay}
                       fromDisplay={makeFromDisplay(constraint)}
-                      onCommit={(v) => patchExpression(constraint, erId, expr.id, { body: v })}
+                      onCommit={(v) => commitExpressionText(constraint, erId, expr, v)}
                     />
-                    {xmlError && <div className="brp-issue-error brp-inline-issue">{xmlError}</div>}
+                    {found.looksLikeBrokenXml && <div className="brp-issue-warning brp-inline-issue">This looks like XML but is not well-formed; it will be stored as plain text.</div>}
                   </>
                 )}
               </div>

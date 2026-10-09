@@ -290,6 +290,48 @@ export const newExpression = (preset = FORMAL_LANGUAGES[2]) => ({
 });
 
 /**
+ * Work out what a pasted rule is, so the editor needs no type / URL fields:
+ *  - well-formed XML whose root element has a namespace  -> embedded XML; the language comes from the
+ *    namespace (RuleML, LegalRuleML, otherwise "XML" with the namespace as its URI)
+ *  - anything else -> text (stored as CDATA); SPARQL and SHACL are recognised from their keywords
+ * Returns { form: 'xml' | 'text', language: {name, version, publicationYear, uri} | null, looksLikeBrokenXml }.
+ */
+export const analyzeExpressionText = (text) => {
+  const t = String(text || '').trim();
+  const result = { form: 'text', language: null, looksLikeBrokenXml: false };
+  if (!t) return result;
+
+  const preset = (name) => {
+    const p = FORMAL_LANGUAGES.find(l => l.name === name);
+    return p ? { name: p.name, version: p.version, publicationYear: p.publicationYear, uri: p.uri } : { name, version: '', publicationYear: '', uri: '' };
+  };
+
+  if (t.startsWith('<') && typeof DOMParser !== 'undefined') {
+    const doc = new DOMParser().parseFromString(`<w>${t.replace(/^<\?xml[^>]*\?>\s*/, '')}</w>`, 'text/xml');
+    if (doc.getElementsByTagName('parsererror').length > 0) {
+      result.looksLikeBrokenXml = true;
+    } else {
+      let root = null;
+      for (let i = 0; i < doc.documentElement.childNodes.length; i++) {
+        if (doc.documentElement.childNodes[i].nodeType === 1) { root = doc.documentElement.childNodes[i]; break; }
+      }
+      const ns = root && root.namespaceURI;
+      if (ns && ns !== 'null' && !ns.includes('standards.iso.org/iso/29481')) {
+        result.form = 'xml';
+        if (/legalruleml/i.test(ns)) result.language = { ...preset('LegalRuleML'), uri: ns };
+        else if (/ruleml\.org/i.test(ns)) result.language = preset('RuleML');
+        else result.language = { name: 'XML', version: '', publicationYear: '', uri: ns };
+        return result;
+      }
+    }
+  }
+
+  if (/^\s*(PREFIX|BASE|SELECT|ASK|CONSTRUCT|DESCRIBE)\b/im.test(t)) result.language = preset('SPARQL');
+  else if (/@prefix\b|\bsh:(NodeShape|PropertyShape|property)\b/.test(t)) result.language = preset('SHACL');
+  return result;
+};
+
+/**
  * Check embedded-XML expression bodies. The schema requires namespaced markup and forbids
  * elements of the IDM namespace. Returns an error string or ''.
  */
