@@ -110,6 +110,89 @@ const autoResizeTextarea = (textarea) => {
 };
 
 /**
+ * Synonyms editor for an IU (idmXSD v2.0 Rev 10).
+ * Each synonym has text and an optional BCP 47 language tag (xml:lang).
+ * Structural changes (add/remove) go through onStructuralChange so the caller can
+ * persist immediately; text edits go through onChange and are committed on blur.
+ */
+const SYNONYM_LANG_SUGGESTIONS = ['en', 'en-US', 'en-GB', 'ko', 'ja', 'zh-CN', 'de', 'fr'];
+const BCP47_PATTERN = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$/;
+
+const SynonymsEditor = ({ synonyms, onChange, onStructuralChange, onBlur }) => {
+  const listId = React.useId();
+  const list = Array.isArray(synonyms) ? synonyms : [];
+  const structural = onStructuralChange || onChange;
+
+  const keyOf = (syn) => `${(syn.lang || '').trim()}\u0000${(syn.text || '').trim()}`;
+  const keyCounts = {};
+  list.forEach(syn => {
+    if ((syn.text || '').trim()) keyCounts[keyOf(syn)] = (keyCounts[keyOf(syn)] || 0) + 1;
+  });
+
+  const update = (id, changes) => onChange(list.map(syn => (syn.id === id ? { ...syn, ...changes } : syn)));
+
+  return (
+    <div className="er-synonyms">
+      <div className="er-card-field-header">
+        <label>Synonyms</label>
+        <button
+          type="button"
+          className="er-link-btn"
+          onClick={() => structural([...list, { id: uuid(), text: '', lang: '' }])}
+        >
+          + Add synonym
+        </button>
+      </div>
+      {list.length === 0 ? (
+        <p className="er-empty-small">No synonyms defined</p>
+      ) : (
+        <div className="er-synonym-list">
+          {list.map(syn => {
+            const lang = (syn.lang || '').trim();
+            const langInvalid = lang !== '' && !BCP47_PATTERN.test(lang);
+            const duplicate = (syn.text || '').trim() !== '' && keyCounts[keyOf(syn)] > 1;
+            return (
+              <div key={syn.id} className="er-synonym-row">
+                <input
+                  type="text"
+                  value={syn.text || ''}
+                  onChange={(e) => update(syn.id, { text: e.target.value })}
+                  onBlur={onBlur}
+                  placeholder="Alternative name or translation"
+                  className={`er-input-small er-synonym-text ${duplicate ? 'er-input-invalid' : ''}`}
+                  title={duplicate ? 'Duplicate synonym for this language' : undefined}
+                />
+                <input
+                  type="text"
+                  list={listId}
+                  value={syn.lang || ''}
+                  onChange={(e) => update(syn.id, { lang: e.target.value })}
+                  onBlur={onBlur}
+                  placeholder="lang"
+                  className={`er-input-small er-synonym-lang ${langInvalid ? 'er-input-invalid' : ''}`}
+                  title={langInvalid ? 'Not a valid BCP 47 language tag (e.g. en, en-GB, ko, zh-CN)' : 'Language (BCP 47), optional'}
+                />
+                <button
+                  type="button"
+                  className="er-remove-btn"
+                  onClick={() => structural(list.filter(x => x.id !== syn.id))}
+                  title="Remove synonym"
+                >
+                  ×
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <datalist id={listId}>
+        {SYNONYM_LANG_SUGGESTIONS.map(l => <option key={l} value={l} />)}
+      </datalist>
+    </div>
+  );
+};
+
+/**
  * Compact definition field with figure upload support.
  * Used for ER descriptions and IU definitions.
  */
@@ -1284,6 +1367,7 @@ const ERPanel = ({
       dataType: 'String / Text',
       isMandatory: false,
       definition: '',
+      synonyms: [],
       examples: '',
       exampleImages: [],
       correspondingExternalElements: [],
@@ -1611,6 +1695,7 @@ const ERPanel = ({
       dataType: 'String / Text',
       isMandatory: false,
       definition: '',
+      synonyms: [],
       examples: '',
       exampleImages: [],
       correspondingExternalElements: [],
@@ -2402,11 +2487,24 @@ const ERPanel = ({
       dataType: iuElement.getAttribute('dataType') || 'String',
       isMandatory: iuElement.getAttribute('isMandatory') === 'true',
       definition: iuElement.getAttribute('definition') || '',
+      synonyms: [],
       examples: '',
       exampleImages: [],
       correspondingExternalElements: [],
       subInformationUnits: []
     };
+
+    // Synonyms (idmXSD v2.0 Rev 10) - iterate children by localName (namespace-safe)
+    Array.from(iuElement.childNodes).forEach(node => {
+      if (node.nodeType !== 1 || node.localName !== 'synonym') return;
+      const text = (node.textContent || '').trim();
+      if (!text) return;
+      unit.synonyms.push({
+        id: uuid(),
+        text,
+        lang: (node.getAttributeNS('http://www.w3.org/XML/1998/namespace', 'lang') || node.getAttribute('xml:lang') || '').trim()
+      });
+    });
 
     const examples = iuElement.querySelector('examples description');
     if (examples) {
@@ -2608,6 +2706,14 @@ const ERPanel = ({
                 onChange={(val) => updateUnit(unit.id, { definition: val }, subERId)}
                 onFiguresChange={(figs) => updateUnit(unit.id, { definitionFigures: figs }, subERId)}
                 placeholder="Describe this information unit..."
+              />
+            </div>
+
+            {/* Synonyms */}
+            <div className="er-card-field">
+              <SynonymsEditor
+                synonyms={unit.synonyms}
+                onChange={(list) => updateUnit(unit.id, { synonyms: list }, subERId)}
               />
             </div>
 
@@ -3126,6 +3232,15 @@ const ERPanel = ({
                       )}
                       {/* Name */}
                       <span className="er-tree-name">{row.name}</span>
+                      {row.type === 'iu' && row.data?.synonyms?.length > 0 && (
+                        <span
+                          className="er-syn-badge"
+                          style={{ marginLeft: 6 }}
+                          title={`Synonyms: ${row.data.synonyms.map(syn => syn.text).filter(Boolean).join(', ')}`}
+                        >
+                          {row.data.synonyms.length}
+                        </span>
+                      )}
                     </div>
                   </div>
                   {/* Data Type (IU only) */}
@@ -3263,6 +3378,14 @@ const ERPanel = ({
                       onBlur={() => { if (hasUnsavedDetailChanges()) commitCurrentEdit(); }}
                       placeholder="Describe this information unit..."
                       rows={6}
+                    />
+                  </div>
+                  <div className="er-detail-field">
+                    <SynonymsEditor
+                      synonyms={selectedItem.data?.synonyms}
+                      onChange={(list) => setSelectedItem(prev => ({ ...prev, data: { ...prev.data, synonyms: list } }))}
+                      onStructuralChange={(list) => commitFigureChange('synonyms', list)}
+                      onBlur={() => { if (hasUnsavedDetailChanges()) commitCurrentEdit(); }}
                     />
                   </div>
                   <div className="er-detail-field">

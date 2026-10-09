@@ -536,6 +536,15 @@ export const generateStandaloneHtml = async ({
       color: #0066cc;
     }
 
+    .iu-synonyms {
+      font-size: 0.85em;
+      color: #666;
+      font-style: italic;
+    }
+    .iu-synonyms .syn-lang {
+      font-style: normal;
+      color: #888;
+    }
     .constraints-cell {
       font-size: 9pt;
       color: #444;

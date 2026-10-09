@@ -3267,3 +3267,33 @@
 .er-bsdd-cache-loading { background: var(--bg-tertiary); color: var(--text-secondary); }
 .er-bsdd-cache-ready { background: rgba(34,197,94,0.15); color: #22c55e; }
 .er-bsdd-cache-error { background: rgba(239,68,68,0.1); color: #ef4444; }
+
+/* Synonyms editor (idmXSD v2.0 Rev 10) */
+.er-synonym-list { display: flex; flex-direction: column; gap: 6px; }
+
+.er-synonym-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.er-synonym-text { flex: 1; min-width: 0; }
+.er-synonym-lang { flex: 0 0 80px; width: 80px; }
+
+.er-input-invalid {
+  border-color: var(--error, #dc2626) !important;
+}
+
+.er-syn-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 10px;
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--success, #059669);
+}

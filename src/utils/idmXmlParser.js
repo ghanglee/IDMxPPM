@@ -1247,7 +1247,7 @@ const parseErElement = (erElement) => {
   const infoUnits = getDirectChildren(erElement, 'informationUnit');
   infoUnits.forEach(iu => {
     const iuId = iu.getAttribute('id') || '';
-    if (iuId === 'iu-placeholder') return; // Skip export placeholder
+    if (iuId.startsWith('iu-placeholder')) return; // Skip export placeholder
     er.informationUnits.push(parseInformationUnit(iu));
   });
 
@@ -1275,11 +1275,24 @@ const parseInformationUnit = (iuElement) => {
     isMandatory: iuElement.getAttribute('isMandatory') === 'true',
     definition: trimStr(iuElement.getAttribute('definition')),
     definitionFigures: [],
+    synonyms: [],
     examples: '',
     exampleImages: [],
     correspondingExternalElements: [],
     subInformationUnits: []
   };
+
+  // Synonyms (idmXSD v2.0 Rev 10) - xml:lang is optional
+  getDirectChildren(iuElement, 'synonym').forEach(syn => {
+    const text = trimStr(syn.textContent);
+    if (!text) return;
+    const lang = trimStr(syn.getAttributeNS('http://www.w3.org/XML/1998/namespace', 'lang') || syn.getAttribute('xml:lang'));
+    unit.synonyms.push({
+      id: `syn-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      text,
+      lang
+    });
+  });
 
   // Check ALL <description> children for definition text and figures
   const defDescs = getDirectChildren(iuElement, 'description');

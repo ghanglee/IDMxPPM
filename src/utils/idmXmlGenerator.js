@@ -136,15 +136,28 @@ const formatAuthor = (author) => {
 /**
  * Generate Information Unit XML per idmXSD V2
  */
+const generateSynonymsXml = (synonyms, indent) => {
+  const lines = [];
+  (synonyms || []).forEach(syn => {
+    const text = (syn && syn.text ? String(syn.text) : '').trim();
+    if (!text) return; // synonymText has minLength 1
+    const lang = syn.lang ? String(syn.lang).trim() : '';
+    lines.push(`${indent}<synonym${lang ? ` xml:lang="${escapeXml(lang)}"` : ''}>${escapeXml(text)}</synonym>`);
+  });
+  return lines;
+};
+
 const generateInformationUnitXml = (unit, indent = '      ') => {
   const lines = [];
+  const synonymLines = generateSynonymsXml(unit.synonyms, indent + '  ');
+  const hasSynonyms = synonymLines.length > 0;
 
   // Check if IU has children (definition figures, examples, external elements, or sub-units)
   const hasDefinitionFigures = unit.definitionFigures && unit.definitionFigures.length > 0;
   const hasExamples = unit.examples || (unit.exampleImages && unit.exampleImages.length > 0);
   const hasExternalElements = unit.correspondingExternalElements && unit.correspondingExternalElements.length > 0;
   const hasSubUnits = unit.subInformationUnits && unit.subInformationUnits.length > 0;
-  const hasChildren = hasDefinitionFigures || hasExamples || hasExternalElements || hasSubUnits;
+  const hasChildren = hasDefinitionFigures || hasSynonyms || hasExamples || hasExternalElements || hasSubUnits;
 
   if (hasChildren) {
     lines.push(`${indent}<informationUnit`);
@@ -158,6 +171,11 @@ const generateInformationUnitXml = (unit, indent = '      ') => {
       lines.push(...generateDescriptionXml(unit.definition || '', unit.definitionFigures, indent + '  '));
     } else {
       lines.push(`${indent}  definition="${escapeXml(unit.definition || '')}">`);
+    }
+
+    // Synonyms - idmXSD v2.0 Rev 10: directly after description, before examples
+    if (hasSynonyms) {
+      lines.push(...synonymLines);
     }
 
     // Examples - per idmXSD V2: examples contains description elements (with title attribute)
@@ -321,7 +339,8 @@ const generateErXml = (er, authorName, indent = '  ', isRoot = true) => {
   // (filtered out on re-import by the parser)
   if (!hasInfoUnits && !hasSubERs) {
     lines.push(`${indent}  <informationUnit`);
-    lines.push(`${indent}    id="iu-placeholder"`);
+    // idmXSD v2.0 Rev 11: IU ids are unique across the whole ER tree, so derive from the ER guid
+    lines.push(`${indent}    id="iu-placeholder-${erGuid}"`);
     lines.push(`${indent}    name="Placeholder"`);
     lines.push(`${indent}    dataType="String"`);
     lines.push(`${indent}    isMandatory="false"`);
@@ -1044,7 +1063,7 @@ export const generateErXmlStandalone = (er, authorName = 'IDMxPPM User') => {
   // Leaf ER with no IUs: add placeholder to satisfy xs:choice minOccurs="1"
   if (!hasInfoUnits && !hasSubERs) {
     lines.push('  <informationUnit');
-    lines.push('    id="iu-placeholder"');
+    lines.push(`    id="iu-placeholder-${erGuid}"`);
     lines.push('    name="Placeholder"');
     lines.push('    dataType="String"');
     lines.push('    isMandatory="false"');
