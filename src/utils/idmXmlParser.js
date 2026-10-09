@@ -1235,6 +1235,7 @@ const parseConstraint = (cEl, index) => {
     }
     constraint.expressions.push({
       id: `expr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      xmlId: trimStr(exprEl.getAttribute('id')), // expression/@id as written in the file
       language: {
         name: trimStr(langEl?.getAttribute('name')),
         version: trimStr(langEl?.getAttribute('version')),

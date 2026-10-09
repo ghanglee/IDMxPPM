@@ -285,7 +285,8 @@ export const newExpression = (preset = FORMAL_LANGUAGES[2]) => ({
   },
   form: preset.form || 'text',
   body: '',
-  uri: ''
+  uri: '',
+  xmlId: ''
 });
 
 /**

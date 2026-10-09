@@ -137,6 +137,26 @@ const RuleImagesEditor = ({ images, onChange }) => {
   );
 };
 
+/** Text with IU references ({{IU:id}} tokens) shown as the current IU name in blue. */
+const REF_TOKEN = /\{\{IU:([^}]+)\}\}/g;
+const RefText = ({ text, names }) => {
+  const parts = [];
+  let last = 0;
+  String(text || '').replace(REF_TOKEN, (match, id, offset) => {
+    if (offset > last) parts.push(String(text).slice(last, offset));
+    const known = names[id] != null && names[id] !== '';
+    parts.push(
+      <span key={`${offset}-${id}`} className={`brp-iu-ref ${known ? '' : 'brp-iu-ref-missing'}`} title={known ? 'Information unit' : 'This information unit no longer exists'}>
+        {known ? names[id] : id}
+      </span>
+    );
+    last = offset + match.length;
+    return match;
+  });
+  if (last < String(text || '').length) parts.push(String(text).slice(last));
+  return <>{parts}</>;
+};
+
 const mapEr = (ers, erId, fn) => (ers || []).map(er => {
   if (er.id === erId) return fn(er);
   return er.subERs && er.subERs.length > 0 ? { ...er, subERs: mapEr(er.subERs, erId, fn) } : er;
@@ -454,7 +474,7 @@ const BusinessRulesPane = ({
         </div>
         <div className="brp-view-field">
           <label>Description (informal statement)</label>
-          {constraint.description ? <p>{resolveIuTokens(constraint.description, names)}</p> : <p className="brp-view-empty">None</p>}
+          {constraint.description ? <p><RefText text={constraint.description} names={names} /></p> : <p className="brp-view-empty">None</p>}
         </div>
         <div className="brp-view-field">
           <label>Formal expressions</label>
@@ -468,9 +488,15 @@ const BusinessRulesPane = ({
                   <strong>Expression {idx + 1}</strong>
                   <span>{[lang.name, lang.version, lang.publicationYear].filter(Boolean).join(' ')} · {formLabel}</span>
                 </div>
+                {(expr.xmlId || (expr.form !== 'external' && expr.uri)) && (
+                  <p className="brp-expr-meta">
+                    {expr.xmlId && <span>id: <code>{expr.xmlId}</code></span>}
+                    {expr.form !== 'external' && expr.uri && <span>source: <code>{expr.uri}</code></span>}
+                  </p>
+                )}
                 {expr.form === 'external'
                   ? <p className="brp-mono">{expr.uri || '(no file given)'}</p>
-                  : <pre className="brp-mono brp-expr-body">{resolveIuTokens(expr.body || '', names) || '(empty)'}</pre>}
+                  : <pre className="brp-mono brp-expr-body">{expr.body ? <RefText text={expr.body} names={names} /> : '(empty)'}</pre>}
               </div>
             );
           })}
@@ -654,6 +680,14 @@ const BusinessRulesPane = ({
                     onCommit={(v) => patchExpressionLanguage(constraint, erId, expr, { publicationYear: v })} />
                   <DraftField className="brp-input" placeholder="Language URI" value={expr.language?.uri || ''}
                     onCommit={(v) => patchExpressionLanguage(constraint, erId, expr, { uri: v })} />
+                </div>
+                <div className="brp-expr-ids">
+                  <DraftField className="brp-input" placeholder="Expression id (optional)" value={expr.xmlId || ''}
+                    onCommit={(v) => patchExpression(constraint, erId, expr.id, { xmlId: v.trim() })} />
+                  {expr.form !== 'external' && (
+                    <DraftField className="brp-input" placeholder="Source file or URI (optional)" value={expr.uri || ''}
+                      onCommit={(v) => patchExpression(constraint, erId, expr.id, { uri: v.trim() })} />
+                  )}
                 </div>
                 {expr.form === 'external' ? (
                   <DraftField className="brp-input" placeholder="Path or URI of the rule file, e.g. rules/BR-07.shacl.ttl"

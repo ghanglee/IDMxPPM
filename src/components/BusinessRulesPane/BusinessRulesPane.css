@@ -230,3 +230,10 @@
 .brp-expr-view-head { display: flex; gap: 10px; align-items: baseline; font-size: 12px; margin-bottom: 4px; }
 .brp-expr-view-head span { color: var(--text-secondary); }
 .brp-expr-body { margin: 0; padding: 6px 8px; max-height: 220px; overflow: auto; background: var(--bg-tertiary); border-radius: var(--radius-sm); white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+
+/* IU references in view mode */
+.brp-iu-ref { color: #2f81f7; font-weight: 600; }
+.brp-iu-ref-missing { color: var(--error); text-decoration: line-through; }
+.brp-expr-meta { display: flex; gap: 14px; margin: 0 0 4px; font-size: 11px; color: var(--text-secondary); }
+.brp-expr-meta code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.brp-expr-ids { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 6px; }

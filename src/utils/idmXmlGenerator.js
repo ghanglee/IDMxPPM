@@ -263,8 +263,10 @@ const generateConstraintsXml = (constraints, indent, ctx = {}) => {
     }
     (constraint.expressions || []).forEach(expr => {
       const lang = expr.language || {};
+      // id and uri are optional schema attributes: kept for every form (inline content may also name its source file)
       const attrs = [];
-      if (expr.form === 'external' && expr.uri) attrs.push(`uri="${escapeXml(expr.uri)}"`);
+      if (expr.xmlId) attrs.push(`id="${escapeXml(expr.xmlId)}"`);
+      if (expr.uri) attrs.push(`uri="${escapeXml(expr.uri)}"`);
       lines.push(`${indent}  <expression${attrs.length ? ' ' + attrs.join(' ') : ''}>`);
       const langAttrs = [`name="${escapeXml(lang.name || '')}"`];
       if (lang.version) langAttrs.push(`version="${escapeXml(lang.version)}"`);
