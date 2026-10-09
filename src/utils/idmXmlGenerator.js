@@ -6,7 +6,7 @@
  */
 
 import { isDataUri, parseDataUri } from './filePathUtils.js';
-import { iuNameMap, resolveIuTokens, getRuleStatements } from './constraintUtils.js';
+import { iuNameMap, resolveIuTokens, normalizeBusinessRule } from './constraintUtils.js';
 import { toIso8601DateTime, hasTimeComponent } from './dateTime.js';
 
 // xml:lang values must be BCP 47 tags; anything else is written without a language
@@ -294,37 +294,36 @@ const generateConstraintsXml = (constraints, indent, ctx = {}) => {
 
 /**
  * Generate uc/businessRule elements (idmXSD v2.0 Rev 12):
- * statement (1..*, one per language), image (0..*), reference (0..*).
+ * statement (exactly one), images/image (0..1 group), description (0..*, commentary), reference (0..*).
  */
 const generateBusinessRulesXml = (businessRules, indent) => {
   const lines = [];
-  (businessRules || []).forEach((br, idx) => {
+  (businessRules || []).forEach((rawRule, idx) => {
+    const br = normalizeBusinessRule(rawRule);
     lines.push(`${indent}<businessRule id="${escapeXml(br.id || `BR-${idx + 1}`)}" name="${escapeXml(br.name || '')}">`);
 
-    const statements = getRuleStatements(br).filter(st => (st.text || '').trim());
-    const seenLang = new Set();
-    const unique = statements.filter(st => {
-      const lang = cleanLang(st.lang);
-      if (seenLang.has(lang)) return false; // schema: one statement per language
-      seenLang.add(lang);
-      return true;
-    });
-    // statement is mandatory; fall back to the rule name so the file stays schema-valid
-    if (unique.length === 0) unique.push({ text: br.name || br.id || 'Business rule', lang: '' });
-    unique.forEach(st => {
-      const lang = cleanLang(st.lang);
-      lines.push(`${indent}  <statement${lang ? ` xml:lang="${escapeXml(lang)}"` : ''}>${escapeXml(String(st.text).trim())}</statement>`);
-    });
+    // statement is mandatory and must not be empty; fall back to the rule name to stay schema-valid
+    const statement = String(br.statement || '').trim() || br.name || br.id || 'Business rule';
+    lines.push(`${indent}  <statement>${escapeXml(statement)}</statement>`);
 
+    const imageLines = [];
     (br.images || []).forEach((img, i) => {
       const caption = escapeXml(img.caption || img.name || `Figure ${i + 1}`);
       const mimeType = escapeXml(img.type || 'image/png');
       if (img.data && isDataUri(img.data)) {
         const parsed = parseDataUri(img.data);
-        lines.push(`${indent}  <image caption="${caption}" mimeType="${mimeType}" encoding="base64">${parsed ? parsed.base64Data : ''}</image>`);
+        imageLines.push(`${indent}    <image caption="${caption}" mimeType="${mimeType}" encoding="base64">${parsed ? parsed.base64Data : ''}</image>`);
       } else if (img.filePath) {
-        lines.push(`${indent}  <image caption="${caption}" mimeType="${mimeType}" filePath="${escapeXml(img.filePath)}"/>`);
+        imageLines.push(`${indent}    <image caption="${caption}" mimeType="${mimeType}" filePath="${escapeXml(img.filePath)}"/>`);
       }
+    });
+    if (imageLines.length > 0) { // images needs at least one image
+      lines.push(`${indent}  <images>`, ...imageLines, `${indent}  </images>`);
+    }
+
+    (br.commentary || []).forEach(c => {
+      const text = String(c?.text ?? c ?? '').trim();
+      if (text) lines.push(`${indent}  <description title="${escapeXml(text)}"/>`);
     });
 
     String(br.reference || '').split(/\r?\n/).map(r => r.trim()).filter(Boolean).forEach(ref => {

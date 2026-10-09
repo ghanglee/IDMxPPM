@@ -2,8 +2,9 @@
  * Business rule / constraint helpers (idmXSD v2.0 Rev 11).
  *
  * Data model
- *   headerData.businessRules = [{ id, name, statements: [{ id, text, lang }], images: [], reference }]
- *     (Rev 12: one statement per language; reference holds one reference per line)
+ *   headerData.businessRules = [{ id, name, statement, images: [], commentary: [{ id, text }], reference }]
+ *     (Rev 12: exactly one statement, no translations; commentary = description elements;
+ *      reference holds one reference per line)
  *   er.constraints = [{
  *     id,
  *     businessRuleIds: [],        // -> <associatedBusinessRule ref>
@@ -198,42 +199,57 @@ export const retokenizeHierarchy = (erHierarchy) => {
   });
 };
 
-// ─── Business rules (Rev 12: statements per language) ────────────────────────
-
-const BCP47 = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$/;
+// ─── Business rules (Rev 12: one statement, images, commentary, references) ──
 
 export const newBusinessRule = (id, name = '') => ({
   id,
   name,
-  statements: [{ id: uid(), text: '', lang: '' }],
+  statement: '',
   images: [],
+  commentary: [],
   reference: ''
 });
 
-/** Statements of a rule; a pre-Rev 12 rule with a single `description` becomes one untagged statement. */
-export const getRuleStatements = (br) => {
-  if (Array.isArray(br?.statements)) return br.statements;
-  const legacy = String(br?.description || '').trim();
-  return legacy ? [{ id: uid(), text: legacy, lang: '' }] : [];
+const isCurrentRuleShape = (br) =>
+  typeof br?.statement === 'string' && Array.isArray(br.images) && Array.isArray(br.commentary)
+  && br.description === undefined && br.statements === undefined;
+
+/**
+ * Bring a stored business rule to the Rev 12 shape. Older shapes:
+ *  - Rev 11: a single `description` becomes the statement.
+ *  - interim Rev 12 draft: `statements[]` per language - the English one (else the first) is kept;
+ *    the others are preserved as commentary prefixed with their language, so no text is lost.
+ */
+export const normalizeBusinessRule = (br) => {
+  if (isCurrentRuleShape(br)) return br;
+  const { description, statements, statement, commentary, ...rest } = br || {};
+  let text = typeof statement === 'string' ? statement : '';
+  const extra = [];
+  if (Array.isArray(statements) && statements.length > 0) {
+    const filled = statements.filter(st => (st.text || '').trim());
+    const keep = filled.find(st => /^en(-|$)/i.test(st.lang || '')) || filled[0];
+    if (!text && keep) text = keep.text;
+    filled.filter(st => st !== keep).forEach(st => extra.push({ id: uid(), text: `${st.lang ? `[${st.lang}] ` : ''}${st.text}` }));
+  }
+  if (!text && typeof description === 'string' && description.trim()) text = description;
+  return {
+    ...rest,
+    statement: text,
+    images: Array.isArray(br?.images) ? br.images : [],
+    commentary: [...(Array.isArray(commentary) ? commentary : []), ...extra],
+    reference: br?.reference || ''
+  };
 };
 
-/** Convert stored pre-Rev 12 business rules (description) to statements/images. */
+/** Convert stored business rules of any earlier shape to Rev 12. */
 export const migrateBusinessRules = (rules = []) => {
   let changed = false;
   const migrated = rules.map(br => {
-    if (Array.isArray(br.statements) && Array.isArray(br.images)) return br;
+    if (isCurrentRuleShape(br)) return br;
     changed = true;
-    const { description: _legacy, ...rest } = br;
-    return { ...rest, statements: getRuleStatements(br), images: Array.isArray(br.images) ? br.images : [] };
+    return normalizeBusinessRule(br);
   });
   return { rules: migrated, changed };
-};
-
-/** Plain-text statement for lists: prefers English, then the first non-empty one. */
-export const primaryStatementText = (br) => {
-  const list = getRuleStatements(br).filter(st => (st.text || '').trim());
-  const en = list.find(st => /^en(-|$)/i.test(st.lang || ''));
-  return (en || list[0])?.text || '';
 };
 
 // ─── Formal rule languages ───────────────────────────────────────────────────
@@ -444,23 +460,10 @@ export const validateConstraintModel = (erHierarchy, businessRules = []) => {
     else if (brNames[n]) issues.push({ severity: 'error', message: `Business rule name "${n}" is used more than once` });
     brNames[n] = true;
 
-    // Rev 12: at least one statement, at most one per language (and at most one untagged)
-    const label = n || br.id;
-    const statements = getRuleStatements(br).filter(st => (st.text || '').trim());
-    if (statements.length === 0) {
-      issues.push({ severity: 'error', message: `Business rule "${label}" needs at least one statement` });
+    // Rev 12: exactly one statement (mandatory, non-empty)
+    if (!(normalizeBusinessRule(br).statement || '').trim()) {
+      issues.push({ severity: 'error', message: `Business rule "${n || br.id}" needs a statement` });
     }
-    const langs = {};
-    statements.forEach(st => {
-      const lang = (st.lang || '').trim();
-      if (lang && !BCP47.test(lang)) {
-        issues.push({ severity: 'error', message: `Business rule "${label}": "${lang}" is not a valid language tag` });
-      }
-      if (langs[lang]) {
-        issues.push({ severity: 'error', message: `Business rule "${label}" has more than one statement${lang ? ` for language "${lang}"` : ' without a language'}` });
-      }
-      langs[lang] = true;
-    });
   });
 
   const perEr = {};

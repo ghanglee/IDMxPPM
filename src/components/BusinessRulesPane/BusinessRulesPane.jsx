@@ -9,8 +9,7 @@ import {
   nextConstraintId,
   nextBusinessRuleId,
   newBusinessRule,
-  getRuleStatements,
-  migrateBusinessRules,
+  normalizeBusinessRule,
   newId,
   tokensToDisplay,
   displayToTokens,
@@ -77,60 +76,29 @@ const DraftField = forwardRef(({ value, onCommit, multiline = false, className =
   return multiline ? <textarea rows={rows} {...common} /> : <input type="text" list={listId} {...common} />;
 });
 
-const BCP47 = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$/;
-const LANG_SUGGESTIONS = ['en', 'en-US', 'en-GB', 'ko', 'ja', 'zh-CN', 'de', 'fr'];
-
-/** Business rule statements (idmXSD Rev 12): one per language, optional BCP 47 tag. */
-const StatementsEditor = ({ statements, onChange }) => {
-  const listId = React.useId();
-  const counts = {};
-  statements.forEach(st => { const k = (st.lang || '').trim(); counts[k] = (counts[k] || 0) + 1; });
-  const update = (id, patch) => onChange(statements.map(st => (st.id === id ? { ...st, ...patch } : st)));
-
-  return (
-    <div className="brp-field">
-      <div className="brp-field-head">
-        <label>Statements</label>
-        <button className="brp-btn" onClick={() => onChange([...statements, { id: newId(), text: '', lang: '' }])}>+ Language</button>
-      </div>
-      {statements.map(st => {
-        const lang = (st.lang || '').trim();
-        const langBad = lang !== '' && !BCP47.test(lang);
-        const dup = counts[lang] > 1;
-        return (
-          <div className="brp-statement" key={st.id}>
-            <DraftField
-              multiline
-              rows={3}
-              className="brp-input brp-textarea"
-              value={st.text}
-              placeholder="The business rule in natural language, e.g. as stated in a legal clause"
-              onCommit={(v) => update(st.id, { text: v })}
-            />
-            <div className="brp-statement-side">
-              <DraftField
-                className={`brp-input ${langBad || dup ? 'brp-input-invalid' : ''}`}
-                value={st.lang || ''}
-                placeholder="lang"
-                listId={listId}
-                onCommit={(v) => update(st.id, { lang: v.trim() })}
-              />
-              {statements.length > 1 && (
-                <button className="brp-icon-btn" title="Remove statement" onClick={() => onChange(statements.filter(x => x.id !== st.id))}>×</button>
-              )}
-            </div>
-            {(langBad || dup) && (
-              <div className="brp-issue-error brp-inline-issue">
-                {langBad ? 'Not a valid BCP 47 language tag (e.g. en, ko, zh-CN)' : `More than one statement ${lang ? `for "${lang}"` : 'without a language'}`}
-              </div>
-            )}
-          </div>
-        );
-      })}
-      <datalist id={listId}>{LANG_SUGGESTIONS.map(l => <option key={l} value={l} />)}</datalist>
+/** Commentary on a business rule: scope, exceptions, interpretation (Rev 12 businessRule/description). */
+const CommentaryEditor = ({ commentary, onChange }) => (
+  <div className="brp-field">
+    <div className="brp-field-head">
+      <label>Commentary</label>
+      <button className="brp-btn" onClick={() => onChange([...commentary, { id: newId(), text: '' }])}>+ Add</button>
     </div>
-  );
-};
+    {commentary.length === 0 && <div className="brp-hint">Optional notes on scope, exceptions or interpretation.</div>}
+    {commentary.map(c => (
+      <div className="brp-commentary-row" key={c.id}>
+        <DraftField
+          multiline
+          rows={2}
+          className="brp-input brp-textarea"
+          value={c.text}
+          placeholder="e.g. Applies to walls that carry vertical loads, including shear walls."
+          onCommit={(v) => onChange(commentary.map(x => (x.id === c.id ? { ...x, text: v } : x)))}
+        />
+        <button className="brp-icon-btn" title="Remove" onClick={() => onChange(commentary.filter(x => x.id !== c.id))}>×</button>
+      </div>
+    ))}
+  </div>
+);
 
 /** Images attached to a business rule (idmXSD Rev 12 businessRule/image). */
 const RuleImagesEditor = ({ images, onChange }) => {
@@ -291,7 +259,7 @@ const BusinessRulesPane = ({
   const patchBusinessRule = (id, patch) => {
     // Old-shape rules (description only) are normalised before the patch is applied
     onBusinessRulesChange(businessRules.map(b => (b.id === id
-      ? { ...migrateBusinessRules([b]).rules[0], ...(typeof patch === 'function' ? patch(migrateBusinessRules([b]).rules[0]) : patch) }
+      ? { ...normalizeBusinessRule(b), ...(typeof patch === 'function' ? patch(normalizeBusinessRule(b)) : patch) }
       : b)));
   };
 
@@ -607,13 +575,24 @@ const BusinessRulesPane = ({
                   <label>Name *</label>
                   <DraftField className="brp-input" value={selectedBr.name} onCommit={(v) => patchBusinessRule(selectedBr.id, { name: v })} />
                 </div>
-                <StatementsEditor
-                  statements={getRuleStatements(selectedBr)}
-                  onChange={(list) => patchBusinessRule(selectedBr.id, { statements: list })}
-                />
+                <div className="brp-field">
+                  <label>Statement *</label>
+                  <DraftField
+                    multiline
+                    rows={4}
+                    className="brp-input brp-textarea"
+                    value={normalizeBusinessRule(selectedBr).statement}
+                    placeholder="The business rule in natural language, e.g. as stated in a legal clause"
+                    onCommit={(v) => patchBusinessRule(selectedBr.id, { statement: v })}
+                  />
+                </div>
                 <RuleImagesEditor
                   images={selectedBr.images || []}
                   onChange={(updater) => patchBusinessRule(selectedBr.id, (b) => ({ images: updater(b.images || []) }))}
+                />
+                <CommentaryEditor
+                  commentary={normalizeBusinessRule(selectedBr).commentary}
+                  onChange={(list) => patchBusinessRule(selectedBr.id, { commentary: list })}
                 />
                 <div className="brp-field">
                   <label>Reference (one per line)</label>

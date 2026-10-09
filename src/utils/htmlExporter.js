@@ -4,7 +4,7 @@
  */
 
 import { defaultIdmXslt } from './defaultIdmXslt';
-import { deriveIuConstraints, collectConstraints, iuNameMap, resolveIuTokens, getRuleStatements } from './constraintUtils.js';
+import { deriveIuConstraints, collectConstraints, iuNameMap, resolveIuTokens, normalizeBusinessRule } from './constraintUtils.js';
 import { getRegionName } from './idmXmlParser';
 import { getReviewUIStyles, getReviewUIScript } from './reviewCommentingUI';
 
@@ -540,6 +540,7 @@ export const generateStandaloneHtml = async ({
     }
 
     .br-table td { vertical-align: top; }
+    .br-commentary { margin-top: 4px; font-size: 9pt; color: #666; font-style: italic; }
     .br-expr {
       margin: 4px 0 8px 0;
       padding: 6px 8px;
@@ -1266,11 +1267,12 @@ const generateBusinessRulesSection = (businessRules, erHierarchy) => {
     html += '<h3>Business Rules</h3><table class="br-table"><thead><tr><th>Name</th><th>Statement</th><th>Reference</th><th>Constraints</th></tr></thead><tbody>';
     rules.forEach(r => {
       const linked = constraints.filter(({ constraint }) => (constraint.businessRuleIds || []).includes(r.id)).map(({ constraint }) => constraint.id);
-      const statements = getRuleStatements(r).filter(st => (st.text || '').trim())
-        .map(st => `<div>${st.lang ? `<span class="syn-lang">[${escapeHtml(st.lang)}]</span> ` : ''}${text(st.text)}</div>`).join('');
-      const images = (r.images || []).filter(img => img.data)
+      const rule = normalizeBusinessRule(r);
+      const images = (rule.images || []).filter(img => img.data)
         .map(img => `<figure style="margin:6px 0"><img src="${escapeHtml(img.data)}" alt="${escapeHtml(img.caption || '')}" style="max-width:100%"><figcaption style="font-size:9pt;color:#666">${escapeHtml(img.caption || '')}</figcaption></figure>`).join('');
-      html += `<tr><td>${escapeHtml(r.name || '')}</td><td>${statements}${images}</td><td>${text(r.reference)}</td><td>${escapeHtml(linked.join(', ')) || '-'}</td></tr>`;
+      const commentary = (rule.commentary || []).filter(c => (c.text || '').trim())
+        .map(c => `<div class="br-commentary">${text(c.text)}</div>`).join('');
+      html += `<tr><td>${escapeHtml(rule.name || '')}</td><td>${text(rule.statement)}${images}${commentary}</td><td>${text(rule.reference)}</td><td>${escapeHtml(linked.join(', ')) || '-'}</td></tr>`;
     });
     html += '</tbody></table>';
   }

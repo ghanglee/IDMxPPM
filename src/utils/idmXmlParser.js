@@ -1125,33 +1125,49 @@ export const parseIdmXml = (xmlContent) => {
 };
 
 /**
- * Parse a business rule (uc/businessRule) into { id, name, statements, images, reference }.
- * Rev 12: <statement xml:lang> (1..*), <image> (0..*), <reference> (0..*, joined by newlines).
- * Older files (Rev 11): proposition/description/@title becomes one untagged statement.
+ * Parse a business rule (uc/businessRule) into { id, name, statement, images, commentary, reference }.
+ * Rev 12: <statement> (exactly one), <images><image/>…</images>, <description title> commentary, <reference>.
+ * Older files are mapped: Rev 11 proposition/description[0]/@title -> statement (further ones -> commentary,
+ * images -> images); the interim draft's per-language statements keep the English one, the others become
+ * commentary prefixed with their language.
  */
 const parseBusinessRule = (brEl, index) => {
   const XML_NS = 'http://www.w3.org/XML/1998/namespace';
-  const statements = getDirectChildren(brEl, 'statement')
-    .map(st => ({
-      id: `st-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      text: trimStr(st.textContent),
-      lang: trimStr(st.getAttributeNS(XML_NS, 'lang') || st.getAttribute('xml:lang'))
-    }))
+  const newId = () => `c-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const descText = (d) => trimStr(d.getAttribute('title')) || trimStr(d.textContent);
+
+  const statementEls = getDirectChildren(brEl, 'statement')
+    .map(st => ({ text: trimStr(st.textContent), lang: trimStr(st.getAttributeNS(XML_NS, 'lang') || st.getAttribute('xml:lang')) }))
     .filter(st => st.text);
+  const commentary = [];
+  let statement = '';
+  if (statementEls.length > 0) {
+    const keep = statementEls.find(st => /^en(-|$)/i.test(st.lang)) || statementEls[0];
+    statement = keep.text;
+    statementEls.filter(st => st !== keep).forEach(st => commentary.push({ id: newId(), text: `${st.lang ? `[${st.lang}] ` : ''}${st.text}` }));
+  }
+
+  const images = [];
+  const imagesEl = getFirstChild(brEl, 'images');
+  if (imagesEl) images.push(...parseFigures(imagesEl));
+  images.push(...parseFigures(brEl)); // images placed directly under the rule (interim draft)
 
   const proposition = getFirstChild(brEl, 'proposition');
   if (proposition) {
     getDirectChildren(proposition, 'description').forEach(d => {
-      const text = trimStr(d.getAttribute('title')) || trimStr(d.textContent);
-      if (text) statements.push({ id: `st-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, text, lang: '' });
+      const text = descText(d);
+      if (text) {
+        if (!statement) statement = text;
+        else commentary.push({ id: newId(), text });
+      }
+      images.push(...parseFigures(d));
     });
   }
 
-  const images = parseFigures(brEl);
-  // Images under the old proposition/description move to the rule itself
-  if (proposition) {
-    getDirectChildren(proposition, 'description').forEach(d => images.push(...parseFigures(d)));
-  }
+  getDirectChildren(brEl, 'description').forEach(d => {
+    const text = descText(d);
+    if (text) commentary.push({ id: newId(), text });
+  });
 
   const reference = getDirectChildren(brEl, 'reference')
     .map(r => trimStr(r.textContent))
@@ -1160,8 +1176,9 @@ const parseBusinessRule = (brEl, index) => {
   return {
     id: trimStr(brEl.getAttribute('id')) || `BR-${index + 1}`,
     name: trimStr(brEl.getAttribute('name')),
-    statements,
+    statement,
     images,
+    commentary,
     reference
   };
 };

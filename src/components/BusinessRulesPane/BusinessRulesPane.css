@@ -197,10 +197,8 @@
 .brp-issue-warning { color: var(--warning); background: rgba(206, 145, 120, 0.12); }
 .brp-inline-issue { margin-top: 4px; padding: 3px 8px; font-size: 12px; border-radius: var(--radius-sm); }
 
-/* Rev 12 statements and images */
-.brp-statement { display: grid; grid-template-columns: minmax(0, 1fr) 88px; gap: 6px; margin-bottom: 8px; }
-.brp-statement-side { display: flex; gap: 2px; align-items: flex-start; }
-.brp-statement .brp-inline-issue { grid-column: 1 / -1; margin-top: 0; }
+/* Rev 12 commentary and images */
+.brp-commentary-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px; align-items: start; margin-bottom: 6px; }
 .brp-input-invalid { border-color: var(--error) !important; }
 .brp-image { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 6px; align-items: center; margin-bottom: 6px; }
 .brp-image img { width: 56px; height: 40px; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--border-secondary); }
