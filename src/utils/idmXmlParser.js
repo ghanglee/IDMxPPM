@@ -5,6 +5,7 @@
 
 import { isBase64Encoding, buildDataUri } from './filePathUtils.js';
 import { toIso8601DateTime } from './dateTime.js';
+import { retokenizeHierarchy } from './constraintUtils.js';
 
 /**
  * ISO 3166-1 alpha-3 to alpha-2 mapping for region code normalization.
@@ -1006,6 +1007,16 @@ const parseIdmElement = (idmRoot, xmlDoc) => {
     // Store the top-level ER hierarchy (with full nesting) for display
     // Sub-ERs are accessed through their parent's subERs array, not as separate entries
     result.erHierarchy = topLevelERs;
+
+    // idmXML holds resolved IU names in constraint text; turn the names of each constraint's own
+    // IUs back into {{IU:id}} tokens so they follow renames. Copied back in place because the
+    // ER objects are shared with erLibrary / erDataMap.
+    const relinkedERs = retokenizeHierarchy(topLevelERs);
+    const copyConstraintsBack = (originals, relinked) => originals.forEach((er, i) => {
+      if (relinked[i]?.constraints?.length) er.constraints = relinked[i].constraints;
+      copyConstraintsBack(er.subERs || [], relinked[i]?.subERs || []);
+    });
+    copyConstraintsBack(topLevelERs, relinkedERs);
 
     // Store all ERs in library for reference (flattened for lookups)
     result.erLibrary = Object.values(ersById);

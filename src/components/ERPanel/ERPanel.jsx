@@ -3,6 +3,7 @@ import './ERPanel.css';
 import { searchSchema, searchSchemaGrouped, searchBsdd, fetchBsddClassProperties, getAvailableSchemas, isSchemaSearchable, RateLimitError } from '../../utils/schemaSearch';
 import { getBsddCacheState, initBsddCache } from '../../utils/bsddCache';
 import BusinessRulesPane from '../BusinessRulesPane/BusinessRulesPane';
+import { parseErElement } from '../../utils/idmXmlParser';
 import { collectConstraints, constraintsReferencingIUs, iuSubtreeIdsById, resolveIuTokens, iuNameMap } from '../../utils/constraintUtils';
 import {
   DataObjectIcon,
@@ -2483,6 +2484,9 @@ const ERPanel = ({
             infoUnits.forEach(iu => {
               importedER.informationUnits.push(parseInformationUnitXml(iu));
             });
+
+            // Constraints travel with the ER; business rules live in the use case, so those links are dropped
+            importedER.constraints = (parseErElement(erElement).constraints || []).map(c => ({ ...c, businessRuleIds: [] }));
           }
         }
 
@@ -2492,6 +2496,7 @@ const ERPanel = ({
             name: importedER.name || 'Imported Sub-ER',
             description: importedER.description || '',
             informationUnits: importedER.informationUnits || [],
+            constraints: importedER.constraints || [],
             linkedTo: 'imported',
             sourceFile: file.name
           };

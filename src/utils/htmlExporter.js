@@ -4,7 +4,7 @@
  */
 
 import { defaultIdmXslt } from './defaultIdmXslt';
-import { deriveIuConstraints } from './constraintUtils.js';
+import { deriveIuConstraints, collectConstraints, iuNameMap, resolveIuTokens } from './constraintUtils.js';
 import { getRegionName } from './idmXmlParser';
 import { getReviewUIStyles, getReviewUIScript } from './reviewCommentingUI';
 
@@ -539,6 +539,15 @@ export const generateStandaloneHtml = async ({
       color: #0066cc;
     }
 
+    .br-table td { vertical-align: top; }
+    .br-expr {
+      margin: 4px 0 8px 0;
+      padding: 6px 8px;
+      background: #f4f4f4;
+      font-size: 9pt;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
     .iu-synonyms {
       font-size: 0.85em;
       color: #666;
@@ -873,6 +882,9 @@ export const generateStandaloneHtml = async ({
 
   <!-- Exchange Requirements -->
   ${generateERsSection(erDataMap, erHierarchy)}
+
+  <!-- Business Rules and Constraints -->
+  ${generateBusinessRulesSection(headerData?.businessRules, erHierarchy)}
 
   <div class="footer">
     Generated from IDMxPPM neo-Seoul | ISO 29481-3 (idmXML) Compliant
@@ -1232,6 +1244,53 @@ const generateActorsSection = (actors) => {
     </table>
   </div>
   `;
+};
+
+/**
+ * Business rules and ER-level constraints (idmXSD v2.0 Rev 11).
+ * Lists every business rule with the constraints that implement it, and every constraint with its
+ * linked information units, informal description and formal expressions.
+ */
+const generateBusinessRulesSection = (businessRules, erHierarchy) => {
+  const rules = businessRules || [];
+  const constraints = collectConstraints(erHierarchy || []);
+  if (rules.length === 0 && constraints.length === 0) return '';
+  const names = iuNameMap(erHierarchy || []);
+  const ruleName = {};
+  rules.forEach(r => { ruleName[r.id] = r.name || r.id; });
+  const text = (value) => escapeHtml(resolveIuTokens(value || '', names)).replace(/\n/g, '<br>');
+
+  let html = '<div class="section"><h2>Business Rules and Constraints</h2>';
+
+  if (rules.length > 0) {
+    html += '<h3>Business Rules</h3><table class="br-table"><thead><tr><th>Name</th><th>Statement</th><th>Reference</th><th>Constraints</th></tr></thead><tbody>';
+    rules.forEach(r => {
+      const linked = constraints.filter(({ constraint }) => (constraint.businessRuleIds || []).includes(r.id)).map(({ constraint }) => constraint.id);
+      html += `<tr><td>${escapeHtml(r.name || '')}</td><td>${text(r.description)}</td><td>${text(r.reference)}</td><td>${escapeHtml(linked.join(', ')) || '-'}</td></tr>`;
+    });
+    html += '</tbody></table>';
+  }
+
+  if (constraints.length > 0) {
+    html += '<h3>Constraints</h3><table class="br-table"><thead><tr><th>ID</th><th>ER</th><th>Business rules</th><th>Information units</th><th>Description</th><th>Formal expressions</th></tr></thead><tbody>';
+    constraints.forEach(({ constraint, erName }) => {
+      const brs = (constraint.businessRuleIds || []).map(id => ruleName[id] || id).join('; ');
+      const ius = (constraint.informationUnitIds || []).map(id => names[id] || id).join('; ');
+      const exprs = (constraint.expressions || []).map(x => {
+        const lang = x.language || {};
+        const label = `${lang.name || ''}${lang.version ? ' ' + lang.version : ''}`.trim();
+        const detail = x.form === 'external'
+          ? escapeHtml(x.uri || '')
+          : `<pre class="br-expr">${escapeHtml(resolveIuTokens(x.body || '', names))}</pre>`;
+        return `<div><strong>${escapeHtml(label)}</strong> ${detail}</div>`;
+      }).join('');
+      html += `<tr><td>${escapeHtml(constraint.id)}</td><td>${escapeHtml(erName)}</td><td>${escapeHtml(brs) || '-'}</td><td>${escapeHtml(ius) || '-'}</td><td>${text(constraint.description)}</td><td>${exprs || '-'}</td></tr>`;
+    });
+    html += '</tbody></table>';
+  }
+
+  html += '</div>';
+  return html;
 };
 
 /**

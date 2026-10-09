@@ -1101,6 +1101,11 @@ export const generateErXmlStandalone = (er, authorName = 'IDMxPPM User') => {
   lines.push('    </author>');
   lines.push('  </authoring>');
 
+  // Constraints (Rev 11). A standalone ER has no use case, so business-rule links are left out
+  // (brIds is empty) and IU links are limited to IUs inside this ER's subtree.
+  const standaloneCtx = { iuNames: iuNameMap([er]), brIds: new Set() };
+  lines.push(...generateConstraintsXml(er.constraints, '  ', standaloneCtx));
+
   // description - per idmXSD V2, uses title attribute
   if (er.description) {
     lines.push(`  <description title="${escapeXml(er.description)}"/>`);
@@ -1123,7 +1128,7 @@ export const generateErXmlStandalone = (er, authorName = 'IDMxPPM User') => {
     er.subERs.forEach(subER => {
       lines.push('  <subEr>');
       lines.push('    <er>');
-      lines.push(generateErXml(subER, authorName, '    ', false));
+      lines.push(generateErXml(subER, authorName, '    ', false, standaloneCtx));
       lines.push('    </er>');
       lines.push('  </subEr>');
     });

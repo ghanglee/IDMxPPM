@@ -137,6 +137,66 @@ export const findIuTokens = (text) => {
 export const resolveIuTokens = (text, nameById = {}) =>
   String(text || '').replace(TOKEN_RE, (_m, id) => (nameById[id] != null && nameById[id] !== '' ? nameById[id] : id));
 
+// ─── Editor display form ─────────────────────────────────────────────────────
+// Stored text uses {{IU:<id>}}; the editor shows [[IU: <name>]] so authors never see ids.
+
+const DISPLAY_RE = /\[\[IU: ([^\]]+)\]\]/g;
+
+export const iuDisplayToken = (name, id) => (name ? `[[IU: ${name}]]` : `[[IU: #${id}]]`);
+
+export const tokensToDisplay = (text, nameById = {}) =>
+  String(text || '').replace(TOKEN_RE, (_m, id) => iuDisplayToken(nameById[id], id));
+
+/** candidates: [{id, name}] in priority order (linked IUs first); unknown labels stay as typed. */
+export const displayToTokens = (text, candidates = []) =>
+  String(text || '').replace(DISPLAY_RE, (match, label) => {
+    if (label.startsWith('#')) return iuToken(label.slice(1));
+    const hit = candidates.find(c => c.name === label);
+    return hit ? iuToken(hit.id) : match;
+  });
+
+// ─── Re-linking IU names in imported text ────────────────────────────────────
+// idmXML stores resolved names. On import, names of the constraint's own associated IUs are
+// turned back into tokens so they follow later renames. Resolving gives identical text.
+
+const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+export const retokenizeText = (text, ius) => {
+  const source = String(text || '');
+  if (!source || !ius.length) return source;
+  const counts = {};
+  ius.forEach(iu => { if (iu.name) counts[iu.name] = (counts[iu.name] || 0) + 1; });
+  const unique = ius.filter(iu => iu.name && iu.name.trim().length >= 2 && counts[iu.name] === 1);
+  if (!unique.length) return source;
+  const byName = {};
+  unique.forEach(iu => { byName[iu.name] = iu.id; });
+  const names = Object.keys(byName).sort((a, b) => b.length - a.length).map(escapeRegExp);
+  const re = new RegExp(`(?<![\\p{L}\\p{N}_])(?:${names.join('|')})(?![\\p{L}\\p{N}_])`, 'gu');
+  // Leave existing tokens untouched
+  return source.split(/(\{\{IU:[^}]+\}\})/).map(part =>
+    part.startsWith('{{IU:') ? part : part.replace(re, (name) => iuToken(byName[name]))
+  ).join('');
+};
+
+export const retokenizeHierarchy = (erHierarchy) => {
+  const iuById = {};
+  flattenIUs(erHierarchy).forEach(iu => { iuById[iu.id] = iu; });
+  return mapERs(erHierarchy, (er) => {
+    if (!er.constraints || er.constraints.length === 0) return er;
+    return {
+      ...er,
+      constraints: er.constraints.map(c => {
+        const linked = (c.informationUnitIds || []).map(id => iuById[id]).filter(Boolean);
+        return {
+          ...c,
+          description: retokenizeText(c.description, linked),
+          expressions: (c.expressions || []).map(x => (x.form === 'text' ? { ...x, body: retokenizeText(x.body, linked) } : x))
+        };
+      })
+    };
+  });
+};
+
 // ─── Formal rule languages ───────────────────────────────────────────────────
 
 export const FORMAL_LANGUAGES = [

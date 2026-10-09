@@ -8,7 +8,9 @@ import {
   collectConstraints,
   nextConstraintId,
   nextBusinessRuleId,
-  iuToken,
+  tokensToDisplay,
+  displayToTokens,
+  iuDisplayToken,
   resolveIuTokens,
   pruneBusinessRuleRefs,
   validateConstraintModel,
@@ -23,16 +25,18 @@ import {
  * re-render the whole application on every keystroke.
  * Exposes insertAtCursor(text) for the "Insert IU reference" helper.
  */
-const DraftField = forwardRef(({ value, onCommit, multiline = false, className = '', placeholder, rows = 3 }, ref) => {
-  const [draft, setDraftState] = useState(value ?? '');
-  const latest = useRef(value ?? '');
+const DraftField = forwardRef(({ value, onCommit, multiline = false, className = '', placeholder, rows = 3, toDisplay, fromDisplay }, ref) => {
+  const shown = toDisplay ? toDisplay(value ?? '') : (value ?? '');
+  const [draft, setDraftState] = useState(shown);
+  const latest = useRef(shown);
   const focused = useRef(false);
-  const setDraft = (v) => { latest.current = v; setDraftState(v); };
   const el = useRef(null);
+  const setDraft = (v) => { latest.current = v; setDraftState(v); };
 
+  // Follow external changes (also IU renames, which change the displayed text)
   useEffect(() => {
-    if (!focused.current) setDraft(value ?? '');
-  }, [value]);
+    if (!focused.current) setDraft(shown);
+  }, [shown]);
 
   useImperativeHandle(ref, () => ({
     insertAtCursor(text) {
@@ -42,7 +46,7 @@ const DraftField = forwardRef(({ value, onCommit, multiline = false, className =
       const end = node?.selectionEnd ?? start;
       const next = current.slice(0, start) + text + current.slice(end);
       setDraft(next);
-      onCommit(next);
+      onCommit(fromDisplay ? fromDisplay(next) : next);
       requestAnimationFrame(() => {
         if (!node) return;
         node.focus();
@@ -54,7 +58,7 @@ const DraftField = forwardRef(({ value, onCommit, multiline = false, className =
 
   const commit = () => {
     focused.current = false;
-    if (latest.current !== (value ?? '')) onCommit(latest.current);
+    if (latest.current !== shown) onCommit(fromDisplay ? fromDisplay(latest.current) : latest.current);
   };
 
   const common = {
@@ -101,6 +105,13 @@ const BusinessRulesPane = ({
     allIUs.forEach(iu => { map[iu.id] = iu; });
     return map;
   }, [allIUs]);
+
+  // Editor shows [[IU: name]] for stored {{IU:id}} tokens; linked IUs win when names repeat
+  const makeFromDisplay = (constraint) => (text) => {
+    const linked = (constraint.informationUnitIds || []).map(id => iuById[id]).filter(Boolean);
+    return displayToTokens(text, [...linked, ...allIUs]);
+  };
+  const toDisplay = (text) => tokensToDisplay(text, names);
 
   const handleClose = useCallback(() => {
     // Make sure a focused field commits its draft before the pane unmounts
@@ -253,7 +264,7 @@ const BusinessRulesPane = ({
         disabled={linked.length === 0}
         title={linked.length === 0 ? 'Associate information units first' : 'Insert a reference to an associated information unit'}
         onChange={(e) => {
-          if (e.target.value) getTarget()?.insertAtCursor(iuToken(e.target.value));
+          if (e.target.value) getTarget()?.insertAtCursor(iuDisplayToken(names[e.target.value], e.target.value));
         }}
       >
         <option value="">Insert IU reference…</option>
@@ -269,7 +280,6 @@ const BusinessRulesPane = ({
     const { constraint, erId } = selected;
     const linkedBrIds = constraint.businessRuleIds || [];
     const unlinkedBrs = businessRules.filter(b => !linkedBrIds.includes(b.id));
-    const hasTokens = /\{\{IU:/.test(constraint.description || '');
 
     return (
       <div className="brp-editor" key={keyOf(erId, constraint.id)}>
@@ -379,14 +389,11 @@ const BusinessRulesPane = ({
             rows={3}
             className="brp-input brp-textarea"
             value={constraint.description || ''}
+            toDisplay={toDisplay}
+            fromDisplay={makeFromDisplay(constraint)}
             placeholder="e.g. Fire rating ≥ 2 h where the wall is load-bearing and the building has more than 12 storeys"
             onCommit={(v) => patchConstraint(erId, constraint.id, { description: v })}
           />
-          {hasTokens && (
-            <div className="brp-preview">
-              <span>Preview: </span>{resolveIuTokens(constraint.description, names)}
-            </div>
-          )}
         </div>
 
         <div className="brp-field">
@@ -452,6 +459,8 @@ const BusinessRulesPane = ({
                       className="brp-input brp-textarea brp-mono"
                       placeholder={expr.form === 'xml' ? '<Implies xmlns="http://ruleml.org/spec">…</Implies>' : 'ASK { … }'}
                       value={expr.body || ''}
+                      toDisplay={toDisplay}
+                      fromDisplay={makeFromDisplay(constraint)}
                       onCommit={(v) => patchExpression(constraint, erId, expr.id, { body: v })}
                     />
                     {xmlError && <div className="brp-issue-error brp-inline-issue">{xmlError}</div>}

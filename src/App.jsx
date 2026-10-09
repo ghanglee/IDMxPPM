@@ -1397,18 +1397,33 @@ const App = () => {
   // 2) Any change to an IU keeps constraints consistent: when an IU disappears from the
   //    hierarchy, constraints that referenced it lose that link. Only ids seen in the previous
   //    hierarchy are pruned, so a freshly loaded file's own dangling refs are left for validation.
+  //    Pruning waits a moment and re-checks the latest hierarchy, so an IU that is moved
+  //    (removed and re-added in separate updates) keeps its links.
   const knownIuIdsRef = useRef(new Set());
+  const latestErHierarchyRef = useRef(erHierarchy);
+  const pendingRemovedIuIdsRef = useRef(new Set());
+  const pruneTimerRef = useRef(null);
   useEffect(() => {
+    latestErHierarchyRef.current = erHierarchy;
     const current = new Set(flattenIUs(erHierarchy).map(iu => iu.id));
-    const removed = new Set([...knownIuIdsRef.current].filter(id => !current.has(id)));
+    knownIuIdsRef.current.forEach(id => { if (!current.has(id)) pendingRemovedIuIdsRef.current.add(id); });
     knownIuIdsRef.current = current;
-    if (removed.size === 0) return;
-    const pruned = pruneDanglingIuRefs(erHierarchy, removed);
-    if (pruned.changed) {
-      setErHierarchy(pruned.erHierarchy);
-      setIsDirty(true);
-    }
+    if (pendingRemovedIuIdsRef.current.size === 0) return;
+    clearTimeout(pruneTimerRef.current);
+    pruneTimerRef.current = setTimeout(() => {
+      const latest = latestErHierarchyRef.current;
+      const stillPresent = new Set(flattenIUs(latest).map(iu => iu.id));
+      const removed = new Set([...pendingRemovedIuIdsRef.current].filter(id => !stillPresent.has(id)));
+      pendingRemovedIuIdsRef.current = new Set();
+      if (removed.size === 0) return;
+      const pruned = pruneDanglingIuRefs(latest, removed);
+      if (pruned.changed) {
+        setErHierarchy(pruned.erHierarchy);
+        setIsDirty(true);
+      }
+    }, 300);
   }, [erHierarchy]);
+  useEffect(() => () => clearTimeout(pruneTimerRef.current), []);
 
   const handleBusinessRulesChange = useCallback((rules) => {
     setHeaderData(prev => ({ ...prev, businessRules: rules }));
