@@ -154,6 +154,9 @@ const BusinessRulesPane = ({
   const [brFilter, setBrFilter] = useState(null); // selected business rule id; null = all constraints
   const [iuFilter, setIuFilter] = useState(initialIuId);
   const [selectedKey, setSelectedKey] = useState(null); // `${erId}::${constraintId}`
+  // View mode is the default. Edit mode is entered with "+ Add" or "Edit"; the snapshot lets Cancel restore.
+  const [ruleEdit, setRuleEdit] = useState(null);       // { id, snapshot, isNew } | null
+  const [conEdit, setConEdit] = useState(null);         // { origErId, snapshot, isNew } | null
   const [showIuPicker, setShowIuPicker] = useState(false);
   const [iuSearch, setIuSearch] = useState('');
   const descRef = useRef(null);
@@ -228,12 +231,49 @@ const BusinessRulesPane = ({
     };
     onReplaceErHierarchy(mapEr(erHierarchy, ownerErId, er => ({ ...er, constraints: [...(er.constraints || []), constraint] })));
     setSelectedKey(keyOf(ownerErId, constraint.id));
+    setConEdit({ origErId: ownerErId, snapshot: null, isNew: true }); // a new constraint opens in edit mode
+    setShowIuPicker(false);
   };
 
   const deleteConstraint = (erId, cId) => {
     if (!window.confirm(`Delete constraint ${cId}?`)) return;
     onReplaceErHierarchy(mapEr(erHierarchy, erId, er => ({ ...er, constraints: (er.constraints || []).filter(c => c.id !== cId) })));
     setSelectedKey(null);
+    setConEdit(null);
+  };
+
+  const selectConstraint = (key) => {
+    setConEdit(null); // leaving a constraint keeps what was typed (fields commit on blur)
+    setShowIuPicker(false);
+    setSelectedKey(key);
+  };
+
+  const startEditConstraint = (erId, constraint) => {
+    setConEdit({ origErId: erId, snapshot: JSON.parse(JSON.stringify(constraint)), isNew: false });
+  };
+
+  const finishEditConstraint = () => {
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); // commit the field being typed in
+    setConEdit(null);
+    setShowIuPicker(false);
+  };
+
+  const cancelEditConstraint = () => {
+    if (!selected || !conEdit) { setConEdit(null); return; }
+    const { erId, constraint } = selected;
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    // remove the constraint where it is now ...
+    let next = mapEr(erHierarchy, erId, er => ({ ...er, constraints: (er.constraints || []).filter(c => c.id !== constraint.id) }));
+    if (conEdit.isNew) {
+      setSelectedKey(null); // ... and a newly added one is simply discarded
+    } else {
+      // ... and put the original back in the ER it came from
+      next = mapEr(next, conEdit.origErId, er => ({ ...er, constraints: [...(er.constraints || []), conEdit.snapshot] }));
+      setSelectedKey(keyOf(conEdit.origErId, conEdit.snapshot.id));
+    }
+    onReplaceErHierarchy(next);
+    setConEdit(null);
+    setShowIuPicker(false);
   };
 
   const moveConstraint = (fromErId, cId, toErId) => {
@@ -253,6 +293,31 @@ const BusinessRulesPane = ({
     const id = nextBusinessRuleId(businessRules);
     onBusinessRulesChange([...businessRules, newBusinessRule(id, `Business rule ${id.replace('BR-', '')}`)]);
     setBrFilter(id);
+    setRuleEdit({ id, snapshot: null, isNew: true }); // a new rule opens in edit mode
+  };
+
+  const selectRule = (id) => {
+    setRuleEdit(null); // leaving a rule keeps what was typed (fields commit on blur)
+    setBrFilter(brFilter === id ? null : id);
+  };
+
+  const startEditRule = (rule) => setRuleEdit({ id: rule.id, snapshot: JSON.parse(JSON.stringify(normalizeBusinessRule(rule))), isNew: false });
+
+  const finishEditRule = () => {
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    setRuleEdit(null);
+  };
+
+  const cancelEditRule = () => {
+    if (!ruleEdit) return;
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    if (ruleEdit.isNew) {
+      onBusinessRulesChange(businessRules.filter(b => b.id !== ruleEdit.id)); // discard the new rule
+      setBrFilter(null);
+    } else {
+      onBusinessRulesChange(businessRules.map(b => (b.id === ruleEdit.id ? ruleEdit.snapshot : b)));
+    }
+    setRuleEdit(null);
   };
 
   const patchBusinessRule = (id, patch) => {
@@ -274,6 +339,7 @@ const BusinessRulesPane = ({
     }
     onBusinessRulesChange(businessRules.filter(b => b.id !== id));
     setBrFilter(null);
+    setRuleEdit(null);
   };
 
   const toggleIu = (constraint, erId, iuId) => {
@@ -338,6 +404,86 @@ const BusinessRulesPane = ({
     );
   };
 
+  const renderConstraintView = () => {
+    const { constraint, erId, erName } = selected;
+    const brIds = constraint.businessRuleIds || [];
+    const iuIds = constraint.informationUnitIds || [];
+    return (
+      <div className="brp-editor brp-view" key={`view-${keyOf(erId, constraint.id)}`}>
+        <div className="brp-editor-head">
+          <h4>Constraint {constraint.id}</h4>
+          <div className="brp-actions">
+            <button className="brp-btn" onClick={() => startEditConstraint(erId, constraint)}>Edit</button>
+            <button className="brp-btn brp-btn-danger" onClick={() => deleteConstraint(erId, constraint.id)}>Delete</button>
+          </div>
+        </div>
+
+        {selectedIssues.length > 0 && (
+          <ul className="brp-issues">
+            {selectedIssues.map((i, idx) => (
+              <li key={idx} className={i.severity === 'error' ? 'brp-issue-error' : 'brp-issue-warning'}>{i.message}</li>
+            ))}
+          </ul>
+        )}
+
+        <div className="brp-view-field">
+          <label>Defined in ER</label>
+          <p>{erName}</p>
+        </div>
+        <div className="brp-view-field">
+          <label>Business rule(s)</label>
+          {brIds.length === 0 ? <p className="brp-view-empty">None</p> : (
+            <div className="brp-chips">
+              {brIds.map(id => {
+                const br = businessRules.find(b => b.id === id);
+                return <span key={id} className={`brp-chip brp-chip-static ${br ? '' : 'brp-chip-missing'}`}>{br ? `${ruleLabel(br.id)} · ${br.name}` : `(missing) ${id}`}</span>;
+              })}
+            </div>
+          )}
+        </div>
+        <div className="brp-view-field">
+          <label>Associated information units</label>
+          {iuIds.length === 0 ? <p className="brp-view-empty">None</p> : (
+            <div className="brp-chips">
+              {iuIds.map(id => {
+                const iu = iuById[id];
+                return <span key={id} className={`brp-chip brp-chip-static ${iu ? '' : 'brp-chip-missing'}`} title={iu ? iu.erPath.join(' › ') : undefined}>{iu ? iu.name || '(unnamed)' : `(missing) ${id}`}</span>;
+              })}
+            </div>
+          )}
+        </div>
+        <div className="brp-view-field">
+          <label>Description (informal statement)</label>
+          {constraint.description ? <p>{resolveIuTokens(constraint.description, names)}</p> : <p className="brp-view-empty">None</p>}
+        </div>
+        <div className="brp-view-field">
+          <label>Formal expressions</label>
+          {(constraint.expressions || []).length === 0 && <p className="brp-view-empty">None</p>}
+          {(constraint.expressions || []).map((expr, idx) => {
+            const lang = expr.language || {};
+            const formLabel = (EXPRESSION_FORMS.find(f => f.value === expr.form) || {}).label || expr.form;
+            return (
+              <div className="brp-expr brp-expr-view" key={expr.id}>
+                <div className="brp-expr-view-head">
+                  <strong>Expression {idx + 1}</strong>
+                  <span>{[lang.name, lang.version, lang.publicationYear].filter(Boolean).join(' ')} · {formLabel}</span>
+                </div>
+                {expr.form === 'external'
+                  ? <p className="brp-mono">{expr.uri || '(no file given)'}</p>
+                  : <pre className="brp-mono brp-expr-body">{resolveIuTokens(expr.body || '', names) || '(empty)'}</pre>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const renderConstraintDetail = () => {
+    if (!selected) return <div className="brp-empty">Select a constraint, or use + Add to create one.</div>;
+    return conEdit ? renderConstraintEditor() : renderConstraintView();
+  };
+
   const renderConstraintEditor = () => {
     if (!selected) {
       return <div className="brp-empty">Select a constraint, or add a new one.</div>;
@@ -349,8 +495,11 @@ const BusinessRulesPane = ({
     return (
       <div className="brp-editor" key={keyOf(erId, constraint.id)}>
         <div className="brp-editor-head">
-          <h4>Constraint {constraint.id}</h4>
-          <button className="brp-btn brp-btn-danger" onClick={() => deleteConstraint(erId, constraint.id)}>Delete</button>
+          <h4>Editing constraint {constraint.id}</h4>
+          <div className="brp-actions">
+            <button className="brp-btn brp-btn-primary" onClick={finishEditConstraint}>Done</button>
+            <button className="brp-btn" onClick={cancelEditConstraint} title={conEdit?.isNew ? 'Discard this new constraint' : 'Discard the changes made in this edit'}>Cancel</button>
+          </div>
         </div>
 
         {selectedIssues.length > 0 && (
@@ -560,7 +709,7 @@ const BusinessRulesPane = ({
                 <div
                   key={br.id}
                   className={`brp-list-item ${brFilter === br.id ? 'active' : ''}`}
-                  onClick={() => setBrFilter(brFilter === br.id ? null : br.id)}
+                  onClick={() => selectRule(br.id)}
                   title={brFilter === br.id ? 'Click again to show all constraints' : 'Show only the constraints of this rule'}
                 >
                   <span className="brp-rule-no">{ruleLabel(br.id)}</span>
@@ -569,8 +718,15 @@ const BusinessRulesPane = ({
                 </div>
               ))}
             </div>
-            {selectedBr && (
-              <div className="brp-rule-form" key={selectedBr.id}>
+            {selectedBr && (ruleEdit && ruleEdit.id === selectedBr.id ? (
+              <div className="brp-rule-form" key={`edit-${selectedBr.id}`}>
+                <div className="brp-editor-head">
+                  <h4>Editing {ruleLabel(selectedBr.id)}</h4>
+                  <div className="brp-actions">
+                    <button className="brp-btn brp-btn-primary" onClick={finishEditRule}>Done</button>
+                    <button className="brp-btn" onClick={cancelEditRule} title={ruleEdit.isNew ? 'Discard this new rule' : 'Discard the changes made in this edit'}>Cancel</button>
+                  </div>
+                </div>
                 <div className="brp-field">
                   <label>Name *</label>
                   <DraftField className="brp-input" value={selectedBr.name} onCommit={(v) => patchBusinessRule(selectedBr.id, { name: v })} />
@@ -600,9 +756,55 @@ const BusinessRulesPane = ({
                     placeholder="e.g. Building Act Enforcement Decree, Art. 56(1)"
                     onCommit={(v) => patchBusinessRule(selectedBr.id, { reference: v })} />
                 </div>
-                <button className="brp-btn brp-btn-danger" onClick={() => deleteBusinessRule(selectedBr.id)}>Delete business rule</button>
               </div>
-            )}
+            ) : (
+              <div className="brp-rule-form brp-view" key={`view-${selectedBr.id}`}>
+                {(() => {
+                  const rule = normalizeBusinessRule(selectedBr);
+                  const refs = String(rule.reference || '').split(/\r?\n/).map(r => r.trim()).filter(Boolean);
+                  return (
+                    <>
+                      <div className="brp-editor-head">
+                        <h4>{ruleLabel(rule.id)} · {rule.name || '(unnamed)'}</h4>
+                        <div className="brp-actions">
+                          <button className="brp-btn" onClick={() => startEditRule(selectedBr)}>Edit</button>
+                          <button className="brp-btn brp-btn-danger" onClick={() => deleteBusinessRule(rule.id)}>Delete</button>
+                        </div>
+                      </div>
+                      <div className="brp-view-field">
+                        <label>Statement</label>
+                        {rule.statement ? <p>{rule.statement}</p> : <p className="brp-view-empty">No statement yet (required)</p>}
+                      </div>
+                      {rule.images.length > 0 && (
+                        <div className="brp-view-field">
+                          <label>Images</label>
+                          <div className="brp-view-images">
+                            {rule.images.map(img => (
+                              <figure key={img.id}>
+                                {img.data ? <img src={img.data} alt={img.caption || ''} /> : <span className="brp-hint">{img.filePath}</span>}
+                                <figcaption>{img.caption}</figcaption>
+                              </figure>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {rule.commentary.length > 0 && (
+                        <div className="brp-view-field">
+                          <label>Commentary</label>
+                          {rule.commentary.map(c => <p key={c.id}>{c.text}</p>)}
+                        </div>
+                      )}
+                      {refs.length > 0 && (
+                        <div className="brp-view-field">
+                          <label>Reference</label>
+                          {refs.map((r, i) => <p key={i}>{r}</p>)}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            ))}
           </div>
 
           {/* Column 2: constraints (list on top, details below - like the business rules column) */}
@@ -630,7 +832,7 @@ const BusinessRulesPane = ({
                 const text = resolveIuTokens(constraint.description || '', names);
                 const hasError = issues.some(i => i.severity === 'error' && i.message.startsWith(`Constraint ${constraint.id}`));
                 return (
-                  <div key={key} className={`brp-list-item brp-constraint-item ${selectedKey === key ? 'active' : ''}`} onClick={() => { setSelectedKey(key); setShowIuPicker(false); }}>
+                  <div key={key} className={`brp-list-item brp-constraint-item ${selectedKey === key ? 'active' : ''}`} onClick={() => selectConstraint(key)}>
                     <div className="brp-constraint-top">
                       <strong>{constraint.id}</strong>
                       <span className="brp-meta">
@@ -647,7 +849,7 @@ const BusinessRulesPane = ({
                 );
               })}
             </div>
-            <div className="brp-detail">{renderConstraintEditor()}</div>
+            <div className="brp-detail">{renderConstraintDetail()}</div>
           </div>
         </div>
       </div>
