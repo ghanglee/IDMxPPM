@@ -28,7 +28,7 @@ import {
  * re-render the whole application on every keystroke.
  * Exposes insertAtCursor(text) for the "Insert IU reference" helper.
  */
-const DraftField = forwardRef(({ value, onCommit, multiline = false, className = '', placeholder, rows = 3, toDisplay, fromDisplay, listId }, ref) => {
+const DraftField = forwardRef(({ value, onCommit, multiline = false, className = '', placeholder, rows = 3, toDisplay, fromDisplay, listId, highlightRefs = false }, ref) => {
   const shown = toDisplay ? toDisplay(value ?? '') : (value ?? '');
   const [draft, setDraftState] = useState(shown);
   const latest = useRef(shown);
@@ -64,16 +64,52 @@ const DraftField = forwardRef(({ value, onCommit, multiline = false, className =
     if (latest.current !== shown) onCommit(fromDisplay ? fromDisplay(latest.current) : latest.current);
   };
 
+  // Highlight layer: a mirror of the text sits behind a transparent-text textarea, so the IU references
+  // ([[IU: name]]) can be drawn in blue while the user keeps typing in a normal textarea.
+  const mirrorRef = useRef(null);
+  const syncMirror = () => {
+    const ta = el.current, mirror = mirrorRef.current;
+    if (!ta || !mirror) return;
+    mirror.scrollTop = ta.scrollTop;
+    mirror.scrollLeft = ta.scrollLeft;
+    // keep line wrapping identical when the textarea shows a vertical scrollbar
+    const cs = getComputedStyle(ta);
+    const scrollbar = ta.offsetWidth - ta.clientWidth - parseFloat(cs.borderLeftWidth) - parseFloat(cs.borderRightWidth);
+    mirror.style.paddingRight = `calc(${cs.paddingRight} + ${Math.max(0, scrollbar)}px)`;
+  };
+  useEffect(() => { if (highlightRefs) syncMirror(); });
+
+  const renderMirror = () => {
+    const parts = [];
+    let last = 0;
+    draft.replace(/\[\[IU: ([^\]]+)\]\]/g, (match, label, offset) => {
+      if (offset > last) parts.push(draft.slice(last, offset));
+      parts.push(<span key={offset} className={label.startsWith('#') ? 'brp-iu-ref-missing' : 'brp-iu-ref-edit'}>{match}</span>);
+      last = offset + match.length;
+      return match;
+    });
+    if (last < draft.length) parts.push(draft.slice(last));
+    if (draft.endsWith('\n')) parts.push(' '); // a trailing newline still takes a line in the textarea
+    return parts;
+  };
+
   const common = {
     ref: el,
     value: draft,
     placeholder,
-    className,
     onFocus: () => { focused.current = true; },
     onChange: (e) => setDraft(e.target.value),
     onBlur: commit
   };
-  return multiline ? <textarea rows={rows} {...common} /> : <input type="text" list={listId} {...common} />;
+  if (multiline && highlightRefs) {
+    return (
+      <div className="brp-hl-wrap">
+        <div ref={mirrorRef} className={`${className} brp-hl-mirror`} aria-hidden="true">{renderMirror()}</div>
+        <textarea rows={rows} {...common} className={`${className} brp-hl-textarea`} onScroll={syncMirror} onInput={syncMirror} />
+      </div>
+    );
+  }
+  return multiline ? <textarea rows={rows} className={className} {...common} /> : <input type="text" list={listId} className={className} {...common} />;
 });
 
 /** Commentary on a business rule: scope, exceptions, interpretation (Rev 12 businessRule/description). */
@@ -638,6 +674,7 @@ const BusinessRulesPane = ({
             multiline
             rows={3}
             className="brp-input brp-textarea"
+            highlightRefs
             value={constraint.description || ''}
             toDisplay={toDisplay}
             fromDisplay={makeFromDisplay(constraint)}
@@ -689,6 +726,7 @@ const BusinessRulesPane = ({
                       multiline
                       rows={6}
                       className="brp-input brp-textarea brp-mono"
+                      highlightRefs
                       placeholder="Paste RuleML, LegalRuleML, SPARQL, SHACL or other rule text here"
                       value={expr.body || ''}
                       toDisplay={toDisplay}

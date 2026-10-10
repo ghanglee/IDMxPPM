@@ -240,3 +240,33 @@
 
 /* Expression editor: language name next to the title */
 .brp-expr-head .brp-expr-lang-name { flex: 0 1 260px; width: auto; }
+
+/* IU references drawn in blue inside the editing textareas (mirror layer behind a transparent textarea) */
+.brp-hl-wrap { position: relative; background: var(--bg-input); border-radius: var(--radius-md); }
+.brp-hl-wrap .brp-hl-mirror {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  color: var(--text-primary);
+  background: transparent;
+  border-color: transparent !important;
+  pointer-events: none;
+  resize: none;
+  min-height: 0;
+}
+.brp-hl-wrap .brp-hl-textarea {
+  position: relative;
+  display: block;
+  background: transparent !important;
+  color: transparent;
+  caret-color: var(--text-primary);
+}
+.brp-hl-wrap .brp-hl-textarea::placeholder { color: var(--text-muted); }
+.brp-hl-wrap .brp-hl-textarea::selection { background: rgba(47, 129, 247, 0.3); color: transparent; }
+.brp-iu-ref-edit { color: #2f81f7; } /* same weight as plain text so the layers stay aligned */
+/* both layers must use exactly the same line height, or long text drifts out of alignment */
+.brp-hl-wrap .brp-hl-textarea,
+.brp-hl-wrap .brp-hl-mirror { line-height: 1.4; }
