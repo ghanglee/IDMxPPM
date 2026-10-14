@@ -1,0 +1,40 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- INVALID on purpose (idmXSD v2.0 Rev 12): description before statement (order: statement, images, description, reference) -->
+<idm xmlns="https://standards.iso.org/iso/29481/-3/ed-2/en">
+  <specId guid="db4f8298-638e-5be6-99f9-fc37eb7f4c05" shortTitle="BR_invalid_06" fullTitle="Minimal business rule sample (idmXSD v2.0 Rev 12)" idmCode="BR-MIN-R12" documentStatus="WD"/>
+  <authoring copyright="Copyright 2026 Building Informatics Group (BIG), Yonsei University">
+    <changeLog id="log-1" changeDateTime="2026-06-29T00:00:00" changeSummary="Initial creation" changedBy="author-1">
+    </changeLog>
+    <author id="author-1">
+      <person firstName="Building Informatics Group" emailAddress="big@yonsei.ac.kr" affiliation="Yonsei University"/>
+    </author>
+  </authoring>
+  <uc>
+    <specId guid="fa70b5d8-eda3-5f61-8b5c-2c0c06de3bae" shortTitle="BR_minimal_r12" fullTitle="Minimal business rule sample (idmXSD v2.0 Rev 12)" idmCode="BR-MIN-R12" documentStatus="WD"/>
+    <authoring copyright="Copyright 2026 Building Informatics Group (BIG), Yonsei University">
+      <changeLog id="log-1" changeDateTime="2026-06-29T00:00:00" changeSummary="Initial creation" changedBy="author-1">
+    </changeLog>
+      <author id="author-1">
+        <person firstName="Building Informatics Group" emailAddress="big@yonsei.ac.kr" affiliation="Yonsei University"/>
+      </author>
+    </authoring>
+    <summary>
+      <description title="Minimal IDM showing a business rule with a statement only."/>
+    </summary>
+    <aimAndScope>
+      <description title="Shows the smallest valid business rule: id, name and statement."/>
+    </aimAndScope>
+    <language>EN</language>
+    <use name="Check Code Compliance"/>
+    <region value="international">
+      <type>USR</type>
+    </region>
+    <standardProjectStage>
+      <name>design</name>
+    </standardProjectStage>
+    <businessRule id="BR-01" name="Minimum ceiling height of habitable rooms">
+      <description title="Commentary"/>
+      <statement>The clear ceiling height of a habitable room shall be at least 2.2 m.</statement>
+    </businessRule>
+  </uc>
+</idm>

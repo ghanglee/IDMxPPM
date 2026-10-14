@@ -1,0 +1,146 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- idmXSD v2.0 Rev 12 sample - business rules with statement, images, commentary and references, linked from constraints with informal and formal (RuleML, LegalRuleML, SPARQL, SHACL) expressions. -->
+<idm xmlns="https://standards.iso.org/iso/29481/-3/ed-2/en">
+  <specId guid="15b6ee47-e223-5072-817d-1b88335727aa" shortTitle="BR_full_r12" fullTitle="Business rules linked to constraints (idmXSD v2.0 Rev 12)" idmCode="BR-FULL-R12" documentStatus="WD"/>
+  <authoring copyright="Copyright 2026 Building Informatics Group (BIG), Yonsei University">
+    <changeLog id="log-1" changeDateTime="2026-06-29T00:00:00" changeSummary="Initial creation" changedBy="author-1">
+    </changeLog>
+    <author id="author-1">
+      <person firstName="Building Informatics Group" emailAddress="big@yonsei.ac.kr" affiliation="Yonsei University"/>
+    </author>
+  </authoring>
+  <uc>
+    <specId guid="96724f0d-84fd-53f2-aed3-3a4c266fe75f" shortTitle="BR_full_r12" fullTitle="Business rules linked to constraints (idmXSD v2.0 Rev 12)" idmCode="BR-FULL-R12" documentStatus="WD"/>
+    <authoring copyright="Copyright 2026 Building Informatics Group (BIG), Yonsei University">
+      <changeLog id="log-1" changeDateTime="2026-06-29T00:00:00" changeSummary="Initial creation" changedBy="author-1">
+    </changeLog>
+      <author id="author-1">
+        <person firstName="Building Informatics Group" emailAddress="big@yonsei.ac.kr" affiliation="Yonsei University"/>
+      </author>
+    </authoring>
+    <summary>
+      <description title="IDM showing business rules with statements, images, commentary and references, linked from ER constraints that state the rules informally and formally (RuleML, LegalRuleML, SPARQL, SHACL)."/>
+    </summary>
+    <aimAndScope>
+      <description title="Fire resistance of load-bearing walls and of walls in fire-compartment boundaries."/>
+    </aimAndScope>
+    <language>EN</language>
+    <use name="Check Code Compliance"/>
+    <region value="international">
+      <type>USR</type>
+    </region>
+    <standardProjectStage>
+      <name>design</name>
+    </standardProjectStage>
+    <businessRule id="BR-07" name="Fire resistance of load-bearing walls">
+      <statement>Load-bearing walls in buildings over 12 storeys shall have a fire resistance of at least 2 hours.</statement>
+      <images>
+        <image caption="Section of a fire-rated load-bearing wall" filePath="images/BR-07_wall_section.png"/>
+        <image caption="Building over 12 storeys with load-bearing walls highlighted" filePath="images/BR-07_building.png"/>
+      </images>
+      <description title="Commentary: applies to walls that carry vertical loads, including shear walls. Non-load-bearing partitions are covered by BR-08."/>
+      <description title="Commentary: the number of storeys is counted above ground level."/>
+      <reference>Building Act Enforcement Decree, Art. 56(1) (illustrative)</reference>
+      <reference>EN 13501-2 (classification of fire resistance)</reference>
+    </businessRule>
+    <businessRule id="BR-08" name="Fire resistance of compartment walls">
+      <statement>Walls that form a fire-compartment boundary shall have a fire resistance of at least 1 hour.</statement>
+      <reference>Building Act Enforcement Decree, Art. 46 (illustrative)</reference>
+    </businessRule>
+    <actor id="actor-1" name="Architect" actorType="group"/>
+    <actor id="actor-2" name="Building Control Officer" actorType="individual"/>
+    <reference basisStandard="false" fullCitation="Building Act Enforcement Decree (illustrative)"/>
+  </uc>
+  <er>
+    <specId guid="0c8ce66e-490e-5afc-ae5b-ad2e1b7b3546" shortTitle="BR_full_r12_ER" fullTitle="BR_full_r12 exchange requirement" idmCode="ER-BR_full_r12" documentStatus="WD"/>
+    <authoring copyright="Copyright 2026 Building Informatics Group (BIG), Yonsei University">
+      <changeLog id="log-1" changeDateTime="2026-06-29T00:00:00" changeSummary="Initial creation" changedBy="author-1">
+    </changeLog>
+      <author id="author-1">
+        <person firstName="Building Informatics Group" emailAddress="big@yonsei.ac.kr" affiliation="Yonsei University"/>
+      </author>
+    </authoring>
+    <constraint id="C-07a">
+      <associatedBusinessRule ref="BR-07"/>
+      <associatedInformationUnit ref="IU-012"/>
+      <associatedInformationUnit ref="IU-003"/>
+      <associatedInformationUnit ref="IU-021"/>
+      <description title="IU-012 &gt;= 2h WHERE IU-003 = true AND IU-021 &gt; 12"/>
+      <expression id="C-07a-ruleml">
+        <formalRuleLanguage name="RuleML" version="1.03" uri="http://ruleml.org/spec"/>
+        <Implies xmlns="http://ruleml.org/spec">
+          <if>
+            <And>
+              <Atom>
+                <Rel>isLoadBearing</Rel>
+                <Var>wall</Var>
+                <Data>true</Data>
+              </Atom>
+              <Atom>
+                <Rel>numberOfStoreys</Rel>
+                <Var>bldg</Var>
+                <Var>n</Var>
+              </Atom>
+              <Atom>
+                <Rel>greaterThan</Rel>
+                <Var>n</Var>
+                <Data>12</Data>
+              </Atom>
+            </And>
+          </if>
+          <then>
+            <Atom>
+              <Rel>fireRatingAtLeast</Rel>
+              <Var>wall</Var>
+              <Data>PT2H</Data>
+            </Atom>
+          </then>
+        </Implies>
+      </expression>
+      <expression id="C-07a-lrml">
+        <formalRuleLanguage name="LegalRuleML" version="1.0" publicationYear="2021" uri="http://docs.oasis-open.org/legalruleml/ns/v1.0/"/>
+        <lrml:LegalRuleML xmlns:lrml="http://docs.oasis-open.org/legalruleml/ns/v1.0/" xmlns:ruleml="http://ruleml.org/spec">
+          <lrml:Statements key="stmts-br07">
+            <lrml:PrescriptiveStatement key="ps-br07">
+              <ruleml:Rule closure="universal"/>
+            </lrml:PrescriptiveStatement>
+          </lrml:Statements>
+        </lrml:LegalRuleML>
+      </expression>
+      <expression id="C-07a-sparql">
+        <formalRuleLanguage name="SPARQL" version="1.1" publicationYear="2013"/><![CDATA[
+        ASK { ?w :isLoadBearing true ; :fireRating ?r ; :inBuilding ?b .
+              ?b :numberOfStoreys ?n .
+              FILTER (?n > 12 && ?r < "PT2H"^^xsd:duration) }   # true = violation
+      ]]></expression>
+      <expression id="C-07a-shacl" uri="rules/BR-07.shacl.ttl">
+        <formalRuleLanguage name="SHACL" publicationYear="2017" uri="http://www.w3.org/ns/shacl#"/>
+      </expression>
+    </constraint>
+    <constraint id="C-08a">
+      <associatedBusinessRule ref="BR-08"/>
+      <associatedInformationUnit ref="IU-012"/>
+      <associatedInformationUnit ref="IU-030"/>
+      <description title="IU-012 &gt;= 1h WHERE IU-030 = true (informal only)"/>
+    </constraint>
+    <informationUnit id="IU-012" name="Fire rating" dataType="IfcLabel" isMandatory="true" definition="Fire resistance rating of the element, expressed as the period it maintains load-bearing capacity, integrity and insulation under standard fire test conditions.">
+      <synonym xml:lang="en">Fire resistance rating</synonym>
+      <synonym xml:lang="en">FRR</synonym>
+      <synonym xml:lang="en-GB">Period of fire resistance</synonym>
+      <synonym xml:lang="ko">내화등급</synonym>
+      <synonym xml:lang="ja">耐火性能</synonym>
+      <correspondingExternalElement basis="IFC4.3" name="Pset_WallCommon.FireRating"/>
+    </informationUnit>
+    <informationUnit id="IU-003" name="Is load-bearing" dataType="IfcBoolean" isMandatory="true" definition="Whether the wall carries vertical loads.">
+      <synonym xml:lang="en">Load bearing</synonym>
+      <correspondingExternalElement basis="IFC4.3" name="Pset_WallCommon.LoadBearing"/>
+    </informationUnit>
+    <informationUnit id="IU-021" name="Number of storeys" dataType="IfcInteger" isMandatory="true" definition="Number of storeys above ground level.">
+      <synonym xml:lang="en">Storey count</synonym>
+    </informationUnit>
+    <informationUnit id="IU-030" name="Is compartment boundary" dataType="IfcBoolean" isMandatory="true" definition="Whether the wall forms a fire-compartment boundary.">
+      <synonym xml:lang="en">Compartmentation</synonym>
+      <correspondingExternalElement basis="IFC4.3" name="Pset_WallCommon.Compartmentation"/>
+    </informationUnit>
+  </er>
+</idm>

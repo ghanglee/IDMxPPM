@@ -1,0 +1,1289 @@
+{
+  "version": "2.0.0",
+  "appName": "xPPM neo-Seoul",
+  "bpmnXml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<bpmn:definitions xmlns:bpmn=\"http://www.omg.org/spec/BPMN/20100524/MODEL\" xmlns:bpmndi=\"http://www.omg.org/spec/BPMN/20100524/DI\" xmlns:dc=\"http://www.omg.org/spec/DD/20100524/DC\" xmlns:di=\"http://www.omg.org/spec/DD/20100524/DI\" id=\"Definitions_FSDR\" targetNamespace=\"https://big.yonsei.ac.kr/idm/samples\" exporter=\"BIG sample generator\" exporterVersion=\"1.0\">\n  <bpmn:collaboration id=\"Collaboration_FSDR\">\n    <bpmn:participant id=\"Participant_Architect\" name=\"Architect\" processRef=\"Process_Architect\"/>\n    <bpmn:participant id=\"Participant_FireEngineer\" name=\"Fire safety engineer\" processRef=\"Process_FireEngineer\"/>\n    <bpmn:participant id=\"Participant_Authority\" name=\"Building permit authority\" processRef=\"Process_Authority\"/>\n    <bpmn:messageFlow id=\"MessageFlow_Model\" name=\"Fire safety design model\" sourceRef=\"Task_ExportModel\" targetRef=\"Start_FSE\"/>\n    <bpmn:messageFlow id=\"MessageFlow_Report\" name=\"Fire safety review report\" sourceRef=\"Task_IssueReport\" targetRef=\"Start_Authority\"/>\n  </bpmn:collaboration>\n  <bpmn:process id=\"Process_Architect\" isExecutable=\"false\">\n    <bpmn:laneSet id=\"LS_Process_Architect\">\n      <bpmn:lane id=\"Lane_DesignArchitect\" name=\"Design architect\">\n        <bpmn:flowNodeRef>Start_FSDR</bpmn:flowNodeRef>\n        <bpmn:flowNodeRef>Task_DefineCompartments</bpmn:flowNodeRef>\n      </bpmn:lane>\n      <bpmn:lane id=\"Lane_BIMCoordinator\" name=\"BIM coordinator\">\n        <bpmn:flowNodeRef>Task_ExportModel</bpmn:flowNodeRef>\n        <bpmn:flowNodeRef>DataObject_FireSafetyModel</bpmn:flowNodeRef>\n        <bpmn:flowNodeRef>End_Architect</bpmn:flowNodeRef>\n      </bpmn:lane>\n    </bpmn:laneSet>\n    <bpmn:startEvent id=\"Start_FSDR\" name=\"Design development started\">\n      <bpmn:outgoing>Flow_A1</bpmn:outgoing>\n    </bpmn:startEvent>\n    <bpmn:task id=\"Task_DefineCompartments\" name=\"Define fire compartments and egress\">\n      <bpmn:incoming>Flow_A1</bpmn:incoming>\n      <bpmn:outgoing>Flow_A2</bpmn:outgoing>\n    </bpmn:task>\n    <bpmn:task id=\"Task_ExportModel\" name=\"Export fire safety design model\">\n      <bpmn:incoming>Flow_A2</bpmn:incoming>\n      <bpmn:outgoing>Flow_A3</bpmn:outgoing>\n      <bpmn:dataOutputAssociation id=\"Assoc_A1\"><bpmn:targetRef>DataObject_FireSafetyModel</bpmn:targetRef></bpmn:dataOutputAssociation>\n    </bpmn:task>\n    <bpmn:dataObject id=\"DataObject_FireSafetyModel_obj\"/>\n    <bpmn:dataObjectReference id=\"DataObject_FireSafetyModel\" name=\"Fire safety design model\" dataObjectRef=\"DataObject_FireSafetyModel_obj\"/>\n    <bpmn:endEvent id=\"End_Architect\" name=\"Model submitted\">\n      <bpmn:incoming>Flow_A3</bpmn:incoming>\n    </bpmn:endEvent>\n    <bpmn:sequenceFlow id=\"Flow_A1\" sourceRef=\"Start_FSDR\" targetRef=\"Task_DefineCompartments\"/>\n    <bpmn:sequenceFlow id=\"Flow_A2\" sourceRef=\"Task_DefineCompartments\" targetRef=\"Task_ExportModel\"/>\n    <bpmn:sequenceFlow id=\"Flow_A3\" sourceRef=\"Task_ExportModel\" targetRef=\"End_Architect\"/>\n  </bpmn:process>\n  <bpmn:process id=\"Process_FireEngineer\" isExecutable=\"false\">\n    <bpmn:startEvent id=\"Start_FSE\" name=\"Model received\">\n      <bpmn:outgoing>Flow_F1</bpmn:outgoing>\n    </bpmn:startEvent>\n    <bpmn:task id=\"Task_CheckModel\" name=\"Check compartments, ratings and travel distances\">\n      <bpmn:incoming>Flow_F1</bpmn:incoming>\n      <bpmn:outgoing>Flow_F2</bpmn:outgoing>\n    </bpmn:task>\n    <bpmn:task id=\"Task_IssueReport\" name=\"Issue fire safety review report\">\n      <bpmn:incoming>Flow_F2</bpmn:incoming>\n      <bpmn:outgoing>Flow_F3</bpmn:outgoing>\n    </bpmn:task>\n    <bpmn:endEvent id=\"End_FSE\" name=\"Report issued\">\n      <bpmn:incoming>Flow_F3</bpmn:incoming>\n    </bpmn:endEvent>\n    <bpmn:sequenceFlow id=\"Flow_F1\" sourceRef=\"Start_FSE\" targetRef=\"Task_CheckModel\"/>\n    <bpmn:sequenceFlow id=\"Flow_F2\" sourceRef=\"Task_CheckModel\" targetRef=\"Task_IssueReport\"/>\n    <bpmn:sequenceFlow id=\"Flow_F3\" sourceRef=\"Task_IssueReport\" targetRef=\"End_FSE\"/>\n  </bpmn:process>\n  <bpmn:process id=\"Process_Authority\" isExecutable=\"false\">\n    <bpmn:laneSet id=\"LS_Process_Authority\">\n      <bpmn:lane id=\"Lane_FirePlanReviewer\" name=\"Fire plan reviewer\">\n        <bpmn:flowNodeRef>Start_Authority</bpmn:flowNodeRef>\n        <bpmn:flowNodeRef>Task_ReviewPermit</bpmn:flowNodeRef>\n        <bpmn:flowNodeRef>End_Authority</bpmn:flowNodeRef>\n      </bpmn:lane>\n    </bpmn:laneSet>\n    <bpmn:startEvent id=\"Start_Authority\" name=\"Report received\">\n      <bpmn:outgoing>Flow_R1</bpmn:outgoing>\n    </bpmn:startEvent>\n    <bpmn:task id=\"Task_ReviewPermit\" name=\"Review fire safety documents for permit\">\n      <bpmn:incoming>Flow_R1</bpmn:incoming>\n      <bpmn:outgoing>Flow_R2</bpmn:outgoing>\n    </bpmn:task>\n    <bpmn:endEvent id=\"End_Authority\" name=\"Review completed\">\n      <bpmn:incoming>Flow_R2</bpmn:incoming>\n    </bpmn:endEvent>\n    <bpmn:sequenceFlow id=\"Flow_R1\" sourceRef=\"Start_Authority\" targetRef=\"Task_ReviewPermit\"/>\n    <bpmn:sequenceFlow id=\"Flow_R2\" sourceRef=\"Task_ReviewPermit\" targetRef=\"End_Authority\"/>\n  </bpmn:process>\n  <bpmndi:BPMNDiagram id=\"BPMNDiagram_1\"><bpmndi:BPMNPlane id=\"BPMNPlane_1\" bpmnElement=\"Collaboration_FSDR\">\n    <bpmndi:BPMNShape id=\"Participant_Architect_di\" bpmnElement=\"Participant_Architect\" isHorizontal=\"true\"><dc:Bounds x=\"0\" y=\"0\" width=\"900\" height=\"300\"/></bpmndi:BPMNShape>\n    <bpmndi:BPMNShape id=\"Lane_DesignArchitect_di\" bpmnElement=\"Lane_DesignArchitect\" isHorizontal=\"true\"><dc:Bounds x=\"30\" y=\"0\" width=\"870\" height=\"150\"/></bpmndi:BPMNShape>\n    <bpmndi:BPMNShape id=\"Lane_BIMCoordinator_di\" bpmnElement=\"Lane_BIMCoordinator\" isHorizontal=\"true\"><dc:Bounds x=\"30\" y=\"150\" width=\"870\" height=\"150\"/></bpmndi:BPMNShape>\n    <bpmndi:BPMNShape id=\"Start_FSDR_di\" bpmnElement=\"Start_FSDR\"><dc:Bounds x=\"82\" y=\"57\" width=\"36\" height=\"36\"/></bpmndi:BPMNShape>\n    <bpmndi:BPMNShape id=\"Task_DefineCompartments_di\" bpmnElement=\"Task_DefineCompartments\"><dc:Bounds x=\"175\" y=\"40\" width=\"110\" height=\"70\"/></bpmndi:BPMNShape>\n    <bpmndi:BPMNShape id=\"Task_ExportModel_di\" bpmnElement=\"Task_ExportModel\"><dc:Bounds x=\"345\" y=\"190\" width=\"110\" height=\"70\"/></bpmndi:BPMNShape>\n    <bpmndi:BPMNShape id=\"DataObject_FireSafetyModel_di\" bpmnElement=\"DataObject_FireSafetyModel\"><dc:Bounds x=\"542\" y=\"200\" width=\"36\" height=\"50\"/></bpmndi:BPMNShape>\n    <bpmndi:BPMNShape id=\"End_Architect_di\" bpmnElement=\"End_Architect\"><dc:Bounds x=\"682\" y=\"207\" width=\"36\" height=\"36\"/></bpmndi:BPMNShape>\n    <bpmndi:BPMNEdge id=\"Flow_A1_di\" bpmnElement=\"Flow_A1\"><di:waypoint x=\"118\" y=\"75\"/><di:waypoint x=\"175\" y=\"75\"/></bpmndi:BPMNEdge>\n    <bpmndi:BPMNEdge id=\"Flow_A2_di\" bpmnElement=\"Flow_A2\"><di:waypoint x=\"285\" y=\"75\"/><di:waypoint x=\"315\" y=\"75\"/><di:waypoint x=\"315\" y=\"225\"/><di:waypoint x=\"345\" y=\"225\"/></bpmndi:BPMNEdge>\n    <bpmndi:BPMNEdge id=\"Flow_A3_di\" bpmnElement=\"Flow_A3\"><di:waypoint x=\"455\" y=\"225\"/><di:waypoint x=\"682\" y=\"225\"/></bpmndi:BPMNEdge>\n    <bpmndi:BPMNShape id=\"Participant_FireEngineer_di\" bpmnElement=\"Participant_FireEngineer\" isHorizontal=\"true\"><dc:Bounds x=\"0\" y=\"330\" width=\"900\" height=\"150\"/></bpmndi:BPMNShape>\n    <bpmndi:BPMNShape id=\"Start_FSE_di\" bpmnElement=\"Start_FSE\"><dc:Bounds x=\"282\" y=\"387\" width=\"36\" height=\"36\"/></bpmndi:BPMNShape>\n    <bpmndi:BPMNShape id=\"Task_CheckModel_di\" bpmnElement=\"Task_CheckModel\"><dc:Bounds x=\"375\" y=\"370\" width=\"110\" height=\"70\"/></bpmndi:BPMNShape>\n    <bpmndi:BPMNShape id=\"Task_IssueReport_di\" bpmnElement=\"Task_IssueReport\"><dc:Bounds x=\"545\" y=\"370\" width=\"110\" height=\"70\"/></bpmndi:BPMNShape>\n    <bpmndi:BPMNShape id=\"End_FSE_di\" bpmnElement=\"End_FSE\"><dc:Bounds x=\"742\" y=\"387\" width=\"36\" height=\"36\"/></bpmndi:BPMNShape>\n    <bpmndi:BPMNEdge id=\"Flow_F1_di\" bpmnElement=\"Flow_F1\"><di:waypoint x=\"318\" y=\"405\"/><di:waypoint x=\"375\" y=\"405\"/></bpmndi:BPMNEdge>\n    <bpmndi:BPMNEdge id=\"Flow_F2_di\" bpmnElement=\"Flow_F2\"><di:waypoint x=\"485\" y=\"405\"/><di:waypoint x=\"545\" y=\"405\"/></bpmndi:BPMNEdge>\n    <bpmndi:BPMNEdge id=\"Flow_F3_di\" bpmnElement=\"Flow_F3\"><di:waypoint x=\"655\" y=\"405\"/><di:waypoint x=\"742\" y=\"405\"/></bpmndi:BPMNEdge>\n    <bpmndi:BPMNShape id=\"Participant_Authority_di\" bpmnElement=\"Participant_Authority\" isHorizontal=\"true\"><dc:Bounds x=\"0\" y=\"510\" width=\"900\" height=\"150\"/></bpmndi:BPMNShape>\n    <bpmndi:BPMNShape id=\"Lane_FirePlanReviewer_di\" bpmnElement=\"Lane_FirePlanReviewer\" isHorizontal=\"true\"><dc:Bounds x=\"30\" y=\"510\" width=\"870\" height=\"150\"/></bpmndi:BPMNShape>\n    <bpmndi:BPMNShape id=\"Start_Authority_di\" bpmnElement=\"Start_Authority\"><dc:Bounds x=\"582\" y=\"567\" width=\"36\" height=\"36\"/></bpmndi:BPMNShape>\n    <bpmndi:BPMNShape id=\"Task_ReviewPermit_di\" bpmnElement=\"Task_ReviewPermit\"><dc:Bounds x=\"675\" y=\"550\" width=\"110\" height=\"70\"/></bpmndi:BPMNShape>\n    <bpmndi:BPMNShape id=\"End_Authority_di\" bpmnElement=\"End_Authority\"><dc:Bounds x=\"842\" y=\"567\" width=\"36\" height=\"36\"/></bpmndi:BPMNShape>\n    <bpmndi:BPMNEdge id=\"Flow_R1_di\" bpmnElement=\"Flow_R1\"><di:waypoint x=\"618\" y=\"585\"/><di:waypoint x=\"675\" y=\"585\"/></bpmndi:BPMNEdge>\n    <bpmndi:BPMNEdge id=\"Flow_R2_di\" bpmnElement=\"Flow_R2\"><di:waypoint x=\"785\" y=\"585\"/><di:waypoint x=\"842\" y=\"585\"/></bpmndi:BPMNEdge>\n    <bpmndi:BPMNEdge id=\"Assoc_A1_di\" bpmnElement=\"Assoc_A1\"><di:waypoint x=\"400\" y=\"260\"/><di:waypoint x=\"560\" y=\"200\"/></bpmndi:BPMNEdge>\n    <bpmndi:BPMNEdge id=\"MessageFlow_Model_di\" bpmnElement=\"MessageFlow_Model\"><di:waypoint x=\"400\" y=\"260\"/><di:waypoint x=\"400\" y=\"323.5\"/><di:waypoint x=\"300\" y=\"323.5\"/><di:waypoint x=\"300\" y=\"387\"/></bpmndi:BPMNEdge>\n    <bpmndi:BPMNEdge id=\"MessageFlow_Report_di\" bpmnElement=\"MessageFlow_Report\"><di:waypoint x=\"600\" y=\"440\"/><di:waypoint x=\"600\" y=\"567\"/></bpmndi:BPMNEdge>\n  </bpmndi:BPMNPlane></bpmndi:BPMNDiagram>\n</bpmn:definitions>",
+  "headerData": {
+    "title": "Fire Safety Design Review",
+    "shortTitle": "FSDR",
+    "subTitle": "Fire compartments, fire ratings and egress",
+    "authors": [
+      {
+        "type": "person",
+        "id": "author-1",
+        "givenName": "Ghang",
+        "familyName": "Lee",
+        "middleInitial": "",
+        "affiliation": "Yonsei University",
+        "uri": "glee@yonsei.ac.kr",
+        "prefix": "",
+        "suffix": "",
+        "postnominalDesignation": "",
+        "affiliationOrgIds": [],
+        "isLead": true,
+        "affiliationOrgId": ""
+      },
+      {
+        "type": "organization",
+        "id": "author-2",
+        "name": "Building Informatics Group (BIG), Yonsei University",
+        "uri": ""
+      }
+    ],
+    "organization": "",
+    "version": "1.0",
+    "creationDate": "",
+    "status": "WD",
+    "localDocumentStatus": "",
+    "localCode": "",
+    "language": "EN",
+    "projectStages": [
+      "design"
+    ],
+    "projectStagesIso": [
+      "design"
+    ],
+    "projectStagesAia": [],
+    "projectStagesRiba": [],
+    "useCategories": [
+      "Check Code Compliance",
+      "Design Review"
+    ],
+    "uses": [
+      {
+        "verb": "Check",
+        "noun": "Code Compliance"
+      },
+      {
+        "verb": "Design",
+        "noun": "Review"
+      }
+    ],
+    "useClassification": {
+      "name": "Code Validation",
+      "version": "",
+      "publicationYear": ""
+    },
+    "region": "KR",
+    "regions": [
+      "KR"
+    ],
+    "summary": "The architect delivers a fire safety design model so that the fire safety engineer and the permit authority can check fire compartmentation, fire resistance of compartment boundaries and egress travel distances.",
+    "revisionHistory": [
+      {
+        "date": "2026-10-01",
+        "description": "Initial draft"
+      },
+      {
+        "date": "2026-10-14",
+        "description": "Business rules, constraints and expressions added"
+      }
+    ],
+    "changeLogs": [
+      {
+        "id": "log-0",
+        "changeDateTime": "2026-10-01T09:00:00",
+        "changeSummary": "Initial draft",
+        "changedBy": "author-1",
+        "changes": []
+      },
+      {
+        "id": "log-1",
+        "changeDateTime": "2026-10-14T10:00:00",
+        "changeSummary": "Business rules, constraints and expressions added",
+        "changedBy": "author-1",
+        "changes": [
+          {
+            "changedElement": "uc/businessRule",
+            "changedFrom": "(none)"
+          }
+        ]
+      }
+    ],
+    "contributors": [],
+    "copyright": "Copyright 2026 Building Informatics Group (BIG), Yonsei University. Sample for testing; not normative.",
+    "keywords": [],
+    "relatedStandards": [],
+    "externalReferences": [],
+    "objectives": "Aim: replace drawing-based fire plan review with model-based checking during design development.",
+    "aimAndScope": "Aim: replace drawing-based fire plan review with model-based checking during design development.",
+    "benefits": "Earlier detection of fire safety non-compliance; fewer permit resubmissions.",
+    "limitations": "Travel distance requires a computed egress path, which not all authoring tools export.",
+    "actors": "",
+    "summaryFigures": [],
+    "aimAndScopeFigures": [],
+    "benefitsFigures": [],
+    "limitationsFigures": [],
+    "actorsList": [
+      {
+        "id": "actor-arch",
+        "name": "Architect",
+        "actorType": "group",
+        "bpmnShapeName": "Participant_Architect",
+        "role": "",
+        "subActors": [
+          {
+            "id": "actor-arch-da",
+            "name": "Design architect",
+            "role": "",
+            "bpmnShapeName": "Lane_DesignArchitect"
+          },
+          {
+            "id": "actor-arch-bc",
+            "name": "BIM coordinator",
+            "role": "",
+            "bpmnShapeName": "Lane_BIMCoordinator"
+          }
+        ]
+      },
+      {
+        "id": "actor-fse",
+        "name": "Fire safety engineer",
+        "actorType": "group",
+        "bpmnShapeName": "Participant_FireEngineer",
+        "role": "",
+        "subActors": []
+      },
+      {
+        "id": "actor-auth",
+        "name": "Building permit authority",
+        "actorType": "group",
+        "bpmnShapeName": "Participant_Authority",
+        "role": "",
+        "subActors": [
+          {
+            "id": "actor-auth-fr",
+            "name": "Fire plan reviewer",
+            "role": "",
+            "bpmnShapeName": "Lane_FirePlanReviewer"
+          }
+        ]
+      }
+    ],
+    "businessRules": [
+      {
+        "id": "BR-FS-01",
+        "name": "Fire compartment assignment",
+        "statement": "Every space shall be assigned to exactly one fire compartment.",
+        "images": [],
+        "commentary": [
+          {
+            "id": "c-1791976131347-88pwgb",
+            "text": "Commentary: shafts and stair enclosures form their own compartments."
+          }
+        ],
+        "reference": ""
+      },
+      {
+        "id": "BR-FS-02",
+        "name": "Fire compartment area limit",
+        "statement": "The floor area of a fire compartment shall not exceed 1,000 m2, or 3,000 m2 where an automatic sprinkler system is installed.",
+        "images": [
+          {
+            "id": "fig-1791976131347-jrd6ny",
+            "name": "images/BR-FS-02_compartment_plan.png",
+            "caption": "Fire compartment plan with floor areas",
+            "type": "image/png",
+            "filePath": "images/BR-FS-02_compartment_plan.png"
+          }
+        ],
+        "commentary": [
+          {
+            "id": "c-1791976131347-mj68by",
+            "text": "Commentary: the limit applies per storey; check the decree for exemptions by use."
+          }
+        ],
+        "reference": "Enforcement Decree of the Building Act (Republic of Korea), Art. 46 (illustrative)"
+      },
+      {
+        "id": "BR-FS-03",
+        "name": "Fire resistance of compartment boundaries",
+        "statement": "Walls and slabs that bound a fire compartment shall have a fire resistance of at least 1 hour.",
+        "images": [],
+        "commentary": [],
+        "reference": "EN 13501-2 (classification of fire resistance)"
+      },
+      {
+        "id": "BR-FS-04",
+        "name": "Fire doors in compartment boundaries",
+        "statement": "Every door in a fire compartment boundary shall be a self-closing fire door.",
+        "images": [],
+        "commentary": [],
+        "reference": ""
+      },
+      {
+        "id": "BR-FS-05",
+        "name": "Travel distance to direct stair",
+        "statement": "The walking distance from any point in a habitable room to the nearest direct stair shall not exceed 30 m, or 50 m where the main structural parts are fire-resistant.",
+        "images": [],
+        "commentary": [
+          {
+            "id": "c-1791976131347-0jpo1v",
+            "text": "Commentary: measured along the actual walking path, not as a straight line."
+          }
+        ],
+        "reference": "Enforcement Decree of the Building Act (Republic of Korea), Art. 34 (illustrative)"
+      },
+      {
+        "id": "BR-FS-06",
+        "name": "Exit door clear width",
+        "statement": "The clear width of every exit door on an egress path shall be at least 0.9 m.",
+        "images": [],
+        "commentary": [],
+        "reference": ""
+      }
+    ],
+    "preconditions": "",
+    "postconditions": "",
+    "triggeringEvents": "",
+    "requiredCapabilities": "",
+    "complianceCriteria": "",
+    "idmGuid": "3f6c2a1e-8b4d-4e7a-9c15-000000000001",
+    "ucGuid": "3f6c2a1e-8b4d-4e7a-9c15-000000000002",
+    "bcmGuid": "3f6c2a1e-8b4d-4e7a-9c15-000000000003",
+    "pmId": "pm-fsdr",
+    "idmCode": "IDM-KR-FSDR-01",
+    "rootERName": "Fire safety design model",
+    "rootERId": "3f6c2a1e-8b4d-4e7a-9c15-000000000004",
+    "publisher": {
+      "name": "Building Informatics Group (BIG), Yonsei University",
+      "location": "Seoul, Republic of Korea"
+    },
+    "ucShortTitle": "FSDR_UC",
+    "ucIdmCode": "IDM-KR-FSDR-01-UC",
+    "ucSubTitle": "",
+    "ucDocumentStatus": "WD",
+    "ucVersion": "1.0",
+    "ucLocalCode": "",
+    "ucLocalDocumentStatus": "",
+    "ucChangeLogs": [
+      {
+        "id": "log-1",
+        "changeDateTime": "2026-10-14T10:00:00",
+        "changeSummary": "Use case drafted",
+        "changedBy": "author-1",
+        "changes": []
+      }
+    ],
+    "bcmShortTitle": "FSDR_BCM",
+    "bcmIdmCode": "IDM-KR-FSDR-01-BCM",
+    "bcmSubTitle": "",
+    "bcmDocumentStatus": "WD",
+    "bcmVersion": "1.0",
+    "bcmLocalCode": "",
+    "bcmLocalDocumentStatus": "",
+    "bcmChangeLogs": [
+      {
+        "id": "log-1",
+        "changeDateTime": "2026-10-14T10:00:00",
+        "changeSummary": "Process map drafted",
+        "changedBy": "author-1",
+        "changes": []
+      }
+    ],
+    "pmDiagramName": "Fire safety design review",
+    "dataObjectAndErLinks": [
+      {
+        "id": "doer-1",
+        "doId": "DataObject_FireSafetyModel",
+        "erId": "3f6c2a1e-8b4d-4e7a-9c15-000000000004"
+      }
+    ],
+    "idmXsdVersion": "2.0",
+    "idmXsdVersionConfidence": "high",
+    "importedActorsList": [
+      {
+        "id": "actor-arch",
+        "name": "Architect",
+        "actorType": "group",
+        "bpmnShapeName": "Participant_Architect",
+        "role": "",
+        "subActors": [
+          {
+            "id": "actor-arch-da",
+            "name": "Design architect",
+            "role": "",
+            "bpmnShapeName": "Lane_DesignArchitect"
+          },
+          {
+            "id": "actor-arch-bc",
+            "name": "BIM coordinator",
+            "role": "",
+            "bpmnShapeName": "Lane_BIMCoordinator"
+          }
+        ]
+      },
+      {
+        "id": "actor-fse",
+        "name": "Fire safety engineer",
+        "actorType": "group",
+        "bpmnShapeName": "Participant_FireEngineer",
+        "role": "",
+        "subActors": []
+      },
+      {
+        "id": "actor-auth",
+        "name": "Building permit authority",
+        "actorType": "group",
+        "bpmnShapeName": "Participant_Authority",
+        "role": "",
+        "subActors": [
+          {
+            "id": "actor-auth-fr",
+            "name": "Fire plan reviewer",
+            "role": "",
+            "bpmnShapeName": "Lane_FirePlanReviewer"
+          }
+        ]
+      }
+    ]
+  },
+  "erHierarchy": [
+    {
+      "id": "3f6c2a1e-8b4d-4e7a-9c15-000000000004",
+      "guid": "3f6c2a1e-8b4d-4e7a-9c15-000000000004",
+      "shortTitle": "ER_FireSafetyDesignModel",
+      "name": "Fire safety design model",
+      "description": "Information the architect delivers for fire safety design review at design development.",
+      "descriptionFigures": [],
+      "examples": "",
+      "exampleImages": [],
+      "informationUnits": [
+        {
+          "id": "IU-01",
+          "name": "Space",
+          "dataType": "IfcSpace",
+          "isMandatory": true,
+          "definition": "A bounded area or volume that hosts an occupancy.",
+          "definitionFigures": [],
+          "synonyms": [],
+          "examples": "",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1791976131350-4e9nd3",
+              "basis": "IFC4.3",
+              "name": "IfcSpace"
+            }
+          ],
+          "subInformationUnits": [
+            {
+              "id": "IU-011",
+              "name": "Space name",
+              "dataType": "IfcLabel",
+              "isMandatory": true,
+              "definition": "Unique name or number of the space.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131350-wk0wjg",
+                  "basis": "IFC4.3",
+                  "name": "IfcSpace.Name"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "IU-012",
+              "name": "Net floor area",
+              "dataType": "IfcAreaMeasure",
+              "isMandatory": true,
+              "definition": "Net floor area of the space in m2.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131350-0sjyqj",
+                  "basis": "IFC4.3",
+                  "name": "Qto_SpaceBaseQuantities.NetFloorArea"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "IU-013",
+              "name": "Fire compartment reference",
+              "dataType": "IfcIdentifier",
+              "isMandatory": true,
+              "definition": "Identifier of the fire compartment that contains the space.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131350-edo472",
+                  "basis": "IFC4.3",
+                  "name": "IfcRelAssignsToGroup"
+                }
+              ],
+              "subInformationUnits": []
+            }
+          ]
+        },
+        {
+          "id": "IU-02",
+          "name": "Fire compartment",
+          "dataType": "IfcZone",
+          "isMandatory": true,
+          "definition": "A group of spaces enclosed by fire-resisting construction.",
+          "definitionFigures": [],
+          "synonyms": [
+            {
+              "id": "syn-1791976131350-8wlhwc",
+              "text": "Fire zone",
+              "lang": "en"
+            },
+            {
+              "id": "syn-1791976131350-0ym0v8",
+              "text": "방화구획",
+              "lang": "ko"
+            }
+          ],
+          "examples": "",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1791976131350-2jd5sa",
+              "basis": "IFC4.3",
+              "name": "IfcZone (ObjectType = FireCompartment)"
+            }
+          ],
+          "subInformationUnits": [
+            {
+              "id": "IU-021",
+              "name": "Compartment ID",
+              "dataType": "IfcIdentifier",
+              "isMandatory": true,
+              "definition": "Unique identifier of the fire compartment.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [],
+              "subInformationUnits": []
+            },
+            {
+              "id": "IU-022",
+              "name": "Gross floor area",
+              "dataType": "IfcAreaMeasure",
+              "isMandatory": true,
+              "definition": "Sum of floor areas of the assigned spaces in m2.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [],
+              "subInformationUnits": []
+            },
+            {
+              "id": "IU-023",
+              "name": "Is sprinklered",
+              "dataType": "IfcBoolean",
+              "isMandatory": true,
+              "definition": "True if an automatic sprinkler system covers the compartment.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131350-dcq65e",
+                  "basis": "IFC4.3",
+                  "name": "Pset_SpaceFireSafetyRequirements.SprinklerProtection"
+                }
+              ],
+              "subInformationUnits": []
+            }
+          ]
+        },
+        {
+          "id": "IU-03",
+          "name": "Compartment boundary element",
+          "dataType": "IfcBuiltElement",
+          "isMandatory": true,
+          "definition": "A wall or slab that separates two fire compartments.",
+          "definitionFigures": [],
+          "synonyms": [],
+          "examples": "",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1791976131350-z0q3kv",
+              "basis": "IFC4.3",
+              "name": "IfcWall"
+            },
+            {
+              "id": "CEE-1791976131350-scqdx5",
+              "basis": "IFC4.3",
+              "name": "IfcSlab"
+            }
+          ],
+          "subInformationUnits": [
+            {
+              "id": "IU-031",
+              "name": "Fire rating",
+              "dataType": "IfcLabel",
+              "isMandatory": true,
+              "definition": "Fire resistance rating of the element, e.g. 60 min.",
+              "definitionFigures": [],
+              "synonyms": [
+                {
+                  "id": "syn-1791976131350-9kfmk5",
+                  "text": "Fire resistance rating",
+                  "lang": "en"
+                },
+                {
+                  "id": "syn-1791976131350-zgov2a",
+                  "text": "내화등급",
+                  "lang": "ko"
+                }
+              ],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131350-xs8uoe",
+                  "basis": "IFC4.3",
+                  "name": "Pset_WallCommon.FireRating"
+                },
+                {
+                  "id": "CEE-1791976131350-luen14",
+                  "basis": "IFC4.3",
+                  "name": "Pset_SlabCommon.FireRating"
+                }
+              ],
+              "subInformationUnits": []
+            }
+          ]
+        },
+        {
+          "id": "IU-04",
+          "name": "Fire door",
+          "dataType": "IfcDoor",
+          "isMandatory": true,
+          "definition": "A door in a fire compartment boundary or on an egress path.",
+          "definitionFigures": [],
+          "synonyms": [],
+          "examples": "",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1791976131351-xuzlr3",
+              "basis": "IFC4.3",
+              "name": "IfcDoor"
+            }
+          ],
+          "subInformationUnits": [
+            {
+              "id": "IU-041",
+              "name": "Door fire rating",
+              "dataType": "IfcLabel",
+              "isMandatory": true,
+              "definition": "Fire rating of the door assembly.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131351-m6n5lb",
+                  "basis": "IFC4.3",
+                  "name": "Pset_DoorCommon.FireRating"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "IU-042",
+              "name": "Self-closing",
+              "dataType": "IfcBoolean",
+              "isMandatory": true,
+              "definition": "True if the door closes automatically.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131351-kt26bl",
+                  "basis": "IFC4.3",
+                  "name": "Pset_DoorCommon.SelfClosing"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "IU-043",
+              "name": "Clear width",
+              "dataType": "IfcPositiveLengthMeasure",
+              "isMandatory": true,
+              "definition": "Clear opening width of the door in m.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [],
+              "subInformationUnits": []
+            }
+          ]
+        },
+        {
+          "id": "IU-05",
+          "name": "Egress path",
+          "dataType": "IfcRelSpaceBoundary",
+          "isMandatory": true,
+          "definition": "The walking route from a room to the nearest direct stair.",
+          "definitionFigures": [],
+          "synonyms": [],
+          "examples": "Room 301 -> Corridor C3 -> Stair S1: 27.4 m",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1791976131351-1uqryo",
+              "basis": "Project property set",
+              "name": "Pset_BIG_Egress"
+            }
+          ],
+          "subInformationUnits": [
+            {
+              "id": "IU-051",
+              "name": "Travel distance",
+              "dataType": "IfcLengthMeasure",
+              "isMandatory": true,
+              "definition": "Walking distance along the egress path in m.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [],
+              "subInformationUnits": []
+            },
+            {
+              "id": "IU-052",
+              "name": "Target stair",
+              "dataType": "IfcIdentifier",
+              "isMandatory": true,
+              "definition": "Identifier of the direct stair reached.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [],
+              "subInformationUnits": []
+            }
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "id": "C-01",
+          "businessRuleIds": [
+            "BR-FS-01"
+          ],
+          "informationUnitIds": [
+            "IU-01",
+            "IU-013"
+          ],
+          "description": "IU-013 references exactly one IU-02 for every IU-01",
+          "expressions": []
+        },
+        {
+          "id": "C-02",
+          "businessRuleIds": [
+            "BR-FS-02"
+          ],
+          "informationUnitIds": [
+            "IU-022",
+            "IU-023"
+          ],
+          "description": "IU-022 <= 1000 m2 WHERE IU-023 = false; IU-022 <= 3000 m2 WHERE IU-023 = true",
+          "expressions": [
+            {
+              "id": "expr-1791976131349-fxoapy",
+              "xmlId": "C-02-sparql",
+              "language": {
+                "name": "SPARQL",
+                "version": "1.1",
+                "publicationYear": "2013",
+                "uri": ""
+              },
+              "form": "text",
+              "body": "PREFIX ifc: <https://standards.buildingsmart.org/IFC/DEV/IFC4_3/OWL#>\nASK {  # true = violation\n  ?z a ifc:IfcZone ; ifc:objectType \"FireCompartment\" ; :grossFloorArea ?a ; :isSprinklered ?s .\n  FILTER ( (?s = false && ?a > 1000) || (?s = true && ?a > 3000) )\n}",
+              "uri": ""
+            }
+          ]
+        },
+        {
+          "id": "C-03",
+          "businessRuleIds": [
+            "BR-FS-03"
+          ],
+          "informationUnitIds": [
+            "IU-031"
+          ],
+          "description": "IU-031 >= 60 min",
+          "expressions": []
+        },
+        {
+          "id": "C-04",
+          "businessRuleIds": [
+            "BR-FS-04"
+          ],
+          "informationUnitIds": [
+            "IU-041",
+            "IU-042"
+          ],
+          "description": "IU-041 is not empty AND IU-042 = true",
+          "expressions": []
+        },
+        {
+          "id": "C-05",
+          "businessRuleIds": [
+            "BR-FS-05"
+          ],
+          "informationUnitIds": [
+            "IU-051"
+          ],
+          "description": "IU-051 <= 30 m, or <= 50 m for fire-resistant structures",
+          "expressions": [
+            {
+              "id": "expr-1791976131350-7ial5h",
+              "xmlId": "C-05-python",
+              "language": {
+                "name": "Python",
+                "version": "3",
+                "publicationYear": "",
+                "uri": ""
+              },
+              "form": "text",
+              "body": "def check(egress_paths, fire_resistant_structure):\n    limit = 50.0 if fire_resistant_structure else 30.0\n    return [p.id for p in egress_paths if p.travel_distance > limit]  # non-empty = violation",
+              "uri": ""
+            },
+            {
+              "id": "expr-1791976131350-72fk04",
+              "xmlId": "C-05-shacl",
+              "language": {
+                "name": "SHACL",
+                "version": "",
+                "publicationYear": "2017",
+                "uri": "http://www.w3.org/ns/shacl#"
+              },
+              "form": "external",
+              "body": "",
+              "uri": "rules/BR-FS-05.shacl.ttl"
+            }
+          ]
+        },
+        {
+          "id": "C-06",
+          "businessRuleIds": [
+            "BR-FS-06"
+          ],
+          "informationUnitIds": [
+            "IU-043"
+          ],
+          "description": "IU-043 >= 0.9 m for doors on an egress path",
+          "expressions": []
+        }
+      ],
+      "subERs": [],
+      "fullTitle": "Fire safety design model",
+      "idmCode": "IDM-KR-FSDR-01-ER01",
+      "subTitle": "",
+      "documentStatus": "WD",
+      "localCode": "",
+      "localDocumentStatus": "",
+      "changeLogs": [
+        {
+          "id": "log-1",
+          "changeDateTime": "2026-10-14T10:00:00",
+          "changeSummary": "Exchange requirement drafted",
+          "changedBy": "author-1",
+          "changes": []
+        }
+      ]
+    }
+  ],
+  "dataObjectErMap": {
+    "DataObject_FireSafetyModel": "3f6c2a1e-8b4d-4e7a-9c15-000000000004"
+  },
+  "erDataMap": {
+    "DataObject_FireSafetyModel": {
+      "id": "3f6c2a1e-8b4d-4e7a-9c15-000000000004",
+      "guid": "3f6c2a1e-8b4d-4e7a-9c15-000000000004",
+      "shortTitle": "ER_FireSafetyDesignModel",
+      "name": "Fire safety design model",
+      "description": "Information the architect delivers for fire safety design review at design development.",
+      "descriptionFigures": [],
+      "examples": "",
+      "exampleImages": [],
+      "informationUnits": [
+        {
+          "id": "IU-01",
+          "name": "Space",
+          "dataType": "IfcSpace",
+          "isMandatory": true,
+          "definition": "A bounded area or volume that hosts an occupancy.",
+          "definitionFigures": [],
+          "synonyms": [],
+          "examples": "",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1791976131350-4e9nd3",
+              "basis": "IFC4.3",
+              "name": "IfcSpace"
+            }
+          ],
+          "subInformationUnits": [
+            {
+              "id": "IU-011",
+              "name": "Space name",
+              "dataType": "IfcLabel",
+              "isMandatory": true,
+              "definition": "Unique name or number of the space.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131350-wk0wjg",
+                  "basis": "IFC4.3",
+                  "name": "IfcSpace.Name"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "IU-012",
+              "name": "Net floor area",
+              "dataType": "IfcAreaMeasure",
+              "isMandatory": true,
+              "definition": "Net floor area of the space in m2.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131350-0sjyqj",
+                  "basis": "IFC4.3",
+                  "name": "Qto_SpaceBaseQuantities.NetFloorArea"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "IU-013",
+              "name": "Fire compartment reference",
+              "dataType": "IfcIdentifier",
+              "isMandatory": true,
+              "definition": "Identifier of the fire compartment that contains the space.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131350-edo472",
+                  "basis": "IFC4.3",
+                  "name": "IfcRelAssignsToGroup"
+                }
+              ],
+              "subInformationUnits": []
+            }
+          ]
+        },
+        {
+          "id": "IU-02",
+          "name": "Fire compartment",
+          "dataType": "IfcZone",
+          "isMandatory": true,
+          "definition": "A group of spaces enclosed by fire-resisting construction.",
+          "definitionFigures": [],
+          "synonyms": [
+            {
+              "id": "syn-1791976131350-8wlhwc",
+              "text": "Fire zone",
+              "lang": "en"
+            },
+            {
+              "id": "syn-1791976131350-0ym0v8",
+              "text": "방화구획",
+              "lang": "ko"
+            }
+          ],
+          "examples": "",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1791976131350-2jd5sa",
+              "basis": "IFC4.3",
+              "name": "IfcZone (ObjectType = FireCompartment)"
+            }
+          ],
+          "subInformationUnits": [
+            {
+              "id": "IU-021",
+              "name": "Compartment ID",
+              "dataType": "IfcIdentifier",
+              "isMandatory": true,
+              "definition": "Unique identifier of the fire compartment.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [],
+              "subInformationUnits": []
+            },
+            {
+              "id": "IU-022",
+              "name": "Gross floor area",
+              "dataType": "IfcAreaMeasure",
+              "isMandatory": true,
+              "definition": "Sum of floor areas of the assigned spaces in m2.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [],
+              "subInformationUnits": []
+            },
+            {
+              "id": "IU-023",
+              "name": "Is sprinklered",
+              "dataType": "IfcBoolean",
+              "isMandatory": true,
+              "definition": "True if an automatic sprinkler system covers the compartment.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131350-dcq65e",
+                  "basis": "IFC4.3",
+                  "name": "Pset_SpaceFireSafetyRequirements.SprinklerProtection"
+                }
+              ],
+              "subInformationUnits": []
+            }
+          ]
+        },
+        {
+          "id": "IU-03",
+          "name": "Compartment boundary element",
+          "dataType": "IfcBuiltElement",
+          "isMandatory": true,
+          "definition": "A wall or slab that separates two fire compartments.",
+          "definitionFigures": [],
+          "synonyms": [],
+          "examples": "",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1791976131350-z0q3kv",
+              "basis": "IFC4.3",
+              "name": "IfcWall"
+            },
+            {
+              "id": "CEE-1791976131350-scqdx5",
+              "basis": "IFC4.3",
+              "name": "IfcSlab"
+            }
+          ],
+          "subInformationUnits": [
+            {
+              "id": "IU-031",
+              "name": "Fire rating",
+              "dataType": "IfcLabel",
+              "isMandatory": true,
+              "definition": "Fire resistance rating of the element, e.g. 60 min.",
+              "definitionFigures": [],
+              "synonyms": [
+                {
+                  "id": "syn-1791976131350-9kfmk5",
+                  "text": "Fire resistance rating",
+                  "lang": "en"
+                },
+                {
+                  "id": "syn-1791976131350-zgov2a",
+                  "text": "내화등급",
+                  "lang": "ko"
+                }
+              ],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131350-xs8uoe",
+                  "basis": "IFC4.3",
+                  "name": "Pset_WallCommon.FireRating"
+                },
+                {
+                  "id": "CEE-1791976131350-luen14",
+                  "basis": "IFC4.3",
+                  "name": "Pset_SlabCommon.FireRating"
+                }
+              ],
+              "subInformationUnits": []
+            }
+          ]
+        },
+        {
+          "id": "IU-04",
+          "name": "Fire door",
+          "dataType": "IfcDoor",
+          "isMandatory": true,
+          "definition": "A door in a fire compartment boundary or on an egress path.",
+          "definitionFigures": [],
+          "synonyms": [],
+          "examples": "",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1791976131351-xuzlr3",
+              "basis": "IFC4.3",
+              "name": "IfcDoor"
+            }
+          ],
+          "subInformationUnits": [
+            {
+              "id": "IU-041",
+              "name": "Door fire rating",
+              "dataType": "IfcLabel",
+              "isMandatory": true,
+              "definition": "Fire rating of the door assembly.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131351-m6n5lb",
+                  "basis": "IFC4.3",
+                  "name": "Pset_DoorCommon.FireRating"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "IU-042",
+              "name": "Self-closing",
+              "dataType": "IfcBoolean",
+              "isMandatory": true,
+              "definition": "True if the door closes automatically.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131351-kt26bl",
+                  "basis": "IFC4.3",
+                  "name": "Pset_DoorCommon.SelfClosing"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "IU-043",
+              "name": "Clear width",
+              "dataType": "IfcPositiveLengthMeasure",
+              "isMandatory": true,
+              "definition": "Clear opening width of the door in m.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [],
+              "subInformationUnits": []
+            }
+          ]
+        },
+        {
+          "id": "IU-05",
+          "name": "Egress path",
+          "dataType": "IfcRelSpaceBoundary",
+          "isMandatory": true,
+          "definition": "The walking route from a room to the nearest direct stair.",
+          "definitionFigures": [],
+          "synonyms": [],
+          "examples": "Room 301 -> Corridor C3 -> Stair S1: 27.4 m",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1791976131351-1uqryo",
+              "basis": "Project property set",
+              "name": "Pset_BIG_Egress"
+            }
+          ],
+          "subInformationUnits": [
+            {
+              "id": "IU-051",
+              "name": "Travel distance",
+              "dataType": "IfcLengthMeasure",
+              "isMandatory": true,
+              "definition": "Walking distance along the egress path in m.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [],
+              "subInformationUnits": []
+            },
+            {
+              "id": "IU-052",
+              "name": "Target stair",
+              "dataType": "IfcIdentifier",
+              "isMandatory": true,
+              "definition": "Identifier of the direct stair reached.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [],
+              "subInformationUnits": []
+            }
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "id": "C-01",
+          "businessRuleIds": [
+            "BR-FS-01"
+          ],
+          "informationUnitIds": [
+            "IU-01",
+            "IU-013"
+          ],
+          "description": "IU-013 references exactly one IU-02 for every IU-01",
+          "expressions": []
+        },
+        {
+          "id": "C-02",
+          "businessRuleIds": [
+            "BR-FS-02"
+          ],
+          "informationUnitIds": [
+            "IU-022",
+            "IU-023"
+          ],
+          "description": "IU-022 <= 1000 m2 WHERE IU-023 = false; IU-022 <= 3000 m2 WHERE IU-023 = true",
+          "expressions": [
+            {
+              "id": "expr-1791976131349-fxoapy",
+              "xmlId": "C-02-sparql",
+              "language": {
+                "name": "SPARQL",
+                "version": "1.1",
+                "publicationYear": "2013",
+                "uri": ""
+              },
+              "form": "text",
+              "body": "PREFIX ifc: <https://standards.buildingsmart.org/IFC/DEV/IFC4_3/OWL#>\nASK {  # true = violation\n  ?z a ifc:IfcZone ; ifc:objectType \"FireCompartment\" ; :grossFloorArea ?a ; :isSprinklered ?s .\n  FILTER ( (?s = false && ?a > 1000) || (?s = true && ?a > 3000) )\n}",
+              "uri": ""
+            }
+          ]
+        },
+        {
+          "id": "C-03",
+          "businessRuleIds": [
+            "BR-FS-03"
+          ],
+          "informationUnitIds": [
+            "IU-031"
+          ],
+          "description": "IU-031 >= 60 min",
+          "expressions": []
+        },
+        {
+          "id": "C-04",
+          "businessRuleIds": [
+            "BR-FS-04"
+          ],
+          "informationUnitIds": [
+            "IU-041",
+            "IU-042"
+          ],
+          "description": "IU-041 is not empty AND IU-042 = true",
+          "expressions": []
+        },
+        {
+          "id": "C-05",
+          "businessRuleIds": [
+            "BR-FS-05"
+          ],
+          "informationUnitIds": [
+            "IU-051"
+          ],
+          "description": "IU-051 <= 30 m, or <= 50 m for fire-resistant structures",
+          "expressions": [
+            {
+              "id": "expr-1791976131350-7ial5h",
+              "xmlId": "C-05-python",
+              "language": {
+                "name": "Python",
+                "version": "3",
+                "publicationYear": "",
+                "uri": ""
+              },
+              "form": "text",
+              "body": "def check(egress_paths, fire_resistant_structure):\n    limit = 50.0 if fire_resistant_structure else 30.0\n    return [p.id for p in egress_paths if p.travel_distance > limit]  # non-empty = violation",
+              "uri": ""
+            },
+            {
+              "id": "expr-1791976131350-72fk04",
+              "xmlId": "C-05-shacl",
+              "language": {
+                "name": "SHACL",
+                "version": "",
+                "publicationYear": "2017",
+                "uri": "http://www.w3.org/ns/shacl#"
+              },
+              "form": "external",
+              "body": "",
+              "uri": "rules/BR-FS-05.shacl.ttl"
+            }
+          ]
+        },
+        {
+          "id": "C-06",
+          "businessRuleIds": [
+            "BR-FS-06"
+          ],
+          "informationUnitIds": [
+            "IU-043"
+          ],
+          "description": "IU-043 >= 0.9 m for doors on an egress path",
+          "expressions": []
+        }
+      ],
+      "subERs": [],
+      "fullTitle": "Fire safety design model",
+      "idmCode": "IDM-KR-FSDR-01-ER01",
+      "subTitle": "",
+      "documentStatus": "WD",
+      "localCode": "",
+      "localDocumentStatus": "",
+      "changeLogs": [
+        {
+          "id": "log-1",
+          "changeDateTime": "2026-10-14T10:00:00",
+          "changeSummary": "Exchange requirement drafted",
+          "changedBy": "author-1",
+          "changes": []
+        }
+      ]
+    }
+  },
+  "erLibrary": null,
+  "savedAt": "2026-10-14T11:08:51.354Z"
+}

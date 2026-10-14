@@ -1,0 +1,1412 @@
+{
+  "version": "2.0.0",
+  "appName": "xPPM neo-Seoul",
+  "bpmnXml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<bpmn:definitions xmlns:bpmn=\"http://www.omg.org/spec/BPMN/20100524/MODEL\" xmlns:bpmndi=\"http://www.omg.org/spec/BPMN/20100524/DI\" xmlns:dc=\"http://www.omg.org/spec/DD/20100524/DC\" xmlns:di=\"http://www.omg.org/spec/DD/20100524/DI\" id=\"Definitions_MEPH\" targetNamespace=\"https://big.yonsei.ac.kr/idm/samples\" exporter=\"BIG sample generator\" exporterVersion=\"1.0\">\n  <bpmn:collaboration id=\"Collaboration_MEPH\">\n    <bpmn:participant id=\"Participant_Contractor\" name=\"MEP contractor\" processRef=\"Process_Contractor\"/>\n    <bpmn:participant id=\"Participant_Owner\" name=\"Owner / facility manager\" processRef=\"Process_Owner\"/>\n    <bpmn:messageFlow id=\"MessageFlow_Package\" name=\"MEP asset handover package\" sourceRef=\"Task_Compile\" targetRef=\"Start_Owner\"/>\n  </bpmn:collaboration>\n  <bpmn:process id=\"Process_Contractor\" isExecutable=\"false\">\n    <bpmn:laneSet id=\"LS_Process_Contractor\">\n      <bpmn:lane id=\"Lane_Commissioning\" name=\"Commissioning manager\">\n        <bpmn:flowNodeRef>Start_MEPH</bpmn:flowNodeRef>\n        <bpmn:flowNodeRef>Task_Commission</bpmn:flowNodeRef>\n      </bpmn:lane>\n      <bpmn:lane id=\"Lane_InfoManager\" name=\"Information manager\">\n        <bpmn:flowNodeRef>Task_Compile</bpmn:flowNodeRef>\n        <bpmn:flowNodeRef>DataObject_HandoverPackage</bpmn:flowNodeRef>\n        <bpmn:flowNodeRef>End_Contractor</bpmn:flowNodeRef>\n      </bpmn:lane>\n    </bpmn:laneSet>\n    <bpmn:startEvent id=\"Start_MEPH\" name=\"Substantial completion\">\n      <bpmn:outgoing>Flow_C1</bpmn:outgoing>\n    </bpmn:startEvent>\n    <bpmn:task id=\"Task_Commission\" name=\"Commission and tag equipment\">\n      <bpmn:incoming>Flow_C1</bpmn:incoming>\n      <bpmn:outgoing>Flow_C2</bpmn:outgoing>\n    </bpmn:task>\n    <bpmn:task id=\"Task_Compile\" name=\"Compile asset, warranty and maintenance data\">\n      <bpmn:incoming>Flow_C2</bpmn:incoming>\n      <bpmn:outgoing>Flow_C3</bpmn:outgoing>\n      <bpmn:dataOutputAssociation id=\"Assoc_C1\"><bpmn:targetRef>DataObject_HandoverPackage</bpmn:targetRef></bpmn:dataOutputAssociation>\n    </bpmn:task>\n    <bpmn:dataObject id=\"DataObject_HandoverPackage_obj\"/>\n    <bpmn:dataObjectReference id=\"DataObject_HandoverPackage\" name=\"MEP asset handover package\" dataObjectRef=\"DataObject_HandoverPackage_obj\"/>\n    <bpmn:endEvent id=\"End_Contractor\" name=\"Package delivered\">\n      <bpmn:incoming>Flow_C3</bpmn:incoming>\n    </bpmn:endEvent>\n    <bpmn:sequenceFlow id=\"Flow_C1\" sourceRef=\"Start_MEPH\" targetRef=\"Task_Commission\"/>\n    <bpmn:sequenceFlow id=\"Flow_C2\" sourceRef=\"Task_Commission\" targetRef=\"Task_Compile\"/>\n    <bpmn:sequenceFlow id=\"Flow_C3\" sourceRef=\"Task_Compile\" targetRef=\"End_Contractor\"/>\n  </bpmn:process>\n  <bpmn:process id=\"Process_Owner\" isExecutable=\"false\">\n    <bpmn:laneSet id=\"LS_Process_Owner\">\n      <bpmn:lane id=\"Lane_CMMSAdmin\" name=\"CMMS administrator\">\n        <bpmn:flowNodeRef>Start_Owner</bpmn:flowNodeRef>\n        <bpmn:flowNodeRef>Task_CheckPackage</bpmn:flowNodeRef>\n        <bpmn:flowNodeRef>Task_LoadCMMS</bpmn:flowNodeRef>\n        <bpmn:flowNodeRef>End_Owner</bpmn:flowNodeRef>\n      </bpmn:lane>\n    </bpmn:laneSet>\n    <bpmn:startEvent id=\"Start_Owner\" name=\"Package received\">\n      <bpmn:outgoing>Flow_O1</bpmn:outgoing>\n    </bpmn:startEvent>\n    <bpmn:task id=\"Task_CheckPackage\" name=\"Check package against business rules\">\n      <bpmn:incoming>Flow_O1</bpmn:incoming>\n      <bpmn:outgoing>Flow_O2</bpmn:outgoing>\n    </bpmn:task>\n    <bpmn:task id=\"Task_LoadCMMS\" name=\"Load assets into CMMS\">\n      <bpmn:incoming>Flow_O2</bpmn:incoming>\n      <bpmn:outgoing>Flow_O3</bpmn:outgoing>\n    </bpmn:task>\n    <bpmn:endEvent id=\"End_Owner\" name=\"Assets in operation\">\n      <bpmn:incoming>Flow_O3</bpmn:incoming>\n    </bpmn:endEvent>\n    <bpmn:sequenceFlow id=\"Flow_O1\" sourceRef=\"Start_Owner\" targetRef=\"Task_CheckPackage\"/>\n    <bpmn:sequenceFlow id=\"Flow_O2\" sourceRef=\"Task_CheckPackage\" targetRef=\"Task_LoadCMMS\"/>\n    <bpmn:sequenceFlow id=\"Flow_O3\" sourceRef=\"Task_LoadCMMS\" targetRef=\"End_Owner\"/>\n  </bpmn:process>\n  <bpmndi:BPMNDiagram id=\"BPMNDiagram_1\"><bpmndi:BPMNPlane id=\"BPMNPlane_1\" bpmnElement=\"Collaboration_MEPH\">\n    <bpmndi:BPMNShape id=\"Participant_Contractor_di\" bpmnElement=\"Participant_Contractor\" isHorizontal=\"true\"><dc:Bounds x=\"0\" y=\"0\" width=\"900\" height=\"300\"/></bpmndi:BPMNShape>\n    <bpmndi:BPMNShape id=\"Lane_Commissioning_di\" bpmnElement=\"Lane_Commissioning\" isHorizontal=\"true\"><dc:Bounds x=\"30\" y=\"0\" width=\"870\" height=\"150\"/></bpmndi:BPMNShape>\n    <bpmndi:BPMNShape id=\"Lane_InfoManager_di\" bpmnElement=\"Lane_InfoManager\" isHorizontal=\"true\"><dc:Bounds x=\"30\" y=\"150\" width=\"870\" height=\"150\"/></bpmndi:BPMNShape>\n    <bpmndi:BPMNShape id=\"Start_MEPH_di\" bpmnElement=\"Start_MEPH\"><dc:Bounds x=\"82\" y=\"57\" width=\"36\" height=\"36\"/></bpmndi:BPMNShape>\n    <bpmndi:BPMNShape id=\"Task_Commission_di\" bpmnElement=\"Task_Commission\"><dc:Bounds x=\"175\" y=\"40\" width=\"110\" height=\"70\"/></bpmndi:BPMNShape>\n    <bpmndi:BPMNShape id=\"Task_Compile_di\" bpmnElement=\"Task_Compile\"><dc:Bounds x=\"345\" y=\"190\" width=\"110\" height=\"70\"/></bpmndi:BPMNShape>\n    <bpmndi:BPMNShape id=\"DataObject_HandoverPackage_di\" bpmnElement=\"DataObject_HandoverPackage\"><dc:Bounds x=\"542\" y=\"200\" width=\"36\" height=\"50\"/></bpmndi:BPMNShape>\n    <bpmndi:BPMNShape id=\"End_Contractor_di\" bpmnElement=\"End_Contractor\"><dc:Bounds x=\"682\" y=\"207\" width=\"36\" height=\"36\"/></bpmndi:BPMNShape>\n    <bpmndi:BPMNEdge id=\"Flow_C1_di\" bpmnElement=\"Flow_C1\"><di:waypoint x=\"118\" y=\"75\"/><di:waypoint x=\"175\" y=\"75\"/></bpmndi:BPMNEdge>\n    <bpmndi:BPMNEdge id=\"Flow_C2_di\" bpmnElement=\"Flow_C2\"><di:waypoint x=\"285\" y=\"75\"/><di:waypoint x=\"315\" y=\"75\"/><di:waypoint x=\"315\" y=\"225\"/><di:waypoint x=\"345\" y=\"225\"/></bpmndi:BPMNEdge>\n    <bpmndi:BPMNEdge id=\"Flow_C3_di\" bpmnElement=\"Flow_C3\"><di:waypoint x=\"455\" y=\"225\"/><di:waypoint x=\"682\" y=\"225\"/></bpmndi:BPMNEdge>\n    <bpmndi:BPMNShape id=\"Participant_Owner_di\" bpmnElement=\"Participant_Owner\" isHorizontal=\"true\"><dc:Bounds x=\"0\" y=\"330\" width=\"900\" height=\"150\"/></bpmndi:BPMNShape>\n    <bpmndi:BPMNShape id=\"Lane_CMMSAdmin_di\" bpmnElement=\"Lane_CMMSAdmin\" isHorizontal=\"true\"><dc:Bounds x=\"30\" y=\"330\" width=\"870\" height=\"150\"/></bpmndi:BPMNShape>\n    <bpmndi:BPMNShape id=\"Start_Owner_di\" bpmnElement=\"Start_Owner\"><dc:Bounds x=\"282\" y=\"387\" width=\"36\" height=\"36\"/></bpmndi:BPMNShape>\n    <bpmndi:BPMNShape id=\"Task_CheckPackage_di\" bpmnElement=\"Task_CheckPackage\"><dc:Bounds x=\"375\" y=\"370\" width=\"110\" height=\"70\"/></bpmndi:BPMNShape>\n    <bpmndi:BPMNShape id=\"Task_LoadCMMS_di\" bpmnElement=\"Task_LoadCMMS\"><dc:Bounds x=\"545\" y=\"370\" width=\"110\" height=\"70\"/></bpmndi:BPMNShape>\n    <bpmndi:BPMNShape id=\"End_Owner_di\" bpmnElement=\"End_Owner\"><dc:Bounds x=\"742\" y=\"387\" width=\"36\" height=\"36\"/></bpmndi:BPMNShape>\n    <bpmndi:BPMNEdge id=\"Flow_O1_di\" bpmnElement=\"Flow_O1\"><di:waypoint x=\"318\" y=\"405\"/><di:waypoint x=\"375\" y=\"405\"/></bpmndi:BPMNEdge>\n    <bpmndi:BPMNEdge id=\"Flow_O2_di\" bpmnElement=\"Flow_O2\"><di:waypoint x=\"485\" y=\"405\"/><di:waypoint x=\"545\" y=\"405\"/></bpmndi:BPMNEdge>\n    <bpmndi:BPMNEdge id=\"Flow_O3_di\" bpmnElement=\"Flow_O3\"><di:waypoint x=\"655\" y=\"405\"/><di:waypoint x=\"742\" y=\"405\"/></bpmndi:BPMNEdge>\n    <bpmndi:BPMNEdge id=\"Assoc_C1_di\" bpmnElement=\"Assoc_C1\"><di:waypoint x=\"400\" y=\"260\"/><di:waypoint x=\"560\" y=\"200\"/></bpmndi:BPMNEdge>\n    <bpmndi:BPMNEdge id=\"MessageFlow_Package_di\" bpmnElement=\"MessageFlow_Package\"><di:waypoint x=\"400\" y=\"260\"/><di:waypoint x=\"400\" y=\"323.5\"/><di:waypoint x=\"300\" y=\"323.5\"/><di:waypoint x=\"300\" y=\"387\"/></bpmndi:BPMNEdge>\n  </bpmndi:BPMNPlane></bpmndi:BPMNDiagram>\n</bpmn:definitions>",
+  "headerData": {
+    "title": "MEP Equipment Handover for Facility Management",
+    "shortTitle": "MEPH",
+    "subTitle": "Asset register, warranties and maintenance tasks",
+    "authors": [
+      {
+        "type": "person",
+        "id": "author-1",
+        "givenName": "Ghang",
+        "familyName": "Lee",
+        "middleInitial": "",
+        "affiliation": "Yonsei University",
+        "uri": "glee@yonsei.ac.kr",
+        "prefix": "",
+        "suffix": "",
+        "postnominalDesignation": "",
+        "affiliationOrgIds": [],
+        "isLead": true,
+        "affiliationOrgId": ""
+      },
+      {
+        "type": "organization",
+        "id": "author-2",
+        "name": "Building Informatics Group (BIG), Yonsei University",
+        "uri": ""
+      }
+    ],
+    "organization": "",
+    "version": "1.0",
+    "creationDate": "",
+    "status": "WD",
+    "localDocumentStatus": "",
+    "localCode": "",
+    "language": "EN",
+    "projectStages": [
+      "production",
+      "maintenance"
+    ],
+    "projectStagesIso": [
+      "production",
+      "maintenance"
+    ],
+    "projectStagesAia": [],
+    "projectStagesRiba": [],
+    "useCategories": [
+      "Asset Management",
+      "Record Modelling"
+    ],
+    "uses": [
+      {
+        "verb": "Asset",
+        "noun": "Management"
+      },
+      {
+        "verb": "Record",
+        "noun": "Modelling"
+      }
+    ],
+    "useClassification": {
+      "name": "Asset Management",
+      "version": "",
+      "publicationYear": ""
+    },
+    "region": "KR",
+    "regions": [
+      "KR"
+    ],
+    "summary": "At substantial completion the MEP contractor hands over an asset register of maintainable equipment, with warranty, document and maintenance information, for loading into the owner's CMMS.",
+    "revisionHistory": [
+      {
+        "date": "2026-10-01",
+        "description": "Initial draft"
+      },
+      {
+        "date": "2026-10-14",
+        "description": "Business rules, constraints and expressions added"
+      }
+    ],
+    "changeLogs": [
+      {
+        "id": "log-0",
+        "changeDateTime": "2026-10-01T09:00:00",
+        "changeSummary": "Initial draft",
+        "changedBy": "author-1",
+        "changes": []
+      },
+      {
+        "id": "log-1",
+        "changeDateTime": "2026-10-14T10:30:00",
+        "changeSummary": "Business rules, constraints and expressions added",
+        "changedBy": "author-1",
+        "changes": [
+          {
+            "changedElement": "uc/businessRule",
+            "changedFrom": "(none)"
+          }
+        ]
+      }
+    ],
+    "contributors": [],
+    "copyright": "Copyright 2026 Building Informatics Group (BIG), Yonsei University. Sample for testing; not normative.",
+    "keywords": [],
+    "relatedStandards": [],
+    "externalReferences": [],
+    "objectives": "Aim: deliver complete, checkable MEP asset data at handover instead of paper O&M binders.",
+    "aimAndScope": "Aim: deliver complete, checkable MEP asset data at handover instead of paper O&M binders.",
+    "benefits": "Shorter mobilisation of facility operations; no manual re-keying of asset data.",
+    "limitations": "Spare parts and resource lists are not covered in this version.",
+    "actors": "",
+    "summaryFigures": [],
+    "aimAndScopeFigures": [],
+    "benefitsFigures": [],
+    "limitationsFigures": [],
+    "actorsList": [
+      {
+        "id": "actor-mepc",
+        "name": "MEP contractor",
+        "actorType": "group",
+        "bpmnShapeName": "Participant_Contractor",
+        "role": "",
+        "subActors": [
+          {
+            "id": "actor-mepc-cm",
+            "name": "Commissioning manager",
+            "role": "",
+            "bpmnShapeName": "Lane_Commissioning"
+          },
+          {
+            "id": "actor-mepc-im",
+            "name": "Information manager",
+            "role": "",
+            "bpmnShapeName": "Lane_InfoManager"
+          }
+        ]
+      },
+      {
+        "id": "actor-own",
+        "name": "Owner / facility manager",
+        "actorType": "group",
+        "bpmnShapeName": "Participant_Owner",
+        "role": "",
+        "subActors": [
+          {
+            "id": "actor-own-fm",
+            "name": "CMMS administrator",
+            "role": "",
+            "bpmnShapeName": "Lane_CMMSAdmin"
+          }
+        ]
+      }
+    ],
+    "businessRules": [
+      {
+        "id": "BR-HO-01",
+        "name": "Asset tag format and uniqueness",
+        "statement": "Every equipment asset tag shall follow the pattern Building-System-Type-Sequence (e.g. B01-HVAC-AHU-001) and shall be unique within the facility.",
+        "images": [
+          {
+            "id": "fig-1791976131363-i563dp",
+            "name": "images/BR-HO-01_tag_label.png",
+            "caption": "Asset tag label on an air handling unit",
+            "type": "image/png",
+            "filePath": "images/BR-HO-01_tag_label.png"
+          }
+        ],
+        "commentary": [
+          {
+            "id": "c-1791976131363-p5d28r",
+            "text": "Commentary: the sequence number has three digits and restarts for each equipment type."
+          }
+        ],
+        "reference": ""
+      },
+      {
+        "id": "BR-HO-02",
+        "name": "Mandatory manufacturer data",
+        "statement": "Manufacturer and model number shall be provided for every equipment type.",
+        "images": [],
+        "commentary": [],
+        "reference": ""
+      },
+      {
+        "id": "BR-HO-03",
+        "name": "Serial number for components",
+        "statement": "A serial number shall be provided for every installed equipment component.",
+        "images": [],
+        "commentary": [],
+        "reference": ""
+      },
+      {
+        "id": "BR-HO-04",
+        "name": "Spatial location",
+        "statement": "Every equipment component shall be located in exactly one space.",
+        "images": [],
+        "commentary": [
+          {
+            "id": "c-1791976131363-psx2j3",
+            "text": "Commentary: roof-mounted equipment is assigned to the roof space."
+          }
+        ],
+        "reference": ""
+      },
+      {
+        "id": "BR-HO-05",
+        "name": "Warranty start date",
+        "statement": "The warranty start date shall equal the date of substantial completion unless the contract states otherwise.",
+        "images": [],
+        "commentary": [],
+        "reference": ""
+      },
+      {
+        "id": "BR-HO-06",
+        "name": "Minimum warranty duration",
+        "statement": "Warranty duration shall be expressed in months and shall be at least 12 months.",
+        "images": [],
+        "commentary": [],
+        "reference": "Owner's Exchange Information Requirements (EIR), clause 7.3 (illustrative)"
+      },
+      {
+        "id": "BR-HO-07",
+        "name": "Planned maintenance task",
+        "statement": "Every equipment type shall have at least one planned maintenance task with a frequency greater than zero.",
+        "images": [],
+        "commentary": [],
+        "reference": "ISO 19650-3:2020, 5.6 (illustrative)"
+      }
+    ],
+    "preconditions": "",
+    "postconditions": "",
+    "triggeringEvents": "",
+    "requiredCapabilities": "",
+    "complianceCriteria": "",
+    "idmGuid": "b7e41d09-2c6a-4f3b-8e52-000000000001",
+    "ucGuid": "b7e41d09-2c6a-4f3b-8e52-000000000002",
+    "bcmGuid": "b7e41d09-2c6a-4f3b-8e52-000000000003",
+    "pmId": "pm-meph",
+    "idmCode": "IDM-KR-MEPH-01",
+    "rootERName": "MEP asset handover data",
+    "rootERId": "b7e41d09-2c6a-4f3b-8e52-000000000004",
+    "publisher": {
+      "name": "Building Informatics Group (BIG), Yonsei University",
+      "location": "Seoul, Republic of Korea"
+    },
+    "ucShortTitle": "MEPH_UC",
+    "ucIdmCode": "IDM-KR-MEPH-01-UC",
+    "ucSubTitle": "",
+    "ucDocumentStatus": "WD",
+    "ucVersion": "1.0",
+    "ucLocalCode": "",
+    "ucLocalDocumentStatus": "",
+    "ucChangeLogs": [
+      {
+        "id": "log-1",
+        "changeDateTime": "2026-10-14T10:30:00",
+        "changeSummary": "Use case drafted",
+        "changedBy": "author-1",
+        "changes": []
+      }
+    ],
+    "bcmShortTitle": "MEPH_BCM",
+    "bcmIdmCode": "IDM-KR-MEPH-01-BCM",
+    "bcmSubTitle": "",
+    "bcmDocumentStatus": "WD",
+    "bcmVersion": "1.0",
+    "bcmLocalCode": "",
+    "bcmLocalDocumentStatus": "",
+    "bcmChangeLogs": [
+      {
+        "id": "log-1",
+        "changeDateTime": "2026-10-14T10:30:00",
+        "changeSummary": "Process map drafted",
+        "changedBy": "author-1",
+        "changes": []
+      }
+    ],
+    "pmDiagramName": "MEP equipment handover",
+    "dataObjectAndErLinks": [
+      {
+        "id": "doer-1",
+        "doId": "DataObject_HandoverPackage",
+        "erId": "b7e41d09-2c6a-4f3b-8e52-000000000004"
+      }
+    ],
+    "idmXsdVersion": "2.0",
+    "idmXsdVersionConfidence": "high",
+    "importedActorsList": [
+      {
+        "id": "actor-mepc",
+        "name": "MEP contractor",
+        "actorType": "group",
+        "bpmnShapeName": "Participant_Contractor",
+        "role": "",
+        "subActors": [
+          {
+            "id": "actor-mepc-cm",
+            "name": "Commissioning manager",
+            "role": "",
+            "bpmnShapeName": "Lane_Commissioning"
+          },
+          {
+            "id": "actor-mepc-im",
+            "name": "Information manager",
+            "role": "",
+            "bpmnShapeName": "Lane_InfoManager"
+          }
+        ]
+      },
+      {
+        "id": "actor-own",
+        "name": "Owner / facility manager",
+        "actorType": "group",
+        "bpmnShapeName": "Participant_Owner",
+        "role": "",
+        "subActors": [
+          {
+            "id": "actor-own-fm",
+            "name": "CMMS administrator",
+            "role": "",
+            "bpmnShapeName": "Lane_CMMSAdmin"
+          }
+        ]
+      }
+    ]
+  },
+  "erHierarchy": [
+    {
+      "id": "b7e41d09-2c6a-4f3b-8e52-000000000004",
+      "guid": "b7e41d09-2c6a-4f3b-8e52-000000000004",
+      "shortTitle": "ER_MEPAssetHandover",
+      "name": "MEP asset handover data",
+      "description": "Equipment asset data the MEP contractor delivers at handover.",
+      "descriptionFigures": [],
+      "examples": "",
+      "exampleImages": [],
+      "informationUnits": [
+        {
+          "id": "IU-01",
+          "name": "Facility",
+          "dataType": "IfcFacility",
+          "isMandatory": true,
+          "definition": "The facility being handed over.",
+          "definitionFigures": [],
+          "synonyms": [],
+          "examples": "",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1791976131365-nvm5sa",
+              "basis": "COBie 2.4",
+              "name": "Facility"
+            },
+            {
+              "id": "CEE-1791976131365-k9w4sc",
+              "basis": "IFC4.3",
+              "name": "IfcBuilding"
+            }
+          ],
+          "subInformationUnits": [
+            {
+              "id": "IU-011",
+              "name": "Substantial completion date",
+              "dataType": "IfcDate",
+              "isMandatory": true,
+              "definition": "Date of substantial completion.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [],
+              "subInformationUnits": []
+            }
+          ]
+        },
+        {
+          "id": "IU-02",
+          "name": "Space",
+          "dataType": "IfcSpace",
+          "isMandatory": true,
+          "definition": "A space that houses equipment.",
+          "definitionFigures": [],
+          "synonyms": [],
+          "examples": "",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1791976131365-ayzgur",
+              "basis": "COBie 2.4",
+              "name": "Space"
+            },
+            {
+              "id": "CEE-1791976131365-8y8ce3",
+              "basis": "IFC4.3",
+              "name": "IfcSpace"
+            }
+          ],
+          "subInformationUnits": [
+            {
+              "id": "IU-021",
+              "name": "Space name",
+              "dataType": "IfcLabel",
+              "isMandatory": true,
+              "definition": "Unique space number.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131365-ruod6n",
+                  "basis": "COBie 2.4",
+                  "name": "Space.Name"
+                }
+              ],
+              "subInformationUnits": []
+            }
+          ]
+        },
+        {
+          "id": "IU-03",
+          "name": "Equipment type",
+          "dataType": "IfcDistributionElementType",
+          "isMandatory": true,
+          "definition": "A product type shared by identical components.",
+          "definitionFigures": [],
+          "synonyms": [
+            {
+              "id": "syn-1791976131365-zbv7q5",
+              "text": "Product type",
+              "lang": "en"
+            },
+            {
+              "id": "syn-1791976131365-1k7ner",
+              "text": "설비 유형",
+              "lang": "ko"
+            }
+          ],
+          "examples": "",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1791976131365-mc07xb",
+              "basis": "COBie 2.4",
+              "name": "Type"
+            },
+            {
+              "id": "CEE-1791976131365-4mbngm",
+              "basis": "IFC4.3",
+              "name": "IfcDistributionElementType"
+            }
+          ],
+          "subInformationUnits": [
+            {
+              "id": "IU-031",
+              "name": "Manufacturer",
+              "dataType": "IfcLabel",
+              "isMandatory": true,
+              "definition": "Manufacturer contact e-mail or name.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131365-bybulv",
+                  "basis": "COBie 2.4",
+                  "name": "Type.Manufacturer"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "IU-032",
+              "name": "Model number",
+              "dataType": "IfcLabel",
+              "isMandatory": true,
+              "definition": "Manufacturer's model number.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131365-lnsrfw",
+                  "basis": "COBie 2.4",
+                  "name": "Type.ModelNumber"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "IU-033",
+              "name": "Warranty duration",
+              "dataType": "IfcInteger",
+              "isMandatory": true,
+              "definition": "Warranty duration for parts.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131365-ql8wxb",
+                  "basis": "COBie 2.4",
+                  "name": "Type.WarrantyDurationParts"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "IU-034",
+              "name": "Warranty duration unit",
+              "dataType": "IfcLabel",
+              "isMandatory": true,
+              "definition": "Unit of the warranty duration.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131365-gzyje5",
+                  "basis": "COBie 2.4",
+                  "name": "Type.WarrantyDurationUnit"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "IU-035",
+              "name": "O&M manual",
+              "dataType": "IfcDocumentReference",
+              "isMandatory": false,
+              "definition": "Operation and maintenance manual of the type.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131365-wbnydy",
+                  "basis": "COBie 2.4",
+                  "name": "Document"
+                },
+                {
+                  "id": "CEE-1791976131365-8ufv79",
+                  "basis": "IFC4.3",
+                  "name": "IfcDocumentReference"
+                }
+              ],
+              "subInformationUnits": []
+            }
+          ]
+        },
+        {
+          "id": "IU-04",
+          "name": "Equipment component",
+          "dataType": "IfcDistributionElement",
+          "isMandatory": true,
+          "definition": "An individually installed, maintainable item.",
+          "definitionFigures": [],
+          "synonyms": [],
+          "examples": "B01-HVAC-AHU-001, serial AHU23-00457, located in space B1-012",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1791976131365-u8mz3p",
+              "basis": "COBie 2.4",
+              "name": "Component"
+            },
+            {
+              "id": "CEE-1791976131365-0y441w",
+              "basis": "IFC4.3",
+              "name": "IfcDistributionElement"
+            }
+          ],
+          "subInformationUnits": [
+            {
+              "id": "IU-041",
+              "name": "Asset tag",
+              "dataType": "IfcIdentifier",
+              "isMandatory": true,
+              "definition": "Owner's asset identifier.",
+              "definitionFigures": [],
+              "synonyms": [
+                {
+                  "id": "syn-1791976131365-zpjp5l",
+                  "text": "Tag number",
+                  "lang": "en"
+                },
+                {
+                  "id": "syn-1791976131365-q0imzj",
+                  "text": "자산번호",
+                  "lang": "ko"
+                }
+              ],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131365-axgnji",
+                  "basis": "COBie 2.4",
+                  "name": "Component.TagNumber"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "IU-042",
+              "name": "Serial number",
+              "dataType": "IfcIdentifier",
+              "isMandatory": true,
+              "definition": "Manufacturer's serial number.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131365-4oe0i6",
+                  "basis": "COBie 2.4",
+                  "name": "Component.SerialNumber"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "IU-043",
+              "name": "Located in space",
+              "dataType": "IfcLabel",
+              "isMandatory": true,
+              "definition": "Name of the space containing the component.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131365-ljtu1j",
+                  "basis": "COBie 2.4",
+                  "name": "Component.Space"
+                },
+                {
+                  "id": "CEE-1791976131365-oyifzk",
+                  "basis": "IFC4.3",
+                  "name": "IfcRelContainedInSpatialStructure"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "IU-044",
+              "name": "Warranty start date",
+              "dataType": "IfcDate",
+              "isMandatory": true,
+              "definition": "Date the warranty starts.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131365-r9qptm",
+                  "basis": "COBie 2.4",
+                  "name": "Component.WarrantyStartDate"
+                }
+              ],
+              "subInformationUnits": []
+            }
+          ]
+        },
+        {
+          "id": "IU-05",
+          "name": "Planned maintenance task",
+          "dataType": "IfcTask",
+          "isMandatory": true,
+          "definition": "A recurring maintenance job for an equipment type.",
+          "definitionFigures": [],
+          "synonyms": [],
+          "examples": "",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1791976131365-ygt818",
+              "basis": "COBie 2.4",
+              "name": "Job"
+            },
+            {
+              "id": "CEE-1791976131365-7wrfnk",
+              "basis": "IFC4.3",
+              "name": "IfcTask"
+            }
+          ],
+          "subInformationUnits": [
+            {
+              "id": "IU-051",
+              "name": "Task name",
+              "dataType": "IfcLabel",
+              "isMandatory": true,
+              "definition": "Name of the maintenance job.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [],
+              "subInformationUnits": []
+            },
+            {
+              "id": "IU-052",
+              "name": "Frequency",
+              "dataType": "IfcReal",
+              "isMandatory": true,
+              "definition": "Number of time units between occurrences.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131365-s7c5r3",
+                  "basis": "COBie 2.4",
+                  "name": "Job.Frequency"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "IU-053",
+              "name": "Frequency unit",
+              "dataType": "IfcLabel",
+              "isMandatory": true,
+              "definition": "Time unit (day, week, month, year).",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131365-bq97y9",
+                  "basis": "COBie 2.4",
+                  "name": "Job.FrequencyUnit"
+                }
+              ],
+              "subInformationUnits": []
+            }
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "id": "C-01",
+          "businessRuleIds": [
+            "BR-HO-01"
+          ],
+          "informationUnitIds": [
+            "IU-041"
+          ],
+          "description": "IU-041 matches ^[A-Z0-9]+-[A-Z]+-[A-Z]+-[0-9]{3}$ AND is unique",
+          "expressions": [
+            {
+              "id": "expr-1791976131364-ba6wlx",
+              "xmlId": "C-01-sparql",
+              "language": {
+                "name": "SPARQL",
+                "version": "1.1",
+                "publicationYear": "2013",
+                "uri": ""
+              },
+              "form": "text",
+              "body": "ASK {  # true = violation (format or duplicate)\n  { ?c :assetTag ?t . FILTER (!REGEX(?t, \"^[A-Z0-9]+-[A-Z]+-[A-Z]+-[0-9]{3}$\")) }\n  UNION\n  { ?c1 :assetTag ?t . ?c2 :assetTag ?t . FILTER (?c1 != ?c2) }\n}",
+              "uri": ""
+            }
+          ]
+        },
+        {
+          "id": "C-02",
+          "businessRuleIds": [
+            "BR-HO-02"
+          ],
+          "informationUnitIds": [
+            "IU-031",
+            "IU-032"
+          ],
+          "description": "IU-031 and IU-032 are not empty",
+          "expressions": []
+        },
+        {
+          "id": "C-03",
+          "businessRuleIds": [
+            "BR-HO-03"
+          ],
+          "informationUnitIds": [
+            "IU-042"
+          ],
+          "description": "IU-042 is not empty",
+          "expressions": []
+        },
+        {
+          "id": "C-04",
+          "businessRuleIds": [
+            "BR-HO-04"
+          ],
+          "informationUnitIds": [
+            "IU-043",
+            "IU-021"
+          ],
+          "description": "IU-043 references exactly one IU-021",
+          "expressions": []
+        },
+        {
+          "id": "C-05",
+          "businessRuleIds": [
+            "BR-HO-05"
+          ],
+          "informationUnitIds": [
+            "IU-044",
+            "IU-011"
+          ],
+          "description": "IU-044 = IU-011",
+          "expressions": []
+        },
+        {
+          "id": "C-06",
+          "businessRuleIds": [
+            "BR-HO-06"
+          ],
+          "informationUnitIds": [
+            "IU-033",
+            "IU-034"
+          ],
+          "description": "IU-034 = 'month' AND IU-033 >= 12",
+          "expressions": []
+        },
+        {
+          "id": "C-07",
+          "businessRuleIds": [
+            "BR-HO-07"
+          ],
+          "informationUnitIds": [
+            "IU-05",
+            "IU-052"
+          ],
+          "description": "count(IU-05 per equipment type WHERE IU-052 > 0) >= 1",
+          "expressions": []
+        }
+      ],
+      "subERs": [],
+      "fullTitle": "MEP asset handover data",
+      "idmCode": "IDM-KR-MEPH-01-ER01",
+      "subTitle": "",
+      "documentStatus": "WD",
+      "localCode": "",
+      "localDocumentStatus": "",
+      "changeLogs": [
+        {
+          "id": "log-1",
+          "changeDateTime": "2026-10-14T10:30:00",
+          "changeSummary": "Exchange requirement drafted",
+          "changedBy": "author-1",
+          "changes": []
+        }
+      ]
+    }
+  ],
+  "dataObjectErMap": {
+    "DataObject_HandoverPackage": "b7e41d09-2c6a-4f3b-8e52-000000000004"
+  },
+  "erDataMap": {
+    "DataObject_HandoverPackage": {
+      "id": "b7e41d09-2c6a-4f3b-8e52-000000000004",
+      "guid": "b7e41d09-2c6a-4f3b-8e52-000000000004",
+      "shortTitle": "ER_MEPAssetHandover",
+      "name": "MEP asset handover data",
+      "description": "Equipment asset data the MEP contractor delivers at handover.",
+      "descriptionFigures": [],
+      "examples": "",
+      "exampleImages": [],
+      "informationUnits": [
+        {
+          "id": "IU-01",
+          "name": "Facility",
+          "dataType": "IfcFacility",
+          "isMandatory": true,
+          "definition": "The facility being handed over.",
+          "definitionFigures": [],
+          "synonyms": [],
+          "examples": "",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1791976131365-nvm5sa",
+              "basis": "COBie 2.4",
+              "name": "Facility"
+            },
+            {
+              "id": "CEE-1791976131365-k9w4sc",
+              "basis": "IFC4.3",
+              "name": "IfcBuilding"
+            }
+          ],
+          "subInformationUnits": [
+            {
+              "id": "IU-011",
+              "name": "Substantial completion date",
+              "dataType": "IfcDate",
+              "isMandatory": true,
+              "definition": "Date of substantial completion.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [],
+              "subInformationUnits": []
+            }
+          ]
+        },
+        {
+          "id": "IU-02",
+          "name": "Space",
+          "dataType": "IfcSpace",
+          "isMandatory": true,
+          "definition": "A space that houses equipment.",
+          "definitionFigures": [],
+          "synonyms": [],
+          "examples": "",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1791976131365-ayzgur",
+              "basis": "COBie 2.4",
+              "name": "Space"
+            },
+            {
+              "id": "CEE-1791976131365-8y8ce3",
+              "basis": "IFC4.3",
+              "name": "IfcSpace"
+            }
+          ],
+          "subInformationUnits": [
+            {
+              "id": "IU-021",
+              "name": "Space name",
+              "dataType": "IfcLabel",
+              "isMandatory": true,
+              "definition": "Unique space number.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131365-ruod6n",
+                  "basis": "COBie 2.4",
+                  "name": "Space.Name"
+                }
+              ],
+              "subInformationUnits": []
+            }
+          ]
+        },
+        {
+          "id": "IU-03",
+          "name": "Equipment type",
+          "dataType": "IfcDistributionElementType",
+          "isMandatory": true,
+          "definition": "A product type shared by identical components.",
+          "definitionFigures": [],
+          "synonyms": [
+            {
+              "id": "syn-1791976131365-zbv7q5",
+              "text": "Product type",
+              "lang": "en"
+            },
+            {
+              "id": "syn-1791976131365-1k7ner",
+              "text": "설비 유형",
+              "lang": "ko"
+            }
+          ],
+          "examples": "",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1791976131365-mc07xb",
+              "basis": "COBie 2.4",
+              "name": "Type"
+            },
+            {
+              "id": "CEE-1791976131365-4mbngm",
+              "basis": "IFC4.3",
+              "name": "IfcDistributionElementType"
+            }
+          ],
+          "subInformationUnits": [
+            {
+              "id": "IU-031",
+              "name": "Manufacturer",
+              "dataType": "IfcLabel",
+              "isMandatory": true,
+              "definition": "Manufacturer contact e-mail or name.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131365-bybulv",
+                  "basis": "COBie 2.4",
+                  "name": "Type.Manufacturer"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "IU-032",
+              "name": "Model number",
+              "dataType": "IfcLabel",
+              "isMandatory": true,
+              "definition": "Manufacturer's model number.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131365-lnsrfw",
+                  "basis": "COBie 2.4",
+                  "name": "Type.ModelNumber"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "IU-033",
+              "name": "Warranty duration",
+              "dataType": "IfcInteger",
+              "isMandatory": true,
+              "definition": "Warranty duration for parts.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131365-ql8wxb",
+                  "basis": "COBie 2.4",
+                  "name": "Type.WarrantyDurationParts"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "IU-034",
+              "name": "Warranty duration unit",
+              "dataType": "IfcLabel",
+              "isMandatory": true,
+              "definition": "Unit of the warranty duration.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131365-gzyje5",
+                  "basis": "COBie 2.4",
+                  "name": "Type.WarrantyDurationUnit"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "IU-035",
+              "name": "O&M manual",
+              "dataType": "IfcDocumentReference",
+              "isMandatory": false,
+              "definition": "Operation and maintenance manual of the type.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131365-wbnydy",
+                  "basis": "COBie 2.4",
+                  "name": "Document"
+                },
+                {
+                  "id": "CEE-1791976131365-8ufv79",
+                  "basis": "IFC4.3",
+                  "name": "IfcDocumentReference"
+                }
+              ],
+              "subInformationUnits": []
+            }
+          ]
+        },
+        {
+          "id": "IU-04",
+          "name": "Equipment component",
+          "dataType": "IfcDistributionElement",
+          "isMandatory": true,
+          "definition": "An individually installed, maintainable item.",
+          "definitionFigures": [],
+          "synonyms": [],
+          "examples": "B01-HVAC-AHU-001, serial AHU23-00457, located in space B1-012",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1791976131365-u8mz3p",
+              "basis": "COBie 2.4",
+              "name": "Component"
+            },
+            {
+              "id": "CEE-1791976131365-0y441w",
+              "basis": "IFC4.3",
+              "name": "IfcDistributionElement"
+            }
+          ],
+          "subInformationUnits": [
+            {
+              "id": "IU-041",
+              "name": "Asset tag",
+              "dataType": "IfcIdentifier",
+              "isMandatory": true,
+              "definition": "Owner's asset identifier.",
+              "definitionFigures": [],
+              "synonyms": [
+                {
+                  "id": "syn-1791976131365-zpjp5l",
+                  "text": "Tag number",
+                  "lang": "en"
+                },
+                {
+                  "id": "syn-1791976131365-q0imzj",
+                  "text": "자산번호",
+                  "lang": "ko"
+                }
+              ],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131365-axgnji",
+                  "basis": "COBie 2.4",
+                  "name": "Component.TagNumber"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "IU-042",
+              "name": "Serial number",
+              "dataType": "IfcIdentifier",
+              "isMandatory": true,
+              "definition": "Manufacturer's serial number.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131365-4oe0i6",
+                  "basis": "COBie 2.4",
+                  "name": "Component.SerialNumber"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "IU-043",
+              "name": "Located in space",
+              "dataType": "IfcLabel",
+              "isMandatory": true,
+              "definition": "Name of the space containing the component.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131365-ljtu1j",
+                  "basis": "COBie 2.4",
+                  "name": "Component.Space"
+                },
+                {
+                  "id": "CEE-1791976131365-oyifzk",
+                  "basis": "IFC4.3",
+                  "name": "IfcRelContainedInSpatialStructure"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "IU-044",
+              "name": "Warranty start date",
+              "dataType": "IfcDate",
+              "isMandatory": true,
+              "definition": "Date the warranty starts.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131365-r9qptm",
+                  "basis": "COBie 2.4",
+                  "name": "Component.WarrantyStartDate"
+                }
+              ],
+              "subInformationUnits": []
+            }
+          ]
+        },
+        {
+          "id": "IU-05",
+          "name": "Planned maintenance task",
+          "dataType": "IfcTask",
+          "isMandatory": true,
+          "definition": "A recurring maintenance job for an equipment type.",
+          "definitionFigures": [],
+          "synonyms": [],
+          "examples": "",
+          "exampleImages": [],
+          "correspondingExternalElements": [
+            {
+              "id": "CEE-1791976131365-ygt818",
+              "basis": "COBie 2.4",
+              "name": "Job"
+            },
+            {
+              "id": "CEE-1791976131365-7wrfnk",
+              "basis": "IFC4.3",
+              "name": "IfcTask"
+            }
+          ],
+          "subInformationUnits": [
+            {
+              "id": "IU-051",
+              "name": "Task name",
+              "dataType": "IfcLabel",
+              "isMandatory": true,
+              "definition": "Name of the maintenance job.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [],
+              "subInformationUnits": []
+            },
+            {
+              "id": "IU-052",
+              "name": "Frequency",
+              "dataType": "IfcReal",
+              "isMandatory": true,
+              "definition": "Number of time units between occurrences.",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131365-s7c5r3",
+                  "basis": "COBie 2.4",
+                  "name": "Job.Frequency"
+                }
+              ],
+              "subInformationUnits": []
+            },
+            {
+              "id": "IU-053",
+              "name": "Frequency unit",
+              "dataType": "IfcLabel",
+              "isMandatory": true,
+              "definition": "Time unit (day, week, month, year).",
+              "definitionFigures": [],
+              "synonyms": [],
+              "examples": "",
+              "exampleImages": [],
+              "correspondingExternalElements": [
+                {
+                  "id": "CEE-1791976131365-bq97y9",
+                  "basis": "COBie 2.4",
+                  "name": "Job.FrequencyUnit"
+                }
+              ],
+              "subInformationUnits": []
+            }
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "id": "C-01",
+          "businessRuleIds": [
+            "BR-HO-01"
+          ],
+          "informationUnitIds": [
+            "IU-041"
+          ],
+          "description": "IU-041 matches ^[A-Z0-9]+-[A-Z]+-[A-Z]+-[0-9]{3}$ AND is unique",
+          "expressions": [
+            {
+              "id": "expr-1791976131364-ba6wlx",
+              "xmlId": "C-01-sparql",
+              "language": {
+                "name": "SPARQL",
+                "version": "1.1",
+                "publicationYear": "2013",
+                "uri": ""
+              },
+              "form": "text",
+              "body": "ASK {  # true = violation (format or duplicate)\n  { ?c :assetTag ?t . FILTER (!REGEX(?t, \"^[A-Z0-9]+-[A-Z]+-[A-Z]+-[0-9]{3}$\")) }\n  UNION\n  { ?c1 :assetTag ?t . ?c2 :assetTag ?t . FILTER (?c1 != ?c2) }\n}",
+              "uri": ""
+            }
+          ]
+        },
+        {
+          "id": "C-02",
+          "businessRuleIds": [
+            "BR-HO-02"
+          ],
+          "informationUnitIds": [
+            "IU-031",
+            "IU-032"
+          ],
+          "description": "IU-031 and IU-032 are not empty",
+          "expressions": []
+        },
+        {
+          "id": "C-03",
+          "businessRuleIds": [
+            "BR-HO-03"
+          ],
+          "informationUnitIds": [
+            "IU-042"
+          ],
+          "description": "IU-042 is not empty",
+          "expressions": []
+        },
+        {
+          "id": "C-04",
+          "businessRuleIds": [
+            "BR-HO-04"
+          ],
+          "informationUnitIds": [
+            "IU-043",
+            "IU-021"
+          ],
+          "description": "IU-043 references exactly one IU-021",
+          "expressions": []
+        },
+        {
+          "id": "C-05",
+          "businessRuleIds": [
+            "BR-HO-05"
+          ],
+          "informationUnitIds": [
+            "IU-044",
+            "IU-011"
+          ],
+          "description": "IU-044 = IU-011",
+          "expressions": []
+        },
+        {
+          "id": "C-06",
+          "businessRuleIds": [
+            "BR-HO-06"
+          ],
+          "informationUnitIds": [
+            "IU-033",
+            "IU-034"
+          ],
+          "description": "IU-034 = 'month' AND IU-033 >= 12",
+          "expressions": []
+        },
+        {
+          "id": "C-07",
+          "businessRuleIds": [
+            "BR-HO-07"
+          ],
+          "informationUnitIds": [
+            "IU-05",
+            "IU-052"
+          ],
+          "description": "count(IU-05 per equipment type WHERE IU-052 > 0) >= 1",
+          "expressions": []
+        }
+      ],
+      "subERs": [],
+      "fullTitle": "MEP asset handover data",
+      "idmCode": "IDM-KR-MEPH-01-ER01",
+      "subTitle": "",
+      "documentStatus": "WD",
+      "localCode": "",
+      "localDocumentStatus": "",
+      "changeLogs": [
+        {
+          "id": "log-1",
+          "changeDateTime": "2026-10-14T10:30:00",
+          "changeSummary": "Exchange requirement drafted",
+          "changedBy": "author-1",
+          "changes": []
+        }
+      ]
+    }
+  },
+  "erLibrary": null,
+  "savedAt": "2026-10-14T11:08:51.367Z"
+}

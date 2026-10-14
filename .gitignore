@@ -16,6 +16,9 @@ samples/xPPM-neo/
 
 # Proprietary sample files from external contributors (not for distribution)
 samples/IDM/KillianReyer/
+samples/IDM/idmXML_v1.0/*
+!samples/IDM/idmXML_v1.0/README.md
+samples/IDM/idmXML_v2.0/Nachtragsmeldung/
 
 # Test scripts
 test-main*.js

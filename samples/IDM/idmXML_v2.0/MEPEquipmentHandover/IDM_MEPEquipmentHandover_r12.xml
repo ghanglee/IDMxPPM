@@ -1,0 +1,384 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<idm xmlns="https://standards.iso.org/iso/29481/-3/ed-2/en">
+  <specId guid="b7e41d09-2c6a-4f3b-8e52-000000000001" shortTitle="MEPH" localShortTitle="설비자산인계" fullTitle="MEP Equipment Handover for Facility Management" subTitle="Asset register, warranties and maintenance tasks" idmCode="IDM-KR-MEPH-01" documentStatus="WD" version="1.0"/>
+  <authoring copyright="Copyright 2026 Building Informatics Group (BIG), Yonsei University. Sample for testing; not normative.">
+    <changeLog id="log-0" changeDateTime="2026-10-01T09:00:00" changeSummary="Initial draft" changedBy="author-1"/>
+    <changeLog id="log-1" changeDateTime="2026-10-14T10:30:00" changeSummary="Business rules, constraints and expressions added" changedBy="author-1">
+      <change changedElement="uc/businessRule" changedFrom="(none)"/>
+    </changeLog>
+    <author id="author-1">
+      <person firstName="Ghang" lastName="Lee" emailAddress="glee@yonsei.ac.kr" affiliation="Yonsei University"/>
+    </author>
+    <author id="author-2">
+      <organization name="Building Informatics Group (BIG), Yonsei University"/>
+    </author>
+    <publisher name="Building Informatics Group (BIG), Yonsei University" location="Seoul, Republic of Korea"/>
+  </authoring>
+  <uc>
+    <specId guid="b7e41d09-2c6a-4f3b-8e52-000000000002" shortTitle="MEPH_UC" fullTitle="MEP Equipment Handover for Facility Management - Use case" idmCode="IDM-KR-MEPH-01-UC" documentStatus="WD" version="1.0"/>
+    <authoring copyright="Copyright 2026 Building Informatics Group (BIG), Yonsei University. Sample for testing; not normative.">
+      <changeLog id="log-1" changeDateTime="2026-10-14T10:30:00" changeSummary="Use case drafted" changedBy="author-1"/>
+      <author id="author-1">
+        <person firstName="Ghang" lastName="Lee" emailAddress="glee@yonsei.ac.kr" affiliation="Yonsei University"/>
+      </author>
+    </authoring>
+    <summary>
+      <description title="At substantial completion the MEP contractor hands over an asset register of maintainable equipment, with warranty, document and maintenance information, for loading into the owner's CMMS."/>
+    </summary>
+    <aimAndScope>
+      <description title="Aim: deliver complete, checkable MEP asset data at handover instead of paper O&amp;M binders."/>
+      <description title="Scope: maintainable HVAC, plumbing, fire protection and electrical equipment. Furniture and IT assets are out of scope."/>
+    </aimAndScope>
+    <language>EN</language>
+    <use name="Asset Management">
+      <classification id="BIMUSE-AM" name="Asset Management"/>
+    </use>
+    <use name="Record Modelling"/>
+    <region value="KR">
+      <type>country</type>
+    </region>
+    <standardProjectStage>
+      <name>production</name>
+      <outcomes>
+        <description title="Verified asset register accepted by the owner."/>
+      </outcomes>
+      <informationRequirements>
+        <description title="MEP asset handover data as defined in the exchange requirement."/>
+        <associatedEr ref="b7e41d09-2c6a-4f3b-8e52-000000000004"/>
+      </informationRequirements>
+    </standardProjectStage>
+    <standardProjectStage>
+      <name>maintenance</name>
+      <outcomes>
+        <description title="CMMS populated with equipment, warranties and planned maintenance tasks."/>
+      </outcomes>
+    </standardProjectStage>
+    <localProjectStage>
+      <name>Completion and handover (준공 및 인계)</name>
+    </localProjectStage>
+    <constructionEntity name="Hospital"/>
+    <constructionEntity name="University campus building"/>
+    <businessRule id="BR-HO-01" name="Asset tag format and uniqueness">
+      <statement>Every equipment asset tag shall follow the pattern Building-System-Type-Sequence (e.g. B01-HVAC-AHU-001) and shall be unique within the facility.</statement>
+      <images>
+        <image caption="Asset tag label on an air handling unit" filePath="images/BR-HO-01_tag_label.png"/>
+      </images>
+      <description title="Commentary: the sequence number has three digits and restarts for each equipment type."/>
+    </businessRule>
+    <businessRule id="BR-HO-02" name="Mandatory manufacturer data">
+      <statement>Manufacturer and model number shall be provided for every equipment type.</statement>
+    </businessRule>
+    <businessRule id="BR-HO-03" name="Serial number for components">
+      <statement>A serial number shall be provided for every installed equipment component.</statement>
+    </businessRule>
+    <businessRule id="BR-HO-04" name="Spatial location">
+      <statement>Every equipment component shall be located in exactly one space.</statement>
+      <description title="Commentary: roof-mounted equipment is assigned to the roof space."/>
+    </businessRule>
+    <businessRule id="BR-HO-05" name="Warranty start date">
+      <statement>The warranty start date shall equal the date of substantial completion unless the contract states otherwise.</statement>
+    </businessRule>
+    <businessRule id="BR-HO-06" name="Minimum warranty duration">
+      <statement>Warranty duration shall be expressed in months and shall be at least 12 months.</statement>
+      <reference>Owner's Exchange Information Requirements (EIR), clause 7.3 (illustrative)</reference>
+    </businessRule>
+    <businessRule id="BR-HO-07" name="Planned maintenance task">
+      <statement>Every equipment type shall have at least one planned maintenance task with a frequency greater than zero.</statement>
+      <reference>ISO 19650-3:2020, 5.6 (illustrative)</reference>
+    </businessRule>
+    <actor id="actor-mepc" name="MEP contractor" actorType="group">
+      <subActor id="actor-mepc-cm" name="Commissioning manager"/>
+      <subActor id="actor-mepc-im" name="Information manager"/>
+    </actor>
+    <actor id="actor-own" name="Owner / facility manager" actorType="group">
+      <subActor id="actor-own-fm" name="CMMS administrator"/>
+    </actor>
+    <benefits>
+      <description title="Shorter mobilisation of facility operations; no manual re-keying of asset data."/>
+    </benefits>
+    <limitations>
+      <description title="Spare parts and resource lists are not covered in this version."/>
+    </limitations>
+    <requiredResources>
+      <description title="IFC 4.3 or COBie export; owner's CMMS import template."/>
+    </requiredResources>
+    <scopeKeyword>handover</scopeKeyword>
+    <scopeKeyword>COBie</scopeKeyword>
+    <scopeKeyword>asset register</scopeKeyword>
+    <scopeKeyword>warranty</scopeKeyword>
+    <benefitKeyword>operational readiness</benefitKeyword>
+    <reference basisStandard="true" fullCitation="ISO 29481-1:2016 Building information models - Information delivery manual - Part 1: Methodology and format"/>
+    <reference basisStandard="false" fullCitation="NBIMS-US V3, 4.2 Construction Operations Building information exchange (COBie)"/>
+    <reference basisStandard="false" fullCitation="ISO 19650-3:2020 Organization and digitization of information about buildings and civil engineering works - Part 3: Operational phase of the assets"/>
+    <userDefinedProperty name="Sample status">
+      <description title="Synthetic sample for testing xPPM neo-Seoul; regulatory values are illustrative."/>
+    </userDefinedProperty>
+  </uc>
+  <businessContextMap>
+    <specId guid="b7e41d09-2c6a-4f3b-8e52-000000000003" shortTitle="MEPH_BCM" fullTitle="MEP Equipment Handover for Facility Management - Process map" idmCode="IDM-KR-MEPH-01-BCM" documentStatus="WD" version="1.0"/>
+    <authoring copyright="Copyright 2026 Building Informatics Group (BIG), Yonsei University. Sample for testing; not normative.">
+      <changeLog id="log-1" changeDateTime="2026-10-14T10:30:00" changeSummary="Process map drafted" changedBy="author-1"/>
+      <author id="author-1">
+        <person firstName="Ghang" lastName="Lee" emailAddress="glee@yonsei.ac.kr" affiliation="Yonsei University"/>
+      </author>
+    </authoring>
+    <pm>
+      <diagram id="pm-meph" name="MEP equipment handover" notation="BPMN 2.0">
+        <description title="Two pools: MEP contractor (two lanes) and Owner / facility manager (one lane)."/>
+        <diagramContent><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_MEPH" targetNamespace="https://big.yonsei.ac.kr/idm/samples" exporter="BIG sample generator" exporterVersion="1.0">
+  <bpmn:collaboration id="Collaboration_MEPH">
+    <bpmn:participant id="Participant_Contractor" name="MEP contractor" processRef="Process_Contractor"/>
+    <bpmn:participant id="Participant_Owner" name="Owner / facility manager" processRef="Process_Owner"/>
+    <bpmn:messageFlow id="MessageFlow_Package" name="MEP asset handover package" sourceRef="Task_Compile" targetRef="Start_Owner"/>
+  </bpmn:collaboration>
+  <bpmn:process id="Process_Contractor" isExecutable="false">
+    <bpmn:laneSet id="LS_Process_Contractor">
+      <bpmn:lane id="Lane_Commissioning" name="Commissioning manager">
+        <bpmn:flowNodeRef>Start_MEPH</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Commission</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_InfoManager" name="Information manager">
+        <bpmn:flowNodeRef>Task_Compile</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>DataObject_HandoverPackage</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_Contractor</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start_MEPH" name="Substantial completion">
+      <bpmn:outgoing>Flow_C1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:task id="Task_Commission" name="Commission and tag equipment">
+      <bpmn:incoming>Flow_C1</bpmn:incoming>
+      <bpmn:outgoing>Flow_C2</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_Compile" name="Compile asset, warranty and maintenance data">
+      <bpmn:incoming>Flow_C2</bpmn:incoming>
+      <bpmn:outgoing>Flow_C3</bpmn:outgoing>
+      <bpmn:dataOutputAssociation id="Assoc_C1"><bpmn:targetRef>DataObject_HandoverPackage</bpmn:targetRef></bpmn:dataOutputAssociation>
+    </bpmn:task>
+    <bpmn:dataObject id="DataObject_HandoverPackage_obj"/>
+    <bpmn:dataObjectReference id="DataObject_HandoverPackage" name="MEP asset handover package" dataObjectRef="DataObject_HandoverPackage_obj"/>
+    <bpmn:endEvent id="End_Contractor" name="Package delivered">
+      <bpmn:incoming>Flow_C3</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_C1" sourceRef="Start_MEPH" targetRef="Task_Commission"/>
+    <bpmn:sequenceFlow id="Flow_C2" sourceRef="Task_Commission" targetRef="Task_Compile"/>
+    <bpmn:sequenceFlow id="Flow_C3" sourceRef="Task_Compile" targetRef="End_Contractor"/>
+  </bpmn:process>
+  <bpmn:process id="Process_Owner" isExecutable="false">
+    <bpmn:laneSet id="LS_Process_Owner">
+      <bpmn:lane id="Lane_CMMSAdmin" name="CMMS administrator">
+        <bpmn:flowNodeRef>Start_Owner</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_CheckPackage</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_LoadCMMS</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_Owner</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start_Owner" name="Package received">
+      <bpmn:outgoing>Flow_O1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:task id="Task_CheckPackage" name="Check package against business rules">
+      <bpmn:incoming>Flow_O1</bpmn:incoming>
+      <bpmn:outgoing>Flow_O2</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_LoadCMMS" name="Load assets into CMMS">
+      <bpmn:incoming>Flow_O2</bpmn:incoming>
+      <bpmn:outgoing>Flow_O3</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:endEvent id="End_Owner" name="Assets in operation">
+      <bpmn:incoming>Flow_O3</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_O1" sourceRef="Start_Owner" targetRef="Task_CheckPackage"/>
+    <bpmn:sequenceFlow id="Flow_O2" sourceRef="Task_CheckPackage" targetRef="Task_LoadCMMS"/>
+    <bpmn:sequenceFlow id="Flow_O3" sourceRef="Task_LoadCMMS" targetRef="End_Owner"/>
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1"><bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_MEPH">
+    <bpmndi:BPMNShape id="Participant_Contractor_di" bpmnElement="Participant_Contractor" isHorizontal="true"><dc:Bounds x="0" y="0" width="900" height="300"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Lane_Commissioning_di" bpmnElement="Lane_Commissioning" isHorizontal="true"><dc:Bounds x="30" y="0" width="870" height="150"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Lane_InfoManager_di" bpmnElement="Lane_InfoManager" isHorizontal="true"><dc:Bounds x="30" y="150" width="870" height="150"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Start_MEPH_di" bpmnElement="Start_MEPH"><dc:Bounds x="82" y="57" width="36" height="36"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Task_Commission_di" bpmnElement="Task_Commission"><dc:Bounds x="175" y="40" width="110" height="70"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Task_Compile_di" bpmnElement="Task_Compile"><dc:Bounds x="345" y="190" width="110" height="70"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="DataObject_HandoverPackage_di" bpmnElement="DataObject_HandoverPackage"><dc:Bounds x="542" y="200" width="36" height="50"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="End_Contractor_di" bpmnElement="End_Contractor"><dc:Bounds x="682" y="207" width="36" height="36"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNEdge id="Flow_C1_di" bpmnElement="Flow_C1"><di:waypoint x="118" y="75"/><di:waypoint x="175" y="75"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Flow_C2_di" bpmnElement="Flow_C2"><di:waypoint x="285" y="75"/><di:waypoint x="315" y="75"/><di:waypoint x="315" y="225"/><di:waypoint x="345" y="225"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Flow_C3_di" bpmnElement="Flow_C3"><di:waypoint x="455" y="225"/><di:waypoint x="682" y="225"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNShape id="Participant_Owner_di" bpmnElement="Participant_Owner" isHorizontal="true"><dc:Bounds x="0" y="330" width="900" height="150"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Lane_CMMSAdmin_di" bpmnElement="Lane_CMMSAdmin" isHorizontal="true"><dc:Bounds x="30" y="330" width="870" height="150"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Start_Owner_di" bpmnElement="Start_Owner"><dc:Bounds x="282" y="387" width="36" height="36"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Task_CheckPackage_di" bpmnElement="Task_CheckPackage"><dc:Bounds x="375" y="370" width="110" height="70"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Task_LoadCMMS_di" bpmnElement="Task_LoadCMMS"><dc:Bounds x="545" y="370" width="110" height="70"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="End_Owner_di" bpmnElement="End_Owner"><dc:Bounds x="742" y="387" width="36" height="36"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNEdge id="Flow_O1_di" bpmnElement="Flow_O1"><di:waypoint x="318" y="405"/><di:waypoint x="375" y="405"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Flow_O2_di" bpmnElement="Flow_O2"><di:waypoint x="485" y="405"/><di:waypoint x="545" y="405"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Flow_O3_di" bpmnElement="Flow_O3"><di:waypoint x="655" y="405"/><di:waypoint x="742" y="405"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Assoc_C1_di" bpmnElement="Assoc_C1"><di:waypoint x="400" y="260"/><di:waypoint x="560" y="200"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="MessageFlow_Package_di" bpmnElement="MessageFlow_Package"><di:waypoint x="400" y="260"/><di:waypoint x="400" y="323.5"/><di:waypoint x="300" y="323.5"/><di:waypoint x="300" y="387"/></bpmndi:BPMNEdge>
+  </bpmndi:BPMNPlane></bpmndi:BPMNDiagram>
+</bpmn:definitions>]]></diagramContent>
+      </diagram>
+      <dataObjectAndEr id="doer-1">
+        <associatedDataObject ref="DataObject_HandoverPackage"/>
+        <associatedEr ref="b7e41d09-2c6a-4f3b-8e52-000000000004"/>
+      </dataObjectAndEr>
+      <shapeAndActor id="sa-1">
+        <associatedShape ref="Participant_Contractor"/>
+        <associatedActor ref="actor-mepc"/>
+      </shapeAndActor>
+      <shapeAndActor id="sa-2">
+        <associatedShape ref="Lane_Commissioning"/>
+        <associatedActor ref="actor-mepc-cm"/>
+      </shapeAndActor>
+      <shapeAndActor id="sa-3">
+        <associatedShape ref="Lane_InfoManager"/>
+        <associatedActor ref="actor-mepc-im"/>
+      </shapeAndActor>
+      <shapeAndActor id="sa-4">
+        <associatedShape ref="Participant_Owner"/>
+        <associatedActor ref="actor-own"/>
+      </shapeAndActor>
+      <shapeAndActor id="sa-5">
+        <associatedShape ref="Lane_CMMSAdmin"/>
+        <associatedActor ref="actor-own-fm"/>
+      </shapeAndActor>
+    </pm>
+  </businessContextMap>
+  <er>
+    <specId guid="b7e41d09-2c6a-4f3b-8e52-000000000004" shortTitle="ER_MEPAssetHandover" fullTitle="MEP asset handover data" idmCode="IDM-KR-MEPH-01-ER01" documentStatus="WD" version="1.0"/>
+    <authoring copyright="Copyright 2026 Building Informatics Group (BIG), Yonsei University. Sample for testing; not normative.">
+      <changeLog id="log-1" changeDateTime="2026-10-14T10:30:00" changeSummary="Exchange requirement drafted" changedBy="author-1"/>
+      <author id="author-1">
+        <person firstName="Ghang" lastName="Lee" emailAddress="glee@yonsei.ac.kr" affiliation="Yonsei University"/>
+      </author>
+    </authoring>
+    <constraint id="C-01">
+      <associatedBusinessRule ref="BR-HO-01"/>
+      <associatedInformationUnit ref="IU-041"/>
+      <description title="IU-041 matches ^[A-Z0-9]+-[A-Z]+-[A-Z]+-[0-9]{3}$ AND is unique"/>
+      <expression id="C-01-sparql">
+        <formalRuleLanguage name="SPARQL" version="1.1" publicationYear="2013"/><![CDATA[
+ASK {  # true = violation (format or duplicate)
+  { ?c :assetTag ?t . FILTER (!REGEX(?t, "^[A-Z0-9]+-[A-Z]+-[A-Z]+-[0-9]{3}$")) }
+  UNION
+  { ?c1 :assetTag ?t . ?c2 :assetTag ?t . FILTER (?c1 != ?c2) }
+}
+]]></expression>
+    </constraint>
+    <constraint id="C-02">
+      <associatedBusinessRule ref="BR-HO-02"/>
+      <associatedInformationUnit ref="IU-031"/>
+      <associatedInformationUnit ref="IU-032"/>
+      <description title="IU-031 and IU-032 are not empty"/>
+    </constraint>
+    <constraint id="C-03">
+      <associatedBusinessRule ref="BR-HO-03"/>
+      <associatedInformationUnit ref="IU-042"/>
+      <description title="IU-042 is not empty"/>
+    </constraint>
+    <constraint id="C-04">
+      <associatedBusinessRule ref="BR-HO-04"/>
+      <associatedInformationUnit ref="IU-043"/>
+      <associatedInformationUnit ref="IU-021"/>
+      <description title="IU-043 references exactly one IU-021"/>
+    </constraint>
+    <constraint id="C-05">
+      <associatedBusinessRule ref="BR-HO-05"/>
+      <associatedInformationUnit ref="IU-044"/>
+      <associatedInformationUnit ref="IU-011"/>
+      <description title="IU-044 = IU-011"/>
+    </constraint>
+    <constraint id="C-06">
+      <associatedBusinessRule ref="BR-HO-06"/>
+      <associatedInformationUnit ref="IU-033"/>
+      <associatedInformationUnit ref="IU-034"/>
+      <description title="IU-034 = 'month' AND IU-033 &gt;= 12"/>
+    </constraint>
+    <constraint id="C-07">
+      <associatedBusinessRule ref="BR-HO-07"/>
+      <associatedInformationUnit ref="IU-05"/>
+      <associatedInformationUnit ref="IU-052"/>
+      <description title="count(IU-05 per equipment type WHERE IU-052 &gt; 0) &gt;= 1"/>
+    </constraint>
+    <correspondingMvd basis="COBie 2.4" name="COBie"/>
+    <correspondingMvd basis="IFC4.3" name="IFC4.3 Reference View"/>
+    <description title="Equipment asset data the MEP contractor delivers at handover."/>
+    <informationUnit id="IU-01" name="Facility" dataType="IfcFacility" isMandatory="true" definition="The facility being handed over.">
+      <correspondingExternalElement basis="COBie 2.4" name="Facility"/>
+      <correspondingExternalElement basis="IFC4.3" name="IfcBuilding"/>
+      <subInformationUnit>
+        <informationUnit id="IU-011" name="Substantial completion date" dataType="IfcDate" isMandatory="true" definition="Date of substantial completion."/>
+      </subInformationUnit>
+    </informationUnit>
+    <informationUnit id="IU-02" name="Space" dataType="IfcSpace" isMandatory="true" definition="A space that houses equipment.">
+      <correspondingExternalElement basis="COBie 2.4" name="Space"/>
+      <correspondingExternalElement basis="IFC4.3" name="IfcSpace"/>
+      <subInformationUnit>
+        <informationUnit id="IU-021" name="Space name" dataType="IfcLabel" isMandatory="true" definition="Unique space number.">
+          <correspondingExternalElement basis="COBie 2.4" name="Space.Name"/>
+        </informationUnit>
+      </subInformationUnit>
+    </informationUnit>
+    <informationUnit id="IU-03" name="Equipment type" dataType="IfcDistributionElementType" isMandatory="true" definition="A product type shared by identical components.">
+      <synonym xml:lang="en">Product type</synonym>
+      <synonym xml:lang="ko">설비 유형</synonym>
+      <correspondingExternalElement basis="COBie 2.4" name="Type"/>
+      <correspondingExternalElement basis="IFC4.3" name="IfcDistributionElementType"/>
+      <subInformationUnit>
+        <informationUnit id="IU-031" name="Manufacturer" dataType="IfcLabel" isMandatory="true" definition="Manufacturer contact e-mail or name.">
+          <correspondingExternalElement basis="COBie 2.4" name="Type.Manufacturer"/>
+        </informationUnit>
+        <informationUnit id="IU-032" name="Model number" dataType="IfcLabel" isMandatory="true" definition="Manufacturer's model number.">
+          <correspondingExternalElement basis="COBie 2.4" name="Type.ModelNumber"/>
+        </informationUnit>
+        <informationUnit id="IU-033" name="Warranty duration" dataType="IfcInteger" isMandatory="true" definition="Warranty duration for parts.">
+          <correspondingExternalElement basis="COBie 2.4" name="Type.WarrantyDurationParts"/>
+        </informationUnit>
+        <informationUnit id="IU-034" name="Warranty duration unit" dataType="IfcLabel" isMandatory="true" definition="Unit of the warranty duration.">
+          <correspondingExternalElement basis="COBie 2.4" name="Type.WarrantyDurationUnit"/>
+        </informationUnit>
+        <informationUnit id="IU-035" name="O&amp;M manual" dataType="IfcDocumentReference" isMandatory="false" definition="Operation and maintenance manual of the type.">
+          <correspondingExternalElement basis="COBie 2.4" name="Document"/>
+          <correspondingExternalElement basis="IFC4.3" name="IfcDocumentReference"/>
+        </informationUnit>
+      </subInformationUnit>
+    </informationUnit>
+    <informationUnit id="IU-04" name="Equipment component" dataType="IfcDistributionElement" isMandatory="true" definition="An individually installed, maintainable item.">
+      <examples>
+        <description title="B01-HVAC-AHU-001, serial AHU23-00457, located in space B1-012"/>
+      </examples>
+      <correspondingExternalElement basis="COBie 2.4" name="Component"/>
+      <correspondingExternalElement basis="IFC4.3" name="IfcDistributionElement"/>
+      <subInformationUnit>
+        <informationUnit id="IU-041" name="Asset tag" dataType="IfcIdentifier" isMandatory="true" definition="Owner's asset identifier.">
+          <synonym xml:lang="en">Tag number</synonym>
+          <synonym xml:lang="ko">자산번호</synonym>
+          <correspondingExternalElement basis="COBie 2.4" name="Component.TagNumber"/>
+        </informationUnit>
+        <informationUnit id="IU-042" name="Serial number" dataType="IfcIdentifier" isMandatory="true" definition="Manufacturer's serial number.">
+          <correspondingExternalElement basis="COBie 2.4" name="Component.SerialNumber"/>
+        </informationUnit>
+        <informationUnit id="IU-043" name="Located in space" dataType="IfcLabel" isMandatory="true" definition="Name of the space containing the component.">
+          <correspondingExternalElement basis="COBie 2.4" name="Component.Space"/>
+          <correspondingExternalElement basis="IFC4.3" name="IfcRelContainedInSpatialStructure"/>
+        </informationUnit>
+        <informationUnit id="IU-044" name="Warranty start date" dataType="IfcDate" isMandatory="true" definition="Date the warranty starts.">
+          <correspondingExternalElement basis="COBie 2.4" name="Component.WarrantyStartDate"/>
+        </informationUnit>
+      </subInformationUnit>
+    </informationUnit>
+    <informationUnit id="IU-05" name="Planned maintenance task" dataType="IfcTask" isMandatory="true" definition="A recurring maintenance job for an equipment type.">
+      <correspondingExternalElement basis="COBie 2.4" name="Job"/>
+      <correspondingExternalElement basis="IFC4.3" name="IfcTask"/>
+      <subInformationUnit>
+        <informationUnit id="IU-051" name="Task name" dataType="IfcLabel" isMandatory="true" definition="Name of the maintenance job."/>
+        <informationUnit id="IU-052" name="Frequency" dataType="IfcReal" isMandatory="true" definition="Number of time units between occurrences.">
+          <correspondingExternalElement basis="COBie 2.4" name="Job.Frequency"/>
+        </informationUnit>
+        <informationUnit id="IU-053" name="Frequency unit" dataType="IfcLabel" isMandatory="true" definition="Time unit (day, week, month, year).">
+          <correspondingExternalElement basis="COBie 2.4" name="Job.FrequencyUnit"/>
+        </informationUnit>
+      </subInformationUnit>
+    </informationUnit>
+  </er>
+</idm>
