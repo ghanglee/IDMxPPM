@@ -11,15 +11,16 @@ Keep local copies in this folder; it is ignored by git except for its README.
 
 | Folder | Contents |
 |---|---|
+| `FireSafetyDesignReview/` | **Startup sample** (Rev 14). ER hierarchy (root ER, design model with three sub-ERs, review report), 7 business rules (one with an embedded image), 7 constraints with SPARQL, Python, SHACL, LegalRuleML and RuleML expressions, 19 synonyms in five languages, an IU description with an embedded image, 3 EVDs (IFC, CityGML, BCF), 3 pools / 3 lanes with an external actor role, 2 data objects linked to ERs, a classified local project phase; `.xml` and `.idm` (app project; the copy the app loads is in `public/samples/`) |
 | `businessRule/r12/` | Rev 12 business-rule samples (minimal, full, WindowCost) and eight invalid cases; see its README |
-| `FireSafetyDesignReview/` | 6 business rules, 6 constraints (SPARQL, Python and SHACL expressions), synonyms, 3 pools / 3 lanes; `.xml` (Rev 12) and `.idm` (app project) |
-| `MEPEquipmentHandover/` | 7 business rules, 7 constraints (SPARQL expression), COBie and IFC mappings, 2 pools / 3 lanes; `.xml` (Rev 12) and `.idm` |
-| `CostEstimation_WindowsDoors/` | `idmWindowCostEstimation.idm` (app project; the copy the app loads is in `public/samples/`) |
+| `MEPEquipmentHandover/` | 7 business rules, 7 constraints (SPARQL expression), COBie and IFC mappings, 2 EVDs, 2 pools / 3 lanes; `.xml` and `.idm` |
+| `CostEstimation_WindowsDoors/` | `idmWindowCostEstimation.idm` (app project; the former startup sample) |
 
-All idmXML 2.0 files in this folder (except `invalid/`) validate against the Rev 12 schema in
-`_local/references/idm schemas/idmXSD_v2/` with libxml2 and Xerces; `tests/run_tests.py` checks them.
-The two new `.idm` files were produced by the app's own importer (`parseIdmXml`), and the app's
-exporter (`generateIdmXml`) turns them back into Rev 12-valid XML with the same business rules,
-constraints, expressions, synonyms and actor mappings.
+All idmXML 2.0 files in this folder (except `invalid/`) validate against the Rev 14 schema in
+`_local/references/idm schemas/idmXSD_v2/` with libxml2, Xerces and xmlschema; `tests/run_tests.py` checks them.
+The `.idm` files are app project files; the app exports them back to Rev 14-valid XML
+(round-trip tests in `_local/roundtrip_tests/`). The FireSafetyDesignReview XML also contains
+outcomes and information requirements for the standard project phase, which the app does not edit yet.
+The Rev 12 version of FireSafetyDesignReview is archived in `_local/samples_archive/FireSafetyDesignReview_r12/`.
 
 Regulatory values in the new samples (Korean Building Act decree articles, EIR clauses) are illustrative.

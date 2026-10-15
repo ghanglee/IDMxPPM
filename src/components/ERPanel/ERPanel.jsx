@@ -4,6 +4,7 @@ import { searchSchema, searchSchemaGrouped, searchBsdd, fetchBsddClassProperties
 import { getBsddCacheState, initBsddCache } from '../../utils/bsddCache';
 import { parseErElement } from '../../utils/idmXmlParser';
 import { collectConstraints, constraintsReferencingIUs, iuSubtreeIdsById, resolveIuTokens, iuNameMap } from '../../utils/constraintUtils';
+import { getCorrespondingEvds } from '../../utils/idmSchemaRev14';
 import {
   DataObjectIcon,
   InfoUnitIcon,
@@ -1168,7 +1169,11 @@ const ERPanel = ({
         description: trim(selectedItem.data?.description),
         descriptionFigures: selectedItem.data?.descriptionFigures,
         examples: trim(selectedItem.data?.examples),
-        exampleImages: selectedItem.data?.exampleImages
+        exampleImages: selectedItem.data?.exampleImages,
+        // idmXSD v2.0 Rev 14: corresponding exchange view definitions (formerly correspondingMvd)
+        correspondingEvds: getCorrespondingEvds(selectedItem.data)
+          .map(e => ({ basis: trim(e.basis), name: trim(e.name), description: trim(e.description) }))
+          .filter(e => e.basis || e.name)
       });
     }
   }, [selectedItem, selectedIULocation, erHierarchy, onUpdateER]);
@@ -2362,7 +2367,7 @@ const ERPanel = ({
       informationUnits: [{ ...iuData }],
       subErs: [],
       constraints: [],
-      correspondingMvd: null
+      correspondingEvds: []
     };
 
     // Remove the IU from its current location
@@ -3672,6 +3677,63 @@ const ERPanel = ({
                       placeholder="Examples for this Exchange Requirement..."
                       rows={3}
                     />
+                  </div>
+                  {/* Corresponding exchange view definitions (idmXSD v2.0 Rev 14, ISO 29481-1:2025 EVD) */}
+                  <div className="er-detail-field">
+                    <div className="er-detail-section-header">
+                      <LinkIcon size={12} />
+                      <span title="Exchange view definitions (EVDs) are specified outside the IDM, e.g. an IFC model view definition (MVD). The ER only links to them.">
+                        Corresponding EVDs ({getCorrespondingEvds(selectedItem.data).length})
+                      </span>
+                      <button
+                        className="er-detail-add-btn"
+                        onClick={() => {
+                          const evds = [...getCorrespondingEvds(selectedItem.data), { basis: '', name: '', description: '' }];
+                          setSelectedItem(prev => ({ ...prev, data: { ...prev.data, correspondingEvds: evds } }));
+                        }}
+                        title="Add a corresponding exchange view definition (EVD)"
+                      >
+                        <AddIcon size={12} /> + EVD
+                      </button>
+                    </div>
+                    {getCorrespondingEvds(selectedItem.data).map((evd, idx) => {
+                      const updateEvd = (patch) => {
+                        const evds = getCorrespondingEvds(selectedItem.data).map((e, i) => (i === idx ? { ...e, ...patch } : e));
+                        setSelectedItem(prev => ({ ...prev, data: { ...prev.data, correspondingEvds: evds } }));
+                      };
+                      return (
+                        <div key={idx} className="er-evd-row" style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '4px' }}>
+                          <input
+                            type="text"
+                            value={evd.basis || ''}
+                            onChange={(e) => updateEvd({ basis: e.target.value })}
+                            onBlur={() => { if (hasUnsavedDetailChanges()) commitCurrentEdit(); }}
+                            placeholder="Basis (e.g., IFC4.3)"
+                            className="er-input"
+                            style={{ flex: '0 0 30%' }}
+                          />
+                          <input
+                            type="text"
+                            value={evd.name || ''}
+                            onChange={(e) => updateEvd({ name: e.target.value })}
+                            onBlur={() => { if (hasUnsavedDetailChanges()) commitCurrentEdit(); }}
+                            placeholder="Name (e.g., IFC4.3 Reference View)"
+                            className="er-input"
+                            style={{ flex: '1 1 auto' }}
+                          />
+                          <button
+                            className="er-detail-close-btn"
+                            onClick={() => {
+                              const evds = getCorrespondingEvds(selectedItem.data).filter((_, i) => i !== idx);
+                              setSelectedItem(prev => ({ ...prev, data: { ...prev.data, correspondingEvds: evds } }));
+                            }}
+                            title="Remove this EVD"
+                          >
+                            <CloseIcon size={12} />
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                   <div className="er-detail-section">
                     <div className="er-detail-section-header">

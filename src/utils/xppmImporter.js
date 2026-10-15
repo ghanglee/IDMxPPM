@@ -443,7 +443,7 @@ const parseExchangeRequirements = (doc) => {
       informationUnits: [],
       constraints: [],
       subERs: [],
-      correspondingMvd: null,
+      correspondingEvds: [],
       parentId: parentId
     };
 
@@ -481,18 +481,10 @@ const parseExchangeRequirements = (doc) => {
     const infoUnits = erElement.querySelectorAll(':scope > informationUnit');
     erData.informationUnits = Array.from(infoUnits).map(iu => parseInformationUnit(iu));
 
-    // Parse correspondingMvd
-    const mvd = erElement.querySelector(':scope > correspondingMvd');
-    if (mvd) {
-      const mvdName = mvd.getAttribute('name');
-      const mvdBasis = mvd.getAttribute('basis');
-      if (mvdName || mvdBasis) {
-        erData.correspondingMvd = {
-          name: mvdName || '',
-          basis: mvdBasis || ''
-        };
-      }
-    }
+    // Parse correspondingMvd (xPPM / idmXML v1.0) into exchange view definitions (idmXSD v2.0 Rev 14: correspondingEvd)
+    erData.correspondingEvds = Array.from(erElement.querySelectorAll(':scope > correspondingMvd, :scope > correspondingEvd'))
+      .map(el => ({ name: el.getAttribute('name') || '', basis: el.getAttribute('basis') || '' }))
+      .filter(e => e.name || e.basis);
 
     // Add to library
     erLibrary.push({
@@ -519,7 +511,7 @@ const parseExchangeRequirements = (doc) => {
           informationUnits: subErData.informationUnits || [],
           subERs: subErData.subERs || [],
           constraints: subErData.constraints || [],
-          correspondingMvd: subErData.correspondingMvd || null
+          correspondingEvds: subErData.correspondingEvds || []
         });
       }
     });

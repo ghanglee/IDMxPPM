@@ -1,0 +1,571 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<idm xmlns="https://standards.iso.org/iso/29481/-3/ed-2/en">
+  <specId guid="3f6c2a1e-8b4d-4e7a-9c15-000000000001" shortTitle="FSDR" localShortTitle="방화설계검토" fullTitle="Fire Safety Design Review" subTitle="Fire compartments, fire ratings, egress and the review report (extended sample)" idmCode="IDM-KR-FSDR-01" documentStatus="WD" version="1.1"/>
+  <authoring copyright="Copyright 2026 Building Informatics Group (BIG), Yonsei University. Sample for testing; not normative.">
+    <changeLog id="log-0" changeDateTime="2026-10-01T09:00:00" changeSummary="Initial draft" changedBy="author-1"/>
+    <changeLog id="log-1" changeDateTime="2026-10-14T10:00:00" changeSummary="Business rules, constraints and expressions added" changedBy="author-1">
+      <change changedElement="uc/businessRule" changedFrom="(none)"/>
+    </changeLog>
+    <changeLog id="log-2" changeDateTime="2026-10-15T10:00:00" changeSummary="Extended sample: ER hierarchy, review report ER, embedded images, RuleML and LegalRuleML expressions, EVDs, local phase classification" changedBy="author-1">
+      <change changedElement="er" changedFrom="single ER without sub-ERs"/>
+      <change changedElement="specId/@version" changedFrom="1.0"/>
+    </changeLog>
+    <author id="author-1">
+      <person firstName="Ghang" lastName="Lee" emailAddress="glee@yonsei.ac.kr" affiliation="Yonsei University"/>
+    </author>
+    <author id="author-2">
+      <organization name="Building Informatics Group (BIG), Yonsei University"/>
+    </author>
+    <publisher name="Building Informatics Group (BIG), Yonsei University" location="Seoul, Republic of Korea"/>
+  </authoring>
+  <uc>
+    <specId guid="3f6c2a1e-8b4d-4e7a-9c15-000000000002" shortTitle="FSDR_UC" fullTitle="Fire Safety Design Review - Use case" idmCode="IDM-KR-FSDR-01-UC" documentStatus="WD" version="1.0"/>
+    <authoring copyright="Copyright 2026 Building Informatics Group (BIG), Yonsei University. Sample for testing; not normative.">
+      <changeLog id="log-1" changeDateTime="2026-10-14T10:00:00" changeSummary="Use case drafted" changedBy="author-1"/>
+      <author id="author-1">
+        <person firstName="Ghang" lastName="Lee" emailAddress="glee@yonsei.ac.kr" affiliation="Yonsei University"/>
+      </author>
+    </authoring>
+    <summary>
+      <description title="The architect delivers a fire safety design model so that the fire safety engineer and the permit authority can check fire compartmentation, fire resistance of compartment boundaries and egress travel distances."/>
+    </summary>
+    <aimAndScope>
+      <description title="Aim: replace drawing-based fire plan review with model-based checking during design development."/>
+      <description title="Scope: spaces, fire compartments, compartment boundaries, fire doors and egress paths. Smoke control and suppression system design are out of scope."/>
+    </aimAndScope>
+    <language>EN</language>
+    <use name="Check Code Compliance">
+      <classification id="BIMUSE-CC" name="Code Validation"/>
+    </use>
+    <use name="Design Review"/>
+    <region value="KR">
+      <type>country</type>
+    </region>
+    <standardProjectPhase>
+      <name>design</name>
+      <outcomes>
+        <description title="Fire safety design model approved for building permit submission."/>
+      </outcomes>
+      <informationRequirements>
+        <description title="Fire compartment and egress information as defined in the exchange requirement."/>
+        <associatedEr ref="3f6c2a1e-8b4d-4e7a-9c15-000000000004"/>
+        <associatedEr ref="3f6c2a1e-8b4d-4e7a-9c15-000000000008"/>
+      </informationRequirements>
+    </standardProjectPhase>
+    <localProjectPhase>
+      <name>Design development (기본설계)</name>
+      <classification id="KR-ADS" name="Korean architectural design stages (건축설계 단계)"/>
+    </localProjectPhase>
+    <constructionEntity name="Office building"/>
+    <constructionEntity name="Mixed-use building"/>
+    <businessRule id="BR-FS-01" name="Fire compartment assignment">
+      <statement>Every space shall be assigned to exactly one fire compartment.</statement>
+      <description title="Commentary: shafts and stair enclosures form their own compartments."/>
+    </businessRule>
+    <businessRule id="BR-FS-02" name="Fire compartment area limit">
+      <statement>The floor area of a fire compartment shall not exceed 1,000 m2, or 3,000 m2 where an automatic sprinkler system is installed.</statement>
+      <images>
+        <image caption="Fire compartment plan with floor areas" mimeType="image/png" encoding="base64">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</image>
+      </images>
+      <description title="Commentary: the limit applies per storey; check the decree for exemptions by use."/>
+      <reference>Enforcement Decree of the Building Act (Republic of Korea), Art. 46 (illustrative)</reference>
+    </businessRule>
+    <businessRule id="BR-FS-03" name="Fire resistance of compartment boundaries">
+      <statement>Walls and slabs that bound a fire compartment shall have a fire resistance of at least 1 hour.</statement>
+      <reference>EN 13501-2 (classification of fire resistance)</reference>
+    </businessRule>
+    <businessRule id="BR-FS-04" name="Fire doors in compartment boundaries">
+      <statement>Every door in a fire compartment boundary shall be a self-closing fire door.</statement>
+    </businessRule>
+    <businessRule id="BR-FS-05" name="Travel distance to direct stair">
+      <statement>The walking distance from any point in a habitable room to the nearest direct stair shall not exceed 30 m, or 50 m where the main structural parts are fire-resistant.</statement>
+      <description title="Commentary: measured along the actual walking path, not as a straight line."/>
+      <reference>Enforcement Decree of the Building Act (Republic of Korea), Art. 34 (illustrative)</reference>
+    </businessRule>
+    <businessRule id="BR-FS-06" name="Exit door clear width">
+      <statement>The clear width of every exit door on an egress path shall be at least 0.9 m.</statement>
+    </businessRule>
+    <businessRule id="BR-FS-07" name="Traceable non-conformities">
+      <statement>Every non-conformity in the fire safety review report shall identify the violated business rule and the affected building element.</statement>
+      <description title="Commentary: non-conformities are exchanged as BCF topics so that the architect can locate them in the model."/>
+      <reference>buildingSMART BIM Collaboration Format (BCF) 3.0</reference>
+    </businessRule>
+    <actor id="actor-arch" name="Architect">
+      <subActor id="actor-arch-da" name="Design architect"/>
+      <subActor id="actor-arch-bc" name="BIM coordinator"/>
+    </actor>
+    <actor id="actor-fse" name="Fire safety engineer"/>
+    <actor id="actor-auth" name="Building permit authority" external="true">
+      <subActor id="actor-auth-fr" name="Fire plan reviewer"/>
+    </actor>
+    <benefits>
+      <description title="Earlier detection of fire safety non-compliance; fewer permit resubmissions."/>
+    </benefits>
+    <limitations>
+      <description title="Travel distance requires a computed egress path, which not all authoring tools export."/>
+    </limitations>
+    <requiredResources>
+      <description title="IFC 4.3 export from the design authoring tool; a rule-checking tool."/>
+    </requiredResources>
+    <requiredCompetencies>
+      <description title="Modelling of spaces and zones; knowledge of fire safety regulations."/>
+    </requiredCompetencies>
+    <scopeKeyword>fire compartment</scopeKeyword>
+    <scopeKeyword>egress</scopeKeyword>
+    <scopeKeyword>fire rating</scopeKeyword>
+    <scopeKeyword>code compliance</scopeKeyword>
+    <benefitKeyword>permit efficiency</benefitKeyword>
+    <reference basisStandard="true" fullCitation="ISO 29481-1:2016 Building information models - Information delivery manual - Part 1: Methodology and format"/>
+    <reference basisStandard="false" fullCitation="ISO 16739-1:2024 Industry Foundation Classes (IFC) for data sharing in the construction and facility management industries"/>
+    <userDefinedProperty name="Sample status">
+      <description title="Synthetic sample for testing xPPM neo-Seoul; regulatory values are illustrative."/>
+    </userDefinedProperty>
+  </uc>
+  <businessContextMap>
+    <specId guid="3f6c2a1e-8b4d-4e7a-9c15-000000000003" shortTitle="FSDR_BCM" fullTitle="Fire Safety Design Review - Process map" idmCode="IDM-KR-FSDR-01-BCM" documentStatus="WD" version="1.0"/>
+    <authoring copyright="Copyright 2026 Building Informatics Group (BIG), Yonsei University. Sample for testing; not normative.">
+      <changeLog id="log-1" changeDateTime="2026-10-14T10:00:00" changeSummary="Process map drafted" changedBy="author-1"/>
+      <author id="author-1">
+        <person firstName="Ghang" lastName="Lee" emailAddress="glee@yonsei.ac.kr" affiliation="Yonsei University"/>
+      </author>
+    </authoring>
+    <pm>
+      <diagram id="pm-fsdr" name="Fire safety design review" notation="BPMN 2.0">
+        <description title="Three pools: Architect (two lanes), Fire safety engineer, Building permit authority (one lane). Two data objects: the fire safety design model and the fire safety review report."/>
+        <diagramContent><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_FSDR" targetNamespace="https://big.yonsei.ac.kr/idm/samples" exporter="BIG sample generator" exporterVersion="1.0">
+  <bpmn:collaboration id="Collaboration_FSDR">
+    <bpmn:participant id="Participant_Architect" name="Architect" processRef="Process_Architect"/>
+    <bpmn:participant id="Participant_FireEngineer" name="Fire safety engineer" processRef="Process_FireEngineer"/>
+    <bpmn:participant id="Participant_Authority" name="Building permit authority" processRef="Process_Authority"/>
+    <bpmn:messageFlow id="MessageFlow_Model" name="Fire safety design model" sourceRef="Task_ExportModel" targetRef="Start_FSE"/>
+    <bpmn:messageFlow id="MessageFlow_Report" name="Fire safety review report" sourceRef="Task_IssueReport" targetRef="Start_Authority"/>
+  </bpmn:collaboration>
+  <bpmn:process id="Process_Architect" isExecutable="false">
+    <bpmn:laneSet id="LS_Process_Architect">
+      <bpmn:lane id="Lane_DesignArchitect" name="Design architect">
+        <bpmn:flowNodeRef>Start_FSDR</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_DefineCompartments</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_BIMCoordinator" name="BIM coordinator">
+        <bpmn:flowNodeRef>Task_ExportModel</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>DataObject_FireSafetyModel</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_Architect</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start_FSDR" name="Design development started">
+      <bpmn:outgoing>Flow_A1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:task id="Task_DefineCompartments" name="Define fire compartments and egress">
+      <bpmn:incoming>Flow_A1</bpmn:incoming>
+      <bpmn:outgoing>Flow_A2</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_ExportModel" name="Export fire safety design model">
+      <bpmn:incoming>Flow_A2</bpmn:incoming>
+      <bpmn:outgoing>Flow_A3</bpmn:outgoing>
+      <bpmn:dataOutputAssociation id="Assoc_A1"><bpmn:targetRef>DataObject_FireSafetyModel</bpmn:targetRef></bpmn:dataOutputAssociation>
+    </bpmn:task>
+    <bpmn:dataObject id="DataObject_FireSafetyModel_obj"/>
+    <bpmn:dataObjectReference id="DataObject_FireSafetyModel" name="Fire safety design model" dataObjectRef="DataObject_FireSafetyModel_obj"/>
+    <bpmn:endEvent id="End_Architect" name="Model submitted">
+      <bpmn:incoming>Flow_A3</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_A1" sourceRef="Start_FSDR" targetRef="Task_DefineCompartments"/>
+    <bpmn:sequenceFlow id="Flow_A2" sourceRef="Task_DefineCompartments" targetRef="Task_ExportModel"/>
+    <bpmn:sequenceFlow id="Flow_A3" sourceRef="Task_ExportModel" targetRef="End_Architect"/>
+  </bpmn:process>
+  <bpmn:process id="Process_FireEngineer" isExecutable="false">
+    <bpmn:startEvent id="Start_FSE" name="Model received">
+      <bpmn:outgoing>Flow_F1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:task id="Task_CheckModel" name="Check compartments, ratings and travel distances">
+      <bpmn:incoming>Flow_F1</bpmn:incoming>
+      <bpmn:outgoing>Flow_F2</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="Task_IssueReport" name="Issue fire safety review report">
+      <bpmn:incoming>Flow_F2</bpmn:incoming>
+      <bpmn:outgoing>Flow_F3</bpmn:outgoing>
+      <bpmn:dataOutputAssociation id="Assoc_F1"><bpmn:targetRef>DataObject_ReviewReport</bpmn:targetRef></bpmn:dataOutputAssociation>
+    </bpmn:task>
+    <bpmn:dataObject id="DataObject_ReviewReport_obj"/>
+    <bpmn:dataObjectReference id="DataObject_ReviewReport" name="Fire safety review report" dataObjectRef="DataObject_ReviewReport_obj"/>
+    <bpmn:endEvent id="End_FSE" name="Report issued">
+      <bpmn:incoming>Flow_F3</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_F1" sourceRef="Start_FSE" targetRef="Task_CheckModel"/>
+    <bpmn:sequenceFlow id="Flow_F2" sourceRef="Task_CheckModel" targetRef="Task_IssueReport"/>
+    <bpmn:sequenceFlow id="Flow_F3" sourceRef="Task_IssueReport" targetRef="End_FSE"/>
+  </bpmn:process>
+  <bpmn:process id="Process_Authority" isExecutable="false">
+    <bpmn:laneSet id="LS_Process_Authority">
+      <bpmn:lane id="Lane_FirePlanReviewer" name="Fire plan reviewer">
+        <bpmn:flowNodeRef>Start_Authority</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ReviewPermit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_Authority</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start_Authority" name="Report received">
+      <bpmn:outgoing>Flow_R1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:task id="Task_ReviewPermit" name="Review fire safety documents for permit">
+      <bpmn:incoming>Flow_R1</bpmn:incoming>
+      <bpmn:outgoing>Flow_R2</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:endEvent id="End_Authority" name="Review completed">
+      <bpmn:incoming>Flow_R2</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_R1" sourceRef="Start_Authority" targetRef="Task_ReviewPermit"/>
+    <bpmn:sequenceFlow id="Flow_R2" sourceRef="Task_ReviewPermit" targetRef="End_Authority"/>
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1"><bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_FSDR">
+    <bpmndi:BPMNShape id="Participant_Architect_di" bpmnElement="Participant_Architect" isHorizontal="true"><dc:Bounds x="0" y="0" width="900" height="300"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Lane_DesignArchitect_di" bpmnElement="Lane_DesignArchitect" isHorizontal="true"><dc:Bounds x="30" y="0" width="870" height="150"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Lane_BIMCoordinator_di" bpmnElement="Lane_BIMCoordinator" isHorizontal="true"><dc:Bounds x="30" y="150" width="870" height="150"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Start_FSDR_di" bpmnElement="Start_FSDR"><dc:Bounds x="82" y="57" width="36" height="36"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Task_DefineCompartments_di" bpmnElement="Task_DefineCompartments"><dc:Bounds x="175" y="40" width="110" height="70"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Task_ExportModel_di" bpmnElement="Task_ExportModel"><dc:Bounds x="345" y="190" width="110" height="70"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="DataObject_FireSafetyModel_di" bpmnElement="DataObject_FireSafetyModel"><dc:Bounds x="522" y="238" width="36" height="50"/><bpmndi:BPMNLabel><dc:Bounds x="566" y="250" width="110" height="27"/></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="End_Architect_di" bpmnElement="End_Architect"><dc:Bounds x="802" y="207" width="36" height="36"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNEdge id="Flow_A1_di" bpmnElement="Flow_A1"><di:waypoint x="118" y="75"/><di:waypoint x="175" y="75"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Flow_A2_di" bpmnElement="Flow_A2"><di:waypoint x="285" y="75"/><di:waypoint x="315" y="75"/><di:waypoint x="315" y="225"/><di:waypoint x="345" y="225"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Flow_A3_di" bpmnElement="Flow_A3"><di:waypoint x="455" y="225"/><di:waypoint x="802" y="225"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNShape id="Participant_FireEngineer_di" bpmnElement="Participant_FireEngineer" isHorizontal="true"><dc:Bounds x="0" y="330" width="900" height="190"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Start_FSE_di" bpmnElement="Start_FSE"><dc:Bounds x="282" y="387" width="36" height="36"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Task_CheckModel_di" bpmnElement="Task_CheckModel"><dc:Bounds x="375" y="370" width="110" height="70"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Task_IssueReport_di" bpmnElement="Task_IssueReport"><dc:Bounds x="545" y="370" width="110" height="70"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="End_FSE_di" bpmnElement="End_FSE"><dc:Bounds x="742" y="387" width="36" height="36"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNEdge id="Flow_F1_di" bpmnElement="Flow_F1"><di:waypoint x="318" y="405"/><di:waypoint x="375" y="405"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Flow_F2_di" bpmnElement="Flow_F2"><di:waypoint x="485" y="405"/><di:waypoint x="545" y="405"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Flow_F3_di" bpmnElement="Flow_F3"><di:waypoint x="655" y="405"/><di:waypoint x="742" y="405"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNShape id="DataObject_ReviewReport_di" bpmnElement="DataObject_ReviewReport"><dc:Bounds x="682" y="448" width="36" height="50"/><bpmndi:BPMNLabel><dc:Bounds x="726" y="462" width="120" height="27"/></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+    <bpmndi:BPMNEdge id="Assoc_F1_di" bpmnElement="Assoc_F1"><di:waypoint x="640" y="440"/><di:waypoint x="682" y="462"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNShape id="Participant_Authority_di" bpmnElement="Participant_Authority" isHorizontal="true"><dc:Bounds x="0" y="550" width="900" height="150"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Lane_FirePlanReviewer_di" bpmnElement="Lane_FirePlanReviewer" isHorizontal="true"><dc:Bounds x="30" y="550" width="870" height="150"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Start_Authority_di" bpmnElement="Start_Authority"><dc:Bounds x="582" y="607" width="36" height="36"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="Task_ReviewPermit_di" bpmnElement="Task_ReviewPermit"><dc:Bounds x="675" y="590" width="110" height="70"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNShape id="End_Authority_di" bpmnElement="End_Authority"><dc:Bounds x="842" y="607" width="36" height="36"/></bpmndi:BPMNShape>
+    <bpmndi:BPMNEdge id="Flow_R1_di" bpmnElement="Flow_R1"><di:waypoint x="618" y="625"/><di:waypoint x="675" y="625"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Flow_R2_di" bpmnElement="Flow_R2"><di:waypoint x="785" y="625"/><di:waypoint x="842" y="625"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="Assoc_A1_di" bpmnElement="Assoc_A1"><di:waypoint x="455" y="250"/><di:waypoint x="522" y="258"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="MessageFlow_Model_di" bpmnElement="MessageFlow_Model"><di:waypoint x="400" y="260"/><di:waypoint x="400" y="323.5"/><di:waypoint x="300" y="323.5"/><di:waypoint x="300" y="387"/></bpmndi:BPMNEdge>
+    <bpmndi:BPMNEdge id="MessageFlow_Report_di" bpmnElement="MessageFlow_Report"><di:waypoint x="600" y="440"/><di:waypoint x="600" y="607"/></bpmndi:BPMNEdge>
+  </bpmndi:BPMNPlane></bpmndi:BPMNDiagram>
+</bpmn:definitions>]]></diagramContent>
+      </diagram>
+      <dataObjectAndEr id="doer-1">
+        <associatedDataObject ref="DataObject_FireSafetyModel"/>
+        <associatedEr ref="3f6c2a1e-8b4d-4e7a-9c15-000000000004"/>
+      </dataObjectAndEr>
+      <dataObjectAndEr id="doer-2">
+        <associatedDataObject ref="DataObject_ReviewReport"/>
+        <associatedEr ref="3f6c2a1e-8b4d-4e7a-9c15-000000000008"/>
+      </dataObjectAndEr>
+      <shapeAndActor id="sa-1">
+        <associatedShape ref="Participant_Architect"/>
+        <associatedActor ref="actor-arch"/>
+      </shapeAndActor>
+      <shapeAndActor id="sa-2">
+        <associatedShape ref="Lane_DesignArchitect"/>
+        <associatedActor ref="actor-arch-da"/>
+      </shapeAndActor>
+      <shapeAndActor id="sa-3">
+        <associatedShape ref="Lane_BIMCoordinator"/>
+        <associatedActor ref="actor-arch-bc"/>
+      </shapeAndActor>
+      <shapeAndActor id="sa-4">
+        <associatedShape ref="Participant_FireEngineer"/>
+        <associatedActor ref="actor-fse"/>
+      </shapeAndActor>
+      <shapeAndActor id="sa-5">
+        <associatedShape ref="Participant_Authority"/>
+        <associatedActor ref="actor-auth"/>
+      </shapeAndActor>
+      <shapeAndActor id="sa-6">
+        <associatedShape ref="Lane_FirePlanReviewer"/>
+        <associatedActor ref="actor-auth-fr"/>
+      </shapeAndActor>
+    </pm>
+  </businessContextMap>
+  <er>
+    <specId guid="3f6c2a1e-8b4d-4e7a-9c15-000000000010" shortTitle="ER_FireSafetyDesignReview" fullTitle="Fire safety design review information" idmCode="IDM-KR-FSDR-01-ER00" documentStatus="WD" version="1.0"/>
+    <authoring copyright="Copyright 2026 Building Informatics Group (BIG), Yonsei University. Sample for testing; not normative.">
+      <changeLog id="log-1" changeDateTime="2026-10-14T10:00:00" changeSummary="Exchange requirement drafted" changedBy="author-1"/>
+      <author id="author-1">
+        <person firstName="Ghang" lastName="Lee" emailAddress="glee@yonsei.ac.kr" affiliation="Yonsei University"/>
+      </author>
+    </authoring>
+    <description title="Exchange requirements of the fire safety design review: the design model delivered by the architect (with three sub-ERs) and the review report issued by the fire safety engineer."/>
+    <subEr>
+      <er>
+        <specId guid="3f6c2a1e-8b4d-4e7a-9c15-000000000004" shortTitle="ER_FireSafetyDesignModel" fullTitle="Fire safety design model" idmCode="IDM-KR-FSDR-01-ER01" documentStatus="WD" version="1.0"/>
+        <authoring copyright="Copyright 2026 Building Informatics Group (BIG), Yonsei University. Sample for testing; not normative.">
+          <changeLog id="log-1" changeDateTime="2026-10-14T10:00:00" changeSummary="Exchange requirement drafted" changedBy="author-1"/>
+          <author id="author-1">
+            <person firstName="Ghang" lastName="Lee" emailAddress="glee@yonsei.ac.kr" affiliation="Yonsei University"/>
+          </author>
+        </authoring>
+        <constraint id="C-01">
+          <associatedBusinessRule ref="BR-FS-01"/>
+          <associatedInformationUnit ref="IU-01"/>
+          <associatedInformationUnit ref="IU-013"/>
+          <description title="IU-013 references exactly one IU-02 for every IU-01"/>
+        </constraint>
+        <constraint id="C-02">
+          <associatedBusinessRule ref="BR-FS-02"/>
+          <associatedInformationUnit ref="IU-022"/>
+          <associatedInformationUnit ref="IU-023"/>
+          <description title="IU-022 &lt;= 1000 m2 WHERE IU-023 = false; IU-022 &lt;= 3000 m2 WHERE IU-023 = true"/>
+          <expression id="C-02-sparql">
+            <formalRuleLanguage name="SPARQL" version="1.1" publicationYear="2013"/><![CDATA[
+PREFIX ifc: <https://standards.buildingsmart.org/IFC/DEV/IFC4_3/OWL#>
+ASK {  # true = violation
+  ?z a ifc:IfcZone ; ifc:objectType "FireCompartment" ; :grossFloorArea ?a ; :isSprinklered ?s .
+  FILTER ( (?s = false && ?a > 1000) || (?s = true && ?a > 3000) )
+}
+]]></expression>
+        </constraint>
+        <constraint id="C-03">
+          <associatedBusinessRule ref="BR-FS-03"/>
+          <associatedInformationUnit ref="IU-031"/>
+          <description title="IU-031 &gt;= 60 min"/>
+          <expression id="C-03-legalruleml">
+            <formalRuleLanguage name="LegalRuleML" version="1.0" publicationYear="2021" uri="http://docs.oasis-open.org/legalruleml/ns/v1.0/"/>
+            <lrml:LegalRuleML xmlns:lrml="http://docs.oasis-open.org/legalruleml/ns/v1.0/" xmlns:ruleml="http://ruleml.org/spec">
+              <lrml:Statements key="fs03">
+                <lrml:PrescriptiveStatement key="ps-fs03">
+                  <ruleml:Rule closure="universal">
+                    <ruleml:if>
+                      <ruleml:Atom>
+                        <ruleml:Rel>boundsFireCompartment</ruleml:Rel>
+                        <ruleml:Var>e</ruleml:Var>
+                      </ruleml:Atom>
+                    </ruleml:if>
+                    <ruleml:then>
+                      <lrml:Obligation>
+                        <ruleml:Atom>
+                          <ruleml:Rel>fireResistanceAtLeast</ruleml:Rel>
+                          <ruleml:Var>e</ruleml:Var>
+                          <ruleml:Data>PT60M</ruleml:Data>
+                        </ruleml:Atom>
+                      </lrml:Obligation>
+                    </ruleml:then>
+                  </ruleml:Rule>
+                </lrml:PrescriptiveStatement>
+              </lrml:Statements>
+            </lrml:LegalRuleML>
+          </expression>
+        </constraint>
+        <constraint id="C-04">
+          <associatedBusinessRule ref="BR-FS-04"/>
+          <associatedInformationUnit ref="IU-041"/>
+          <associatedInformationUnit ref="IU-042"/>
+          <description title="IU-041 is not empty AND IU-042 = true"/>
+        </constraint>
+        <constraint id="C-05">
+          <associatedBusinessRule ref="BR-FS-05"/>
+          <associatedInformationUnit ref="IU-051"/>
+          <description title="IU-051 &lt;= 30 m, or &lt;= 50 m for fire-resistant structures"/>
+          <expression id="C-05-python">
+            <formalRuleLanguage name="Python" version="3"/><![CDATA[
+def check(egress_paths, fire_resistant_structure):
+    limit = 50.0 if fire_resistant_structure else 30.0
+    return [p.id for p in egress_paths if p.travel_distance > limit]  # non-empty = violation
+]]></expression>
+          <expression id="C-05-shacl" uri="rules/BR-FS-05.shacl.ttl">
+            <formalRuleLanguage name="SHACL" publicationYear="2017" uri="http://www.w3.org/ns/shacl#"/>
+          </expression>
+        </constraint>
+        <constraint id="C-06">
+          <associatedBusinessRule ref="BR-FS-06"/>
+          <associatedInformationUnit ref="IU-043"/>
+          <description title="IU-043 &gt;= 0.9 m for doors on an egress path"/>
+        </constraint>
+        <correspondingEvd basis="IFC4.3" name="IFC4.3 Reference View">
+          <description title="IFC model view definition (MVD) used as the exchange view definition (EVD) for the design model."/>
+        </correspondingEvd>
+        <correspondingEvd basis="CityGML 3.0" name="LOD2 building model for the site context"/>
+        <description title="Information the architect delivers for fire safety design review at design development."/>
+        <subEr>
+          <er>
+            <specId guid="3f6c2a1e-8b4d-4e7a-9c15-000000000005" shortTitle="ER_SpacesAndCompartments" fullTitle="Spaces and fire compartments" idmCode="IDM-KR-FSDR-01-ER02" documentStatus="WD" version="1.0"/>
+            <authoring copyright="Copyright 2026 Building Informatics Group (BIG), Yonsei University. Sample for testing; not normative.">
+              <changeLog id="log-1" changeDateTime="2026-10-14T10:00:00" changeSummary="Exchange requirement drafted" changedBy="author-1"/>
+              <author id="author-1">
+                <person firstName="Ghang" lastName="Lee" emailAddress="glee@yonsei.ac.kr" affiliation="Yonsei University"/>
+              </author>
+            </authoring>
+            <description title="Spaces and the fire compartments they belong to."/>
+            <informationUnit id="IU-01" name="Space" dataType="IfcSpace" isMandatory="true" definition="A bounded area or volume that hosts an occupancy.">
+              <synonym xml:lang="en">Room</synonym>
+              <synonym xml:lang="ko">실</synonym>
+              <correspondingExternalElement basis="IFC4.3" name="IfcSpace"/>
+              <subInformationUnit>
+                <informationUnit id="IU-011" name="Space name" dataType="IfcLabel" isMandatory="true" definition="Unique name or number of the space.">
+                  <correspondingExternalElement basis="IFC4.3" name="IfcSpace.Name"/>
+                </informationUnit>
+                <informationUnit id="IU-012" name="Net floor area" dataType="IfcAreaMeasure" isMandatory="true" definition="Net floor area of the space in m2.">
+                  <correspondingExternalElement basis="IFC4.3" name="Qto_SpaceBaseQuantities.NetFloorArea"/>
+                </informationUnit>
+                <informationUnit id="IU-013" name="Fire compartment reference" dataType="IfcIdentifier" isMandatory="true" definition="Identifier of the fire compartment that contains the space.">
+                  <correspondingExternalElement basis="IFC4.3" name="IfcRelAssignsToGroup">
+                    <description title="IfcZone"/>
+                  </correspondingExternalElement>
+                </informationUnit>
+              </subInformationUnit>
+            </informationUnit>
+            <informationUnit id="IU-02" name="Fire compartment" dataType="IfcZone" isMandatory="true" definition="A group of spaces enclosed by fire-resisting construction.">
+              <synonym xml:lang="en">Fire zone</synonym>
+              <synonym xml:lang="ko">방화구획</synonym>
+              <correspondingExternalElement basis="IFC4.3" name="IfcZone">
+                <description title="ObjectType = FireCompartment"/>
+              </correspondingExternalElement>
+              <subInformationUnit>
+                <informationUnit id="IU-021" name="Compartment ID" dataType="IfcIdentifier" isMandatory="true" definition="Unique identifier of the fire compartment."/>
+                <informationUnit id="IU-022" name="Gross floor area" dataType="IfcAreaMeasure" isMandatory="true" definition="Sum of floor areas of the assigned spaces in m2."/>
+                <informationUnit id="IU-023" name="Is sprinklered" dataType="IfcBoolean" isMandatory="true" definition="True if an automatic sprinkler system covers the compartment.">
+                  <correspondingExternalElement basis="IFC4.3" name="Pset_SpaceFireSafetyRequirements.SprinklerProtection"/>
+                </informationUnit>
+              </subInformationUnit>
+            </informationUnit>
+          </er>
+        </subEr>
+        <subEr>
+          <er>
+            <specId guid="3f6c2a1e-8b4d-4e7a-9c15-000000000006" shortTitle="ER_BoundariesAndDoors" fullTitle="Compartment boundaries and fire doors" idmCode="IDM-KR-FSDR-01-ER03" documentStatus="WD" version="1.0"/>
+            <authoring copyright="Copyright 2026 Building Informatics Group (BIG), Yonsei University. Sample for testing; not normative.">
+              <changeLog id="log-1" changeDateTime="2026-10-14T10:00:00" changeSummary="Exchange requirement drafted" changedBy="author-1"/>
+              <author id="author-1">
+                <person firstName="Ghang" lastName="Lee" emailAddress="glee@yonsei.ac.kr" affiliation="Yonsei University"/>
+              </author>
+            </authoring>
+            <description title="Walls, slabs and doors that separate fire compartments."/>
+            <informationUnit id="IU-03" name="Compartment boundary element" dataType="IfcBuiltElement" isMandatory="true" definition="A wall or slab that separates two fire compartments.">
+              <correspondingExternalElement basis="IFC4.3" name="IfcWall"/>
+              <correspondingExternalElement basis="IFC4.3" name="IfcSlab"/>
+              <subInformationUnit>
+                <informationUnit id="IU-031" name="Fire rating" dataType="IfcLabel" isMandatory="true" definition="Fire resistance rating of the element, e.g. 60 min.">
+                  <synonym xml:lang="en">Fire resistance rating</synonym>
+                  <synonym xml:lang="ko">내화등급</synonym>
+                  <correspondingExternalElement basis="IFC4.3" name="Pset_WallCommon.FireRating"/>
+                  <correspondingExternalElement basis="IFC4.3" name="Pset_SlabCommon.FireRating"/>
+                </informationUnit>
+              </subInformationUnit>
+            </informationUnit>
+            <informationUnit id="IU-04" name="Fire door" dataType="IfcDoor" isMandatory="true" definition="A door in a fire compartment boundary or on an egress path.">
+              <synonym xml:lang="en">Fire-rated door</synonym>
+              <synonym xml:lang="ko">방화문</synonym>
+              <synonym xml:lang="ja">防火戸</synonym>
+              <synonym xml:lang="de">Brandschutztür</synonym>
+              <correspondingExternalElement basis="IFC4.3" name="IfcDoor"/>
+              <subInformationUnit>
+                <informationUnit id="IU-041" name="Door fire rating" dataType="IfcLabel" isMandatory="true" definition="Fire rating of the door assembly.">
+                  <correspondingExternalElement basis="IFC4.3" name="Pset_DoorCommon.FireRating"/>
+                </informationUnit>
+                <informationUnit id="IU-042" name="Self-closing" dataType="IfcBoolean" isMandatory="true" definition="True if the door closes automatically.">
+                  <correspondingExternalElement basis="IFC4.3" name="Pset_DoorCommon.SelfClosing"/>
+                </informationUnit>
+                <informationUnit id="IU-043" name="Clear width" dataType="IfcPositiveLengthMeasure" isMandatory="true" definition="Clear opening width of the door in m."/>
+              </subInformationUnit>
+            </informationUnit>
+          </er>
+        </subEr>
+        <subEr>
+          <er>
+            <specId guid="3f6c2a1e-8b4d-4e7a-9c15-000000000007" shortTitle="ER_Egress" fullTitle="Egress" idmCode="IDM-KR-FSDR-01-ER04" documentStatus="WD" version="1.0"/>
+            <authoring copyright="Copyright 2026 Building Informatics Group (BIG), Yonsei University. Sample for testing; not normative.">
+              <changeLog id="log-1" changeDateTime="2026-10-14T10:00:00" changeSummary="Exchange requirement drafted" changedBy="author-1"/>
+              <author id="author-1">
+                <person firstName="Ghang" lastName="Lee" emailAddress="glee@yonsei.ac.kr" affiliation="Yonsei University"/>
+              </author>
+            </authoring>
+            <description title="Egress paths from habitable rooms to direct stairs."/>
+            <informationUnit id="IU-05" name="Egress path" dataType="IfcRelSpaceBoundary" isMandatory="true" definition="The walking route from a room to the nearest direct stair.">
+              <description title="The egress path is measured along the actual walking route, not as a straight line.">
+                <image caption="Egress path from a habitable room to the nearest direct stair" mimeType="image/png" encoding="base64">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</image>
+              </description>
+              <synonym xml:lang="en-GB">Means of escape</synonym>
+              <synonym xml:lang="en">Escape route</synonym>
+              <synonym xml:lang="ko">피난경로</synonym>
+              <synonym xml:lang="ja">避難経路</synonym>
+              <examples>
+                <description title="Room 301 -&gt; Corridor C3 -&gt; Stair S1: 27.4 m"/>
+              </examples>
+              <correspondingExternalElement basis="Project property set" name="Pset_BIG_Egress"/>
+              <subInformationUnit>
+                <informationUnit id="IU-051" name="Travel distance" dataType="IfcLengthMeasure" isMandatory="true" definition="Walking distance along the egress path in m."/>
+                <informationUnit id="IU-052" name="Target stair" dataType="IfcIdentifier" isMandatory="true" definition="Identifier of the direct stair reached."/>
+              </subInformationUnit>
+            </informationUnit>
+          </er>
+        </subEr>
+      </er>
+    </subEr>
+    <subEr>
+      <er>
+        <specId guid="3f6c2a1e-8b4d-4e7a-9c15-000000000008" shortTitle="ER_FireSafetyReviewReport" fullTitle="Fire safety review report" idmCode="IDM-KR-FSDR-01-ER05" documentStatus="WD" version="1.0"/>
+        <authoring copyright="Copyright 2026 Building Informatics Group (BIG), Yonsei University. Sample for testing; not normative.">
+          <changeLog id="log-1" changeDateTime="2026-10-14T10:00:00" changeSummary="Exchange requirement drafted" changedBy="author-1"/>
+          <author id="author-1">
+            <person firstName="Ghang" lastName="Lee" emailAddress="glee@yonsei.ac.kr" affiliation="Yonsei University"/>
+          </author>
+        </authoring>
+        <constraint id="C-07">
+          <associatedBusinessRule ref="BR-FS-07"/>
+          <associatedInformationUnit ref="IU-R031"/>
+          <associatedInformationUnit ref="IU-R032"/>
+          <description title="For every IU-R03: IU-R031 is not empty AND IU-R032 is not empty"/>
+          <expression id="C-07-ruleml">
+            <formalRuleLanguage name="RuleML" version="1.03" uri="http://ruleml.org/spec"/>
+            <Implies xmlns="http://ruleml.org/spec">
+              <if>
+                <Atom>
+                  <Rel>nonConformity</Rel>
+                  <Var>n</Var>
+                </Atom>
+              </if>
+              <then>
+                <And>
+                  <Atom>
+                    <Rel>hasViolatedRule</Rel>
+                    <Var>n</Var>
+                    <Var>r</Var>
+                  </Atom>
+                  <Atom>
+                    <Rel>hasAffectedElement</Rel>
+                    <Var>n</Var>
+                    <Var>g</Var>
+                  </Atom>
+                </And>
+              </then>
+            </Implies>
+          </expression>
+        </constraint>
+        <correspondingEvd basis="BCF 3.0" name="BIM Collaboration Format topics">
+          <description title="Non-conformities are exchanged as BCF topics with viewpoints that reference the affected IFC elements."/>
+        </correspondingEvd>
+        <description title="Result of the fire safety review, issued by the fire safety engineer to the architect and the permit authority."/>
+        <informationUnit id="IU-R01" name="Review result" dataType="IfcLabel" isMandatory="true" definition="Overall result of the review: PASS, CONDITIONAL or FAIL.">
+          <synonym xml:lang="en">Review outcome</synonym>
+          <synonym xml:lang="ko">검토 결과</synonym>
+        </informationUnit>
+        <informationUnit id="IU-R02" name="Review date" dataType="IfcDate" isMandatory="true" definition="Date on which the review report was issued."/>
+        <informationUnit id="IU-R03" name="Non-conformity" dataType="IfcLabel" isMandatory="false" definition="A finding that a design element does not meet a business rule.">
+          <synonym xml:lang="en">Issue</synonym>
+          <synonym xml:lang="ko">부적합 사항</synonym>
+          <synonym xml:lang="ja">不適合</synonym>
+          <correspondingExternalElement basis="BCF 3.0" name="Markup/Topic"/>
+          <subInformationUnit>
+            <informationUnit id="IU-R031" name="Violated business rule" dataType="IfcIdentifier" isMandatory="true" definition="Identifier of the business rule that is not met, e.g. BR-FS-05."/>
+            <informationUnit id="IU-R032" name="Affected element" dataType="IfcGloballyUniqueId" isMandatory="true" definition="GlobalId of the IFC element that does not conform.">
+              <correspondingExternalElement basis="BCF 3.0" name="Markup/Viewpoints/Components/Selection/Component/@IfcGuid"/>
+            </informationUnit>
+            <informationUnit id="IU-R033" name="Finding" dataType="IfcText" isMandatory="true" definition="Description of the non-conformity and the required correction."/>
+          </subInformationUnit>
+        </informationUnit>
+        <informationUnit id="IU-R04" name="Report document" dataType="IfcDocumentReference" isMandatory="true" definition="Reference to the signed review report document.">
+          <correspondingExternalElement basis="IFC4.3" name="IfcDocumentReference"/>
+        </informationUnit>
+      </er>
+    </subEr>
+  </er>
+</idm>

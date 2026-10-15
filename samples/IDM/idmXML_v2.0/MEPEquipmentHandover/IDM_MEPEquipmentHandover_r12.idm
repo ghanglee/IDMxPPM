@@ -119,7 +119,6 @@
       {
         "id": "actor-mepc",
         "name": "MEP contractor",
-        "actorType": "group",
         "bpmnShapeName": "Participant_Contractor",
         "role": "",
         "subActors": [
@@ -135,12 +134,12 @@
             "role": "",
             "bpmnShapeName": "Lane_InfoManager"
           }
-        ]
+        ],
+        "external": false
       },
       {
         "id": "actor-own",
         "name": "Owner / facility manager",
-        "actorType": "group",
         "bpmnShapeName": "Participant_Owner",
         "role": "",
         "subActors": [
@@ -150,7 +149,8 @@
             "role": "",
             "bpmnShapeName": "Lane_CMMSAdmin"
           }
-        ]
+        ],
+        "external": false
       }
     ],
     "businessRules": [
@@ -291,7 +291,6 @@
       {
         "id": "actor-mepc",
         "name": "MEP contractor",
-        "actorType": "group",
         "bpmnShapeName": "Participant_Contractor",
         "role": "",
         "subActors": [
@@ -307,12 +306,12 @@
             "role": "",
             "bpmnShapeName": "Lane_InfoManager"
           }
-        ]
+        ],
+        "external": false
       },
       {
         "id": "actor-own",
         "name": "Owner / facility manager",
-        "actorType": "group",
         "bpmnShapeName": "Participant_Owner",
         "role": "",
         "subActors": [
@@ -322,7 +321,15 @@
             "role": "",
             "bpmnShapeName": "Lane_CMMSAdmin"
           }
-        ]
+        ],
+        "external": false
+      }
+    ],
+    "customProjectPhases": [
+      {
+        "id": "custom-phase-1",
+        "classificationName": "",
+        "phaseName": "Completion and handover (준공 및 인계)"
       }
     ]
   },
@@ -861,6 +868,18 @@
           "changeSummary": "Exchange requirement drafted",
           "changedBy": "author-1",
           "changes": []
+        }
+      ],
+      "correspondingEvds": [
+        {
+          "basis": "COBie 2.4",
+          "name": "COBie",
+          "description": ""
+        },
+        {
+          "basis": "IFC4.3",
+          "name": "IFC4.3 Reference View",
+          "description": ""
         }
       ]
     }
@@ -1403,6 +1422,18 @@
           "changeSummary": "Exchange requirement drafted",
           "changedBy": "author-1",
           "changes": []
+        }
+      ],
+      "correspondingEvds": [
+        {
+          "basis": "COBie 2.4",
+          "name": "COBie",
+          "description": ""
+        },
+        {
+          "basis": "IFC4.3",
+          "name": "IFC4.3 Reference View",
+          "description": ""
         }
       ]
     }

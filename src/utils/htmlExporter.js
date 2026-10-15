@@ -1178,7 +1178,7 @@ const generateStagesSection = (stages) => {
 
   return `
   <div class="section">
-    <h3>Project Stages (ISO 22263)</h3>
+    <h3>Project Phases (ISO 22263)</h3>
     ${stages.map(s => `<span class="tag">${escapeHtml(s)}</span>`).join('')}
   </div>
   `;
@@ -1205,15 +1205,15 @@ const generateActorsSection = (actors) => {
       <thead>
         <tr>
           <th>Actor Name</th>
-          <th>Type</th>
+          <th>Scope</th>
           <th>BPMN Shape</th>
           <th>Role</th>
         </tr>
       </thead>
       <tbody>
         ${actors.map(actor => {
-          const actorType = actor.actorType || 'group';
-          const actorTypeLabel = actorType === 'group' ? 'Organization' : 'Individual';
+          // idmXSD v2.0 Rev 13: actors are actor roles; external marks roles outside the scope of interest
+          const actorTypeLabel = actor.external ? 'External' : 'Internal';
           const bpmnShape = actor.bpmnShapeName || actor.bpmnId || '-';
           const role = actor.role || '-';
           const subActors = actor.subActors || [];

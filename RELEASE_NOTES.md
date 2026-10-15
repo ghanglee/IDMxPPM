@@ -1,5 +1,41 @@
 # IDMxPPM neo-Seoul — Release Notes
 
+## Unreleased — idmXSD v2.0 Revisions 13–14
+
+### Schema alignment (ISO 29481-1:2025)
+
+- **Project phases** — idmXML 2.0 export writes `standardProjectPhase` / `localProjectPhase` (was `standardProjectStage` / `localProjectStage`). Import reads both.
+- **ISO 22263 phases** — The Use Case pane offers the six ISO 22263 phases (inception, brief, design, production, maintenance, demolition). Older projects with *handover*, *operation* or *end-of-life* are mapped to production, maintenance and demolition.
+- **Custom project phase classifications** — Now exported as `localProjectPhase` (with a classification when a classification name is given) and imported back; unclassified local phases in idmXML files are kept as custom phases instead of being dropped.
+- **Actor roles** — `actorType` (group/individual) is no longer written. A new **External** checkbox on each actor writes `external="true"` (external actor role, ISO 29481-1:2025 Annex D). HTML export shows *External* / *Internal*.
+- **Exchange view definitions** — ERs have a *Corresponding EVDs* list (basis, name) in the ER detail editor. Exported as `correspondingEvd` (idmXSD v2.0 Rev 14); `correspondingEvd` and `correspondingMvd` are both imported (previously `correspondingMvd` was not read from idmXML at all). idmXML 1.0 export still writes `correspondingMvd`.
+
+### Sample project
+
+- **New startup sample: Fire Safety Design Review** (`public/samples/IDM/FireSafetyDesignReview/`). It covers the idmXSD v2.0 features up to Rev 14: ER hierarchy with sub-ERs, business rules with statements, images and commentary, constraints with SPARQL, Python, SHACL, LegalRuleML and RuleML expressions, multilingual synonyms, embedded images, EVDs, pools and lanes with an external actor role, two data objects linked to ERs and a classified local project phase. Its IFC mappings export to a valid IDS file with six specifications.
+
+### IDS export (hand-authored information units)
+
+- **One specification per IFC entity** — Information units are no longer pooled into one specification per ER (which applied, e.g., door properties to walls). Each IFC entity mapping now gets its own specification, named *ER: information unit*, with only the requirements of that entity and its sub-units. Property set requirements go to the entity that matches the property set (Pset_WallCommon → IFCWALL, Pset_SlabCommon → IFCSLAB).
+- **Data types** — Property facets take their data type from the information unit's IFC data type (IfcAreaMeasure → IFCAREAMEASURE, IfcBoolean → IFCBOOLEAN) instead of IFCLABEL.
+- **Relationships** — IfcRel… mappings are no longer written as applicability entities. Mappings to a valid IDS relation (IfcRelAggregates, IfcRelAssignsToGroup, IfcRelContainedInSpatialStructure, IfcRelNests, IfcRelVoidsElement, IfcRelFillsElement) become a *part of* requirement; the parent entity is taken from the mapping description (e.g. *IfcZone*).
+- **Applicability conditions** — A mapping description of the form *Attribute = Value* (e.g. *ObjectType = FireCompartment*) is written as an attribute condition in the applicability.
+- **IfcMaterial** — An IfcMaterial mapping becomes a material requirement on the related entity.
+- **Existence** — A mandatory information unit that maps to exactly one IFC entity requires that entity in the model (applicability minOccurs="1"); with no further facets the entity itself is the requirement.
+- **Examples** — IDM examples are no longer written as required values (they are illustrative).
+- **IDS round trip** — An imported IDS specification whose requirements contain only an entity facet is no longer dropped on export.
+- **Mapping descriptions** — The description of a corresponding external element is now kept in idmXML 2.0 export and import (it was dropped).
+
+### Bug fixes
+
+- **Use case fields lost in idmXML 2.0** — Scope and benefit keywords, target construction entities, references, additional description (user-defined properties), required resources and competencies, publisher, sub-title, local short title, local code and local document status are now exported and imported (several had an editor in the Use Case pane but were not written to idmXML).
+- **changeLog/@changedBy** — Author ids that are not valid XML NCNames (e.g. UUIDs starting with a digit) are prefixed, and every changedBy now refers to an exported author, so exports from projects with UUID author ids validate.
+- **specId details lost on idmXML 2.0 round trip** — Short title, full title, IDM code and version of the use case and business context map, and ER short titles (e.g. ER_FireSafetyDesignModel) and versions, are now kept. The business context map code is no longer a new timestamp on every export.
+- **Line breaks in information unit definitions** — Kept in idmXML 2.0 (written as `&#10;`); they were turned into spaces.
+- **Empty external mappings** — `correspondingExternalElement` entries without a name are no longer exported (they were dropped on import anyway).
+
+---
+
 ## v1.5.0 (2026-05-31)
 
 ### Highlights

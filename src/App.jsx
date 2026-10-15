@@ -799,7 +799,6 @@ const App = () => {
               // Skip if actor is already linked to a Lane (has bpmnLaneId)
               if (matchedByName && !updatedActor.bpmnId && !updatedActor.bpmnLaneId) {
                 updatedActor.bpmnId = bpmnActor.id;
-                updatedActor.actorType = 'group';
                 needsUpdate = true;
                 console.info(`Linked actor "${updatedActor.name}" to Pool "${bpmnActor.name}"`);
               }
@@ -868,7 +867,7 @@ const App = () => {
                   id: `actor-${bpmnActor.id}-${Date.now()}`,
                   name: bpmnActor.name,
                   role: '',
-                  actorType: 'group',
+                  external: false,
                   bpmnId: bpmnActor.id,
                   bpmnShapeName: bpmnActor.name,
                   subActors: bpmnActor.subActors.map(lane => ({
@@ -2101,8 +2100,8 @@ const App = () => {
 
   // Extract actors from BPMN swimlanes (Pools and Lanes) per IDM 2.0 schema
   // Structure:
-  // - Pools = groups (for external exchanges between organizations)
-  // - Lanes within Pools = individuals/subActors (for internal exchanges within organizations)
+  // - Pools = actors (actor roles, ISO 29481-1:2025)
+  // - Lanes within Pools = subActors; a Pool with Lanes is a composite actor role
   const extractSwimlanesFromModeler = useCallback(() => {
     if (!modelerRef.current) return [];
 
@@ -2172,12 +2171,10 @@ const App = () => {
           id: pool.id,
           name: poolName,
           type: 'pool',
-          actorType: 'group', // Pools are groups (external exchanges)
           subActors: effectiveLanes.map(lane => ({
             id: lane.id,
             name: lane.businessObject?.name || '',
-            type: 'lane',
-            actorType: 'individual' // Lanes are individuals (internal exchanges)
+            type: 'lane'
           }))
         };
 
@@ -2222,7 +2219,7 @@ const App = () => {
       }
 
       // Sync swimlanes (Pools/Lanes) with Actor Roles per IDM 2.0 schema
-      // Pools = groups (external exchanges), Lanes = individuals/subActors (internal exchanges)
+      // Pools = actors (actor roles), Lanes = subActors
       const bpmnActors = extractSwimlanesFromModeler();
       setBpmnActorsList(bpmnActors);
       setHeaderData(prevHeaderData => {
@@ -2271,7 +2268,6 @@ const App = () => {
               if (matchedByName && !updatedActor.bpmnId && !updatedActor.bpmnLaneId) {
                 updatedActor.bpmnId = bpmnActor.id;
                 updatedActor.bpmnShapeName = bpmnActor.name;
-                updatedActor.actorType = 'group'; // Pool = group
                 needsUpdate = true;
                 console.info(`Linked actor "${updatedActor.name}" to BPMN Pool by name match`);
               }
@@ -2338,7 +2334,7 @@ const App = () => {
               id: `actor-${bpmnActor.id}-${Date.now()}`,
               name: bpmnActor.name,
               role: '',
-              actorType: 'group',
+              external: false,
               bpmnId: bpmnActor.id,
               bpmnShapeName: bpmnActor.name,
               subActors: (bpmnActor.subActors || []).map(lane => ({
@@ -3743,10 +3739,10 @@ const App = () => {
     setHasActiveProject(true);
 
     if (projectType === 'sample') {
-      // Load GDE-IDM sample project from file
+      // Load the sample project (Fire Safety Design Review: covers the idmXSD v2.0 features up to Rev 14)
       try {
         isLoadingProjectRef.current = true;
-        const response = await fetch('./samples/IDM/CostEstimation_WindowsDoors/idmWindowCostEstimation.idm');
+        const response = await fetch('./samples/IDM/FireSafetyDesignReview/IDM_FireSafetyDesignReview.idm');
         if (!response.ok) {
           throw new Error(`Failed to fetch sample: ${response.status}`);
         }

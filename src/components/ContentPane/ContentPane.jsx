@@ -17,6 +17,7 @@ import {
   SaveExportIcon
 } from '../icons';
 import { normalizeRegionCode } from '../../utils/idmXmlParser';
+import { normalizeIso22263Phases } from '../../utils/idmSchemaRev14';
 import ReviewCommentsPanel from '../ReviewCommentsPanel/ReviewCommentsPanel';
 import './ContentPane.css';
 
@@ -1475,18 +1476,17 @@ const STATUS_OPTIONS = [
   { value: 'WDRL', label: 'WDRL - Withdrawn', description: 'No longer active' }
 ];
 
-// Project Stages per ISO 22263 (international standard)
+// Project phases per ISO 22263 (international standard; ISO 29481-1:2025, Table 1)
 const PROJECT_STAGES_ISO = [
   { value: 'inception', label: 'Inception', description: 'Initial project conception' },
   { value: 'brief', label: 'Brief', description: 'Project brief and requirements' },
   { value: 'design', label: 'Design', description: 'Design development phase' },
-  { value: 'production', label: 'Production', description: 'Construction/production phase' },
-  { value: 'handover', label: 'Handover', description: 'Project handover and commissioning' },
-  { value: 'operation', label: 'Operation', description: 'Facility operation and maintenance' },
-  { value: 'end-of-life', label: 'End of Life', description: 'Demolition/decommissioning' }
+  { value: 'production', label: 'Production', description: 'Construction/production phase, including handover' },
+  { value: 'maintenance', label: 'Maintenance', description: 'Operation and maintenance' },
+  { value: 'demolition', label: 'Demolition', description: 'Decommissioning, dismantling and disposal' }
 ];
 
-// AIA Document B101 Project Stages (US standard)
+// AIA Document B101 project phases (US standard)
 const PROJECT_STAGES_AIA = [
   { value: 'aia-sd', label: 'SD - Schematic Design', description: 'AIA: Initial design concepts' },
   { value: 'aia-dd', label: 'DD - Design Development', description: 'AIA: Detailed design development' },
@@ -2252,7 +2252,7 @@ const ContentPane = ({
                   id: `actor-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                   name: '',
                   role: '', // Role field (user-editable)
-                  actorType: 'group', // Default to group (Pool) per IDM 2.0
+                  external: false, // idmXSD v2.0 Rev 13: true = external actor role (outside the scope of interest)
                   bpmnShapeName: '',
                   subActors: [] // For BPMN lanes within a pool
                 };
@@ -2264,7 +2264,7 @@ const ContentPane = ({
               <AddIcon size={12} /> Add Actor
             </button>
           </div>
-          <span className="pane-hint">Actors can be groups or individuals. Information exchange between groups is external, while exchange between individuals is internal. In BPMN, Pools represent groups and external exchanges, and Swimlanes represent individuals and internal exchanges.</span>
+          <span className="pane-hint">An actor in an IDM is an actor role, i.e. what a person or organization does at a point in time (ISO 29481-1:2025). In BPMN, a Pool is an actor and its Lanes are sub-actors; an actor with sub-actors is a composite actor role. Mark an actor as external when it is outside the scope of interest of this IDM and only provides input or receives output.</span>
         </div>
         {(Array.isArray(headerData.actorsList) ? headerData.actorsList : []).length === 0 ? (
           <div className="pane-empty-small">No actors defined. Add actors manually or they will be auto-populated from BPMN Pools and Swimlanes.</div>
@@ -2344,6 +2344,22 @@ const ContentPane = ({
                     title="Role of this actor in the process"
                     rows={1}
                   />
+                  <label
+                    className="actor-external-toggle"
+                    title="External actor role: outside the scope of interest of this IDM (ISO 29481-1:2025, Annex D)"
+                    style={{ display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap', fontSize: '12px', marginLeft: '6px' }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={!!actor.external}
+                      onChange={(e) => {
+                        const newActors = [...headerData.actorsList];
+                        newActors[index] = { ...actor, external: e.target.checked };
+                        handleHeaderFieldChange('actorsList', newActors);
+                      }}
+                    />
+                    External
+                  </label>
                 </div>
 
                 {/* Line 3: sub-actors list + Sub-actor button below */}
@@ -2758,13 +2774,13 @@ const ContentPane = ({
       <Section title="Target Project Phases" defaultExpanded={true}>
         {/* Default: ISO 22263 Stages (mandatory) */}
         <MultiSelectCheckbox
-          label={<>ISO 22263 Project Stages <span className="required">*</span></>}
+          label={<>ISO 22263 Project Phases <span className="required">*</span></>}
           options={PROJECT_STAGES_ISO}
-          selected={Array.isArray(headerData.projectStagesIso) ? headerData.projectStagesIso : (Array.isArray(headerData.projectStages) ? headerData.projectStages : [])}
+          selected={normalizeIso22263Phases(Array.isArray(headerData.projectStagesIso) && headerData.projectStagesIso.length > 0 ? headerData.projectStagesIso : (Array.isArray(headerData.projectStages) ? headerData.projectStages : []))}
           onChange={(items) => handleHeaderFieldChange('projectStagesIso', items)}
           allowCustom={false}
         />
-        <span className="pane-hint">ISO 22263 project stages are mandatory for the IDM specification.</span>
+        <span className="pane-hint">At least one ISO 22263 project phase is mandatory for the IDM specification (ISO 29481-1:2025).</span>
 
         {/* Optional: Additional Framework Stages */}
         <div className="pane-field" style={{ marginTop: '16px' }}>
@@ -2774,7 +2790,7 @@ const ContentPane = ({
 
         {/* AIA Stages (optional) */}
         <MultiSelectCheckbox
-          label="AIA B101 Project Stages (US)"
+          label="AIA B101 Project Phases (US)"
           options={PROJECT_STAGES_AIA}
           selected={Array.isArray(headerData.projectStagesAia) ? headerData.projectStagesAia : []}
           onChange={(items) => handleHeaderFieldChange('projectStagesAia', items)}

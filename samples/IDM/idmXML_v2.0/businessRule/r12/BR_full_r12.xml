@@ -29,9 +29,9 @@
     <region value="international">
       <type>USR</type>
     </region>
-    <standardProjectStage>
+    <standardProjectPhase>
       <name>design</name>
-    </standardProjectStage>
+    </standardProjectPhase>
     <businessRule id="BR-07" name="Fire resistance of load-bearing walls">
       <statement>Load-bearing walls in buildings over 12 storeys shall have a fire resistance of at least 2 hours.</statement>
       <images>
@@ -47,8 +47,8 @@
       <statement>Walls that form a fire-compartment boundary shall have a fire resistance of at least 1 hour.</statement>
       <reference>Building Act Enforcement Decree, Art. 46 (illustrative)</reference>
     </businessRule>
-    <actor id="actor-1" name="Architect" actorType="group"/>
-    <actor id="actor-2" name="Building Control Officer" actorType="individual"/>
+    <actor id="actor-1" name="Architect"/>
+    <actor id="actor-2" name="Building Control Officer" external="true"/>
     <reference basisStandard="false" fullCitation="Building Act Enforcement Decree (illustrative)"/>
   </uc>
   <er>

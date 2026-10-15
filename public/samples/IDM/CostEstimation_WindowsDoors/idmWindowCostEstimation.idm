@@ -90,28 +90,28 @@
       {
         "id": "actor-1",
         "name": "Architect",
-        "actorType": "group",
         "bpmnShapeName": "",
         "role": "Design Author",
         "subActors": [],
-        "bpmnId": "Participant_Architect"
+        "bpmnId": "Participant_Architect",
+        "external": false
       },
       {
         "id": "actor-2",
         "name": "Cost Estimator",
-        "actorType": "group",
         "bpmnShapeName": "",
         "role": "Cost Engineer",
         "subActors": [],
-        "bpmnId": "Participant_CostEstimator"
+        "bpmnId": "Participant_CostEstimator",
+        "external": false
       },
       {
         "id": "actor-3",
         "name": "Quantity Surveyor",
-        "actorType": "individual",
         "bpmnShapeName": "",
         "role": "Quantity Surveyor",
-        "subActors": []
+        "subActors": [],
+        "external": false
       }
     ],
     "preconditions": "",

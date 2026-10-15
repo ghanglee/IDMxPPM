@@ -4,6 +4,7 @@
  */
 
 import { isBase64Encoding, buildDataUri } from './filePathUtils.js';
+import { normalizeIso22263Phase } from './idmSchemaRev14.js';
 import { toIso8601DateTime } from './dateTime.js';
 import { retokenizeHierarchy } from './constraintUtils.js';
 
@@ -127,6 +128,10 @@ const parseFigures = (sectionElement) => {
  * Returns empty string for null/undefined.
  */
 const trimStr = (val) => (val ? val.replace(/[\r\n\t]+/g, ' ').replace(/ {2,}/g, ' ').trim() : '');
+// Like trimStr, but keeps line breaks written as &#10; (literal ones in attributes are already spaces)
+const trimMultiline = (val) => (val
+  ? val.split(/\r\n|\r|\n/).map(l => l.replace(/[\t ]+/g, ' ').trim()).join('\n').trim()
+  : '');
 
 /**
  * Helper: get direct child elements by tag name (namespace-safe).
@@ -258,6 +263,7 @@ const parseIdmElement = (idmRoot, xmlDoc) => {
     if (specId) {
       result.headerData.idmGuid = trimStr(specId.getAttribute('guid'));
       result.headerData.shortTitle = trimStr(specId.getAttribute('shortTitle'));
+      result.headerData.localShortTitle = trimStr(specId.getAttribute('localShortTitle'));
       result.headerData.title = trimStr(specId.getAttribute('fullTitle') || specId.getAttribute('shortTitle'));
       result.headerData.subTitle = trimStr(specId.getAttribute('subTitle'));
       result.headerData.idmCode = trimStr(specId.getAttribute('idmCode'));
@@ -528,6 +534,7 @@ const parseIdmElement = (idmRoot, xmlDoc) => {
       if (ucSpecId) {
         result.headerData.ucGuid = ucSpecId.getAttribute('guid') || '';
         result.headerData.ucShortTitle = ucSpecId.getAttribute('shortTitle') || '';
+        result.headerData.ucFullTitle = ucSpecId.getAttribute('fullTitle') || '';
         result.headerData.ucIdmCode = ucSpecId.getAttribute('idmCode') || '';
         result.headerData.ucSubTitle = ucSpecId.getAttribute('subTitle') || '';
         result.headerData.ucDocumentStatus = ucSpecId.getAttribute('documentStatus') || '';
@@ -590,13 +597,53 @@ const parseIdmElement = (idmRoot, xmlDoc) => {
         }
       }
 
+      // Required resources / competencies (description titles, one per line)
+      const descTitles = (el) => (el ? getDirectChildren(el, 'description').map(d => trimStr(d.getAttribute('title') || d.textContent)).filter(Boolean).join('\n') : '');
+      const reqRes = descTitles(getFirstChild(uc, 'requiredResources'));
+      if (reqRes) result.headerData.requiredResources = reqRes;
+      const reqComp = descTitles(getFirstChild(uc, 'requiredCompetencies'));
+      if (reqComp) result.headerData.requiredCompetencies = reqComp;
+
+      // Target construction entities
+      const constructionEntities = getDirectChildren(uc, 'constructionEntity').map(c => trimStr(c.getAttribute('name'))).filter(Boolean);
+      if (constructionEntities.length > 0) result.headerData.constructionEntities = constructionEntities;
+
+      // Scope and benefit keywords
+      const scopeKeywords = getDirectChildren(uc, 'scopeKeyword').map(k => trimStr(k.textContent)).filter(Boolean);
+      if (scopeKeywords.length > 0) result.headerData.keywords = scopeKeywords;
+      const benefitKeywords = getDirectChildren(uc, 'benefitKeyword').map(k => trimStr(k.textContent)).filter(Boolean);
+      if (benefitKeywords.length > 0) result.headerData.benefitKeywords = benefitKeywords;
+
+      // References (uc/reference) - one per line; basis standards are marked with "[basis] "
+      const ucRefs = getDirectChildren(uc, 'reference').map(r => {
+        const citation = trimStr(r.getAttribute('fullCitation') || r.textContent);
+        if (!citation) return '';
+        return (r.getAttribute('basisStandard') === 'true' ? '[basis] ' : '') + citation;
+      }).filter(Boolean);
+      if (ucRefs.length > 0) result.headerData.references = ucRefs.join('\n');
+
+      // User-defined properties: ISO 29481-1 fields written by this app, others as "name = value" lines
+      const udpFieldMap = {
+        'Preconditions': 'preconditions', 'Postconditions': 'postconditions', 'Triggering Events': 'triggeringEvents',
+        'Required Capabilities': 'requiredCapabilities', 'Compliance Criteria': 'complianceCriteria'
+      };
+      const additional = [];
+      getDirectChildren(uc, 'userDefinedProperty').forEach(p => {
+        const name = trimStr(p.getAttribute('name'));
+        const value = descTitles(p);
+        if (udpFieldMap[name]) result.headerData[udpFieldMap[name]] = value;
+        else if (name || value) additional.push(`${name} = ${value.replace(/\n/g, ' ')}`);
+      });
+      if (additional.length > 0) result.headerData.additionalDescription = additional.join('\n');
+
       // Business rules (uc/businessRule)
       const businessRuleEls = getDirectChildren(uc, 'businessRule');
       if (businessRuleEls.length > 0) {
         result.headerData.businessRules = businessRuleEls.map(parseBusinessRule);
       }
 
-      // Actors - support IDM 2.0 structure with actorType, bpmnShapeName, and subActors
+      // Actors - idmXSD v2.0 Rev 13: actor roles with optional external="true" and subActors
+      // (actorType from earlier drafts is no longer part of the schema and is ignored)
       const actorElements = getDirectChildren(uc, 'actor');
       if (actorElements.length > 0) {
         result.headerData.actorsList = [];
@@ -604,7 +651,8 @@ const parseIdmElement = (idmRoot, xmlDoc) => {
         const parseActor = (actorEl) => {
           const actorId = actorEl.getAttribute('id') || `actor-${Date.now()}`;
           const actorName = actorEl.getAttribute('name') || '';
-          const actorType = actorEl.getAttribute('actorType') || 'group';
+          const externalAttr = (actorEl.getAttribute('external') || '').trim();
+          const external = externalAttr === 'true' || externalAttr === '1';
 
           const bpmnShapeEl = getFirstChild(actorEl, 'bpmnShapeName');
           const bpmnShapeName = bpmnShapeEl ? bpmnShapeEl.textContent.trim() : '';
@@ -651,7 +699,7 @@ const parseIdmElement = (idmRoot, xmlDoc) => {
           return {
             id: actorId,
             name: actorName,
-            actorType,
+            external,
             bpmnShapeName,
             role,
             subActors
@@ -721,78 +769,44 @@ const parseIdmElement = (idmRoot, xmlDoc) => {
         result.headerData.regions = ['international'];
       }
 
-      // Project Stages - support both legacy (standardProjectPhase) and new (standardProjectStage) formats
+      // Project phases - idmXSD v2.0 Rev 13 uses standardProjectPhase/localProjectPhase (ISO 29481-1:2025).
+      // standardProjectStage/localProjectStage from earlier 2.0 drafts are still read.
       result.headerData.projectStagesIso = [];
       result.headerData.projectStages = [];
+      result.headerData.projectStagesAia = [];
+      result.headerData.projectStagesRiba = [];
+      result.headerData.customProjectPhases = [];
 
-      // New format: standardProjectStage
-      const projectStages = getDirectChildren(uc, 'standardProjectStage');
-      projectStages.forEach(stage => {
-        const nameEl = getFirstChild(stage, 'name');
-        const stageValue = nameEl?.textContent?.trim();
-        if (stageValue) {
-          result.headerData.projectStagesIso.push(stageValue.toLowerCase());
-          result.headerData.projectStages.push(stageValue.toLowerCase());
+      const standardPhases = [...getDirectChildren(uc, 'standardProjectPhase'), ...getDirectChildren(uc, 'standardProjectStage')];
+      standardPhases.forEach(phase => {
+        const raw = getFirstChild(phase, 'name')?.textContent?.trim();
+        const mapped = normalizeIso22263Phase(raw);
+        if (mapped && !result.headerData.projectStagesIso.includes(mapped)) {
+          result.headerData.projectStagesIso.push(mapped);
+          result.headerData.projectStages.push(mapped);
         }
       });
 
-      // Legacy format: standardProjectPhase (xPPM uses this)
-      const legacyProjectPhases = getDirectChildren(uc, 'standardProjectPhase');
-      legacyProjectPhases.forEach(phase => {
-        const nameEl = getFirstChild(phase, 'name');
-        const stageValue = nameEl?.textContent?.trim();
-        if (stageValue) {
-          const normalizedStage = stageValue.toLowerCase().replace(/\s+/g, '');
-          const stageMap = {
-            'design': 'design',
-            'production': 'production',
-            'construction': 'production',
-            'handover': 'handover',
-            'operation': 'operation',
-            'inception': 'inception',
-            'brief': 'brief',
-            'end-of-life': 'end-of-life'
-          };
-          const mappedStage = stageMap[normalizedStage] || stageValue.toLowerCase();
-          if (!result.headerData.projectStagesIso.includes(mappedStage)) {
-            result.headerData.projectStagesIso.push(mappedStage);
-            result.headerData.projectStages.push(mappedStage);
-          }
-        }
-      });
-
-      // Also check for localProjectPhase (legacy xPPM)
-      const localProjectPhases = getDirectChildren(uc, 'localProjectPhase');
-      localProjectPhases.forEach(phase => {
-        const nameEl = getFirstChild(phase, 'name');
-        const stageValue = nameEl?.textContent?.trim();
-        if (stageValue && !result.headerData.projectStages.includes(stageValue)) {
-          result.headerData.projectStages.push(stageValue);
-        }
-      });
-
-      // Local project stages (v2.0)
-      const localStages = getDirectChildren(uc, 'localProjectStage');
-      localStages.forEach(stage => {
-        const nameEl = getFirstChild(stage, 'name');
-        const stageName = nameEl?.textContent?.trim();
-        const classification = getFirstChild(stage, 'classification');
+      const localPhases = [...getDirectChildren(uc, 'localProjectPhase'), ...getDirectChildren(uc, 'localProjectStage')];
+      localPhases.forEach((phase, index) => {
+        const phaseName = getFirstChild(phase, 'name')?.textContent?.trim();
+        if (!phaseName) return;
+        const classification = getFirstChild(phase, 'classification');
         const classSystem = classification?.getAttribute('name') || '';
-
-        if (stageName) {
-          if (classSystem.includes('AIA')) {
-            if (!result.headerData.projectStagesAia) result.headerData.projectStagesAia = [];
-            result.headerData.projectStagesAia.push(stageName);
-          } else if (classSystem.includes('RIBA')) {
-            if (!result.headerData.projectStagesRiba) result.headerData.projectStagesRiba = [];
-            result.headerData.projectStagesRiba.push(stageName);
-          }
+        if (/\bAIA\b/.test(classSystem)) {
+          result.headerData.projectStagesAia.push(phaseName);
+        } else if (/\bRIBA\b/.test(classSystem)) {
+          result.headerData.projectStagesRiba.push(phaseName);
+        } else {
+          result.headerData.customProjectPhases.push({
+            id: `custom-phase-${index + 1}`,
+            classificationName: classSystem,
+            phaseName
+          });
         }
       });
 
       // User-defined Project Stages (AIA B101, RIBA Plan of Work, etc.) - legacy
-      result.headerData.projectStagesAia = result.headerData.projectStagesAia || [];
-      result.headerData.projectStagesRiba = result.headerData.projectStagesRiba || [];
 
       const userDefinedStages = getDirectChildren(uc, 'userDefinedProjectStage');
       userDefinedStages.forEach(stage => {
@@ -850,6 +864,8 @@ const parseIdmElement = (idmRoot, xmlDoc) => {
       if (bcmSpecId) {
         result.headerData.bcmGuid = bcmSpecId.getAttribute('guid') || '';
         result.headerData.bcmShortTitle = bcmSpecId.getAttribute('shortTitle') || '';
+        result.headerData.bcmFullTitle = bcmSpecId.getAttribute('fullTitle') || '';
+        result.headerData.bcmLocalDocumentStatus = bcmSpecId.getAttribute('localDocumentStatus') || '';
         result.headerData.bcmIdmCode = bcmSpecId.getAttribute('idmCode') || '';
         result.headerData.bcmSubTitle = bcmSpecId.getAttribute('subTitle') || '';
         result.headerData.bcmDocumentStatus = bcmSpecId.getAttribute('documentStatus') || '';
@@ -1275,6 +1291,7 @@ const parseErElement = (erElement) => {
     er.guid = trimStr(specId.getAttribute('guid'));
     er.shortTitle = trimStr(specId.getAttribute('shortTitle'));
     er.fullTitle = trimStr(specId.getAttribute('fullTitle'));
+    er.version = trimStr(specId.getAttribute('version'));
 
     // Use GUID as the primary id — GUIDs are guaranteed unique per ER.
     // idmCode is NOT unique (different ERs in the same document can share the
@@ -1393,6 +1410,15 @@ const parseErElement = (erElement) => {
     er.constraints.push(parseConstraint(cEl, i));
   });
 
+  // Corresponding exchange view definitions (idmXSD v2.0 Rev 14: correspondingEvd; correspondingMvd before Rev 14 and in v1.0)
+  er.correspondingEvds = [...getDirectChildren(erElement, 'correspondingEvd'), ...getDirectChildren(erElement, 'correspondingMvd')]
+    .map(el => ({
+      basis: trimStr(el.getAttribute('basis')),
+      name: trimStr(el.getAttribute('name')),
+      description: getDirectChildren(el, 'description').map(d => trimStr(d.getAttribute('title'))).filter(Boolean).join('\n')
+    }))
+    .filter(e => e.basis || e.name);
+
   // Parse information units - namespace-safe
   // Skip placeholder IUs that were auto-generated during export for schema compliance
   const infoUnits = getDirectChildren(erElement, 'informationUnit');
@@ -1424,7 +1450,7 @@ const parseInformationUnit = (iuElement) => {
     name: trimStr(iuElement.getAttribute('name')),
     dataType: trimStr(iuElement.getAttribute('dataType')) || 'String',
     isMandatory: iuElement.getAttribute('isMandatory') === 'true',
-    definition: trimStr(iuElement.getAttribute('definition')),
+    definition: trimMultiline(iuElement.getAttribute('definition')),
     definitionFigures: [],
     synonyms: [],
     examples: '',
@@ -1536,7 +1562,10 @@ const parseInformationUnit = (iuElement) => {
       unit.correspondingExternalElements.push({
         id: `CEE-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         basis: m.getAttribute('basis') || 'IFC 4x3 ADD2',
-        name: name
+        name: name,
+        description: getDirectChildren(m, 'description')
+          .map(d => (d.getAttribute('title') || d.textContent || '').trim())
+          .filter(Boolean).join('\n')
       });
     }
   });
@@ -1597,11 +1626,11 @@ export const detectIdmXmlVersion = (content) => {
   const hasV2VersionAttr = /version\s*=\s*["']2\.0["']/.test(content);
 
   // Check for element naming differences
-  // v1.0 uses "standardProjectPhase", v2.0 uses "standardProjectStage"
+  // v1.0 and v2.0 Rev 13+ use "standardProjectPhase"; v2.0 drafts before Rev 13 used "standardProjectStage"
   const hasProjectPhase = content.includes('<standardProjectPhase') || content.includes('standardProjectPhase>');
   const hasProjectStage = content.includes('<standardProjectStage') || content.includes('standardProjectStage>');
 
-  // v1.0 uses "localProjectPhase", v2.0 uses "localProjectStage"
+  // v1.0 and v2.0 Rev 13+ use "localProjectPhase"; v2.0 drafts before Rev 13 used "localProjectStage"
   const hasLocalPhase = content.includes('<localProjectPhase') || content.includes('localProjectPhase>');
   const hasLocalStage = content.includes('<localProjectStage') || content.includes('localProjectStage>');
 
@@ -1610,13 +1639,14 @@ export const detectIdmXmlVersion = (content) => {
   if (hasV2Namespace) result.indicators.push('v2.0 namespace (idmXML/2.0)');
   if (hasV1VersionAttr) result.indicators.push('version="1.0" attribute');
   if (hasV2VersionAttr) result.indicators.push('version="2.0" attribute');
-  if (hasProjectPhase) result.indicators.push('standardProjectPhase element (v1.0)');
-  if (hasProjectStage) result.indicators.push('standardProjectStage element (v2.0)');
-  if (hasLocalPhase) result.indicators.push('localProjectPhase element (v1.0)');
-  if (hasLocalStage) result.indicators.push('localProjectStage element (v2.0)');
+  if (hasProjectPhase) result.indicators.push('standardProjectPhase element (v1.0 or v2.0 Rev 13+)');
+  if (hasProjectStage) result.indicators.push('standardProjectStage element (v2.0 draft, before Rev 13)');
+  if (hasLocalPhase) result.indicators.push('localProjectPhase element (v1.0 or v2.0 Rev 13+)');
+  if (hasLocalStage) result.indicators.push('localProjectStage element (v2.0 draft, before Rev 13)');
 
   // Determine version based on indicators
-  const v1Score = (hasV1Namespace ? 3 : 0) + (hasV1VersionAttr ? 2 : 0) + (hasProjectPhase ? 1 : 0) + (hasLocalPhase ? 1 : 0);
+  // idmXSD v2.0 Rev 13 returned to standardProjectPhase/localProjectPhase, so these names no longer indicate v1.0.
+  const v1Score = (hasV1Namespace ? 3 : 0) + (hasV1VersionAttr ? 2 : 0);
   const v2Score = (hasV2Namespace ? 3 : 0) + (hasV2VersionAttr ? 2 : 0) + (hasProjectStage ? 1 : 0) + (hasLocalStage ? 1 : 0);
 
   if (v1Score > v2Score && v1Score > 0) {

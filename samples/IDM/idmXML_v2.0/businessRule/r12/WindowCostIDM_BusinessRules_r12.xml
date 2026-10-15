@@ -29,12 +29,12 @@
     <region value="international">
       <type>USR</type>
     </region>
-    <standardProjectStage>
+    <standardProjectPhase>
       <name>design</name>
-    </standardProjectStage>
-    <standardProjectStage>
+    </standardProjectPhase>
+    <standardProjectPhase>
       <name>production</name>
-    </standardProjectStage>
+    </standardProjectPhase>
     <businessRule id="BR-1" name="Thermal transmittance of windows">
       <statement>The thermal transmittance (U-value) of a window in the building envelope shall not exceed 1.3 W/(m²·K).</statement>
       <reference>Illustrative energy code, thermal envelope requirements, Table 3</reference>
@@ -57,13 +57,13 @@
       <statement>Every cost estimate shall state its currency and reference date, and the total cost per window type shall equal (unit supply cost + unit installation cost) × (1 + contingency / 100).</statement>
       <reference>Cost estimation procedure, section 6 (illustrative)</reference>
     </businessRule>
-    <actor id="actor-1" name="Architect" actorType="group">
+    <actor id="actor-1" name="Architect">
       <classification id="role-1" name="Design Author"/>
     </actor>
-    <actor id="actor-2" name="Cost Estimator" actorType="group">
+    <actor id="actor-2" name="Cost Estimator">
       <classification id="role-2" name="Cost Engineer"/>
     </actor>
-    <actor id="actor-3" name="Quantity Surveyor" actorType="individual">
+    <actor id="actor-3" name="Quantity Surveyor">
       <classification id="role-3" name="Quantity Surveyor"/>
     </actor>
     <benefits>

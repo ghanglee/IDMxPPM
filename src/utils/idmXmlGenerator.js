@@ -8,6 +8,16 @@
 import { isDataUri, parseDataUri } from './filePathUtils.js';
 import { iuNameMap, resolveIuTokens, normalizeBusinessRule } from './constraintUtils.js';
 import { toIso8601DateTime, hasTimeComponent } from './dateTime.js';
+import { normalizeIso22263Phases, getCorrespondingEvds } from './idmSchemaRev14.js';
+
+// changeLog/@changedBy is an xs:NCName that must match an author/@id (keyref_changedBy),
+// so author ids such as UUIDs (which may start with a digit) are prefixed to form a valid NCName.
+const toNcName = (id) => {
+  const s = String(id || '').trim();
+  if (/^[A-Za-z_][A-Za-z0-9._-]*$/.test(s)) return s;
+  const cleaned = s.replace(/[^A-Za-z0-9._-]/g, '-');
+  return cleaned ? `a-${cleaned}` : '';
+};
 
 // xml:lang values must be BCP 47 tags; anything else is written without a language
 const BCP47_TAG = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$/;
@@ -39,7 +49,10 @@ const escapeXml = (str) => {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
+    .replace(/'/g, '&apos;')
+    // Keep line breaks in attribute values (XML parsers turn literal ones into spaces)
+    .replace(/\r\n|\r|\n/g, '&#10;')
+    .replace(/\t/g, '&#9;');
 };
 
 // Format date for XML
@@ -207,12 +220,19 @@ const generateInformationUnitXml = (unit, indent = '      ') => {
 
     // Corresponding External Elements - per idmXSD V2: basis and name required
     if (hasExternalElements) {
-      unit.correspondingExternalElements.forEach(mapping => {
+      unit.correspondingExternalElements.filter(m => (m?.name || '').trim()).forEach(mapping => {
         // For "Other" schema, use customBasis if available
         const basis = mapping.basis === 'Other' && mapping.customBasis
           ? mapping.customBasis
           : mapping.basis;
-        lines.push(`${indent}  <correspondingExternalElement basis="${escapeXml(basis)}" name="${escapeXml(mapping.name)}"/>`);
+        const mDesc = (mapping.description || '').trim();
+        if (mDesc) {
+          lines.push(`${indent}  <correspondingExternalElement basis="${escapeXml(basis)}" name="${escapeXml(mapping.name)}">`);
+          lines.push(`${indent}    <description title="${escapeXml(mDesc)}"/>`);
+          lines.push(`${indent}  </correspondingExternalElement>`);
+        } else {
+          lines.push(`${indent}  <correspondingExternalElement basis="${escapeXml(basis)}" name="${escapeXml(mapping.name)}"/>`);
+        }
       });
     }
 
@@ -357,9 +377,13 @@ const generateErXml = (er, authorName, indent = '  ', isRoot = true, ctx = {}) =
   // specId
   lines.push(`${indent}  <specId`);
   lines.push(`${indent}    guid="${erGuid}"`);
-  lines.push(`${indent}    shortTitle="${escapeXml(er.name || er.shortTitle || 'ER')}"`);
+  const erShortTitle = (isCodeShortTitle(er.shortTitle) && er.name === er.fullTitle)
+    ? er.shortTitle
+    : (er.name || er.shortTitle || 'ER');
+  lines.push(`${indent}    shortTitle="${escapeXml(erShortTitle)}"`);
   lines.push(`${indent}    fullTitle="${escapeXml(er.fullTitle || er.name || 'Exchange Requirement')}"`);
   lines.push(`${indent}    idmCode="${escapeXml(er.idmCode || `ER-${er.id || Date.now()}`)}"`);
+  lines.push(...optionalSpecIdAttrs({ version: er.version }, `${indent}    `));
   lines.push(`${indent}    documentStatus="${escapeXml(er.documentStatus || 'WD')}"/>`);
 
   // authoring per idmXSD v2.0
@@ -374,12 +398,17 @@ const generateErXml = (er, authorName, indent = '  ', isRoot = true, ctx = {}) =
   // constraint (optional) - idmXSD v2.0 Rev 11 child-element form
   lines.push(...generateConstraintsXml(er.constraints, indent + '  ', ctx));
 
-  // correspondingMvd (optional)
-  if (er.correspondingMvd && er.correspondingMvd.length > 0) {
-    er.correspondingMvd.forEach(mvd => {
-      lines.push(`${indent}  <correspondingMvd basis="${escapeXml(mvd.basis)}" name="${escapeXml(mvd.name)}"/>`);
-    });
-  }
+  // correspondingEvd (optional) - idmXSD v2.0 Rev 14: exchange view definition (formerly correspondingMvd)
+  getCorrespondingEvds(er).filter(e => (e.name || '').trim() || (e.basis || '').trim()).forEach(evd => {
+    const open = `${indent}  <correspondingEvd basis="${escapeXml(evd.basis || '')}" name="${escapeXml(evd.name || '')}"`;
+    if ((evd.description || '').trim()) {
+      lines.push(`${open}>`);
+      lines.push(`${indent}    <description title="${escapeXml(evd.description.trim())}"/>`);
+      lines.push(`${indent}  </correspondingEvd>`);
+    } else {
+      lines.push(`${open}/>`);
+    }
+  });
 
   // description (optional, per idmXSD V2 uses title attribute, with optional image children)
   if (er.description || (er.descriptionFigures && er.descriptionFigures.length > 0)) {
@@ -522,6 +551,14 @@ const generateRootErXml = (erDataMap, headerData, authorName) => {
   return lines.join('\n');
 };
 
+// Optional specId attributes kept from an imported file (written only when non-empty)
+const optionalSpecIdAttrs = (vals, indent) => Object.entries(vals)
+  .filter(([, v]) => v != null && String(v).trim() !== '')
+  .map(([k, v]) => `${indent}${k}="${escapeXml(String(v).trim())}"`);
+
+// idmXML 1.0-style code in shortTitle (ER_xxx, er_xxx, ...) is kept while the ER name is unchanged
+const isCodeShortTitle = (st) => /^(?:er|uc|idm|pm|bcm|req|usecase)_/i.test(st || '');
+
 /**
  * Generate full idmXML document
  *
@@ -565,14 +602,29 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, da
   lines.push('  <specId');
   lines.push(`    guid="${idmGuid}"`);
   lines.push(`    shortTitle="${escapeXml(shortTitle)}"`);
+  // Optional specId attributes (idmXSD v2.0): written only when set
+  const optAttr = (name, value) => { const v = String(value || '').trim(); if (v) lines.push(`    ${name}="${escapeXml(v)}"`); };
+  optAttr('localShortTitle', headerData?.localShortTitle);
   lines.push(`    fullTitle="${escapeXml(title)}"`);
+  optAttr('subTitle', headerData?.subTitle);
   lines.push(`    idmCode="${escapeXml(idmCode)}"`);
+  optAttr('localCode', headerData?.localCode);
   lines.push(`    documentStatus="${escapeXml(status)}"`);
+  optAttr('localDocumentStatus', headerData?.localDocumentStatus);
   lines.push(`    version="${escapeXml(version)}"/>`);
 
   // IDM authoring per idmXSD v2.0 - copyright attribute required, contains changeLog and author elements
   const copyright = headerData?.copyright || `Copyright ${new Date().getFullYear()}`;
   lines.push(`  <authoring copyright="${escapeXml(copyright)}">`);
+
+  // Author ids as written below (NCName); changeLog/@changedBy must refer to one of them
+  const authorIdOf = (authorObj, index) =>
+    toNcName((authorObj && typeof authorObj === 'object' && authorObj.id) || `author-${index + 1}`) || `author-${index + 1}`;
+  const emittedAuthorIds = authorsArray.length > 0 ? authorsArray.map(authorIdOf) : ['author-1'];
+  const resolveChangedBy = (raw) => {
+    const id = toNcName(raw);
+    return emittedAuthorIds.includes(id) ? id : emittedAuthorIds[0];
+  };
 
   // changeLog elements (required per v2.0, at least one)
   // Per schema: id, changeDateTime, changeSummary, changedBy attributes required
@@ -581,7 +633,7 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, da
       const logId = log.id || `log-${index + 1}`;
       const changeDateTime = toIso8601DateTime(log.changeDateTime) || `${creationDate}T00:00:00`;
       const changeSummary = log.changeSummary || 'Initial creation';
-      const changedBy = log.changedBy || 'author-1';
+      const changedBy = resolveChangedBy(log.changedBy);
       lines.push(`    <changeLog id="${escapeXml(logId)}" changeDateTime="${escapeXml(changeDateTime)}" changeSummary="${escapeXml(changeSummary)}" changedBy="${escapeXml(changedBy)}">`);
       // Optional change children
       if (log.changes && log.changes.length > 0) {
@@ -599,11 +651,11 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, da
         ? (hasTimeComponent(entry.date) ? toIso8601DateTime(entry.date) : `${entry.date}T00:00:00`)
         : `${creationDate}T00:00:00`;
       const changeSummary = entry.description || 'Modified';
-      lines.push(`    <changeLog id="${escapeXml(logId)}" changeDateTime="${escapeXml(changeDateTime)}" changeSummary="${escapeXml(changeSummary)}" changedBy="author-1"/>`);
+      lines.push(`    <changeLog id="${escapeXml(logId)}" changeDateTime="${escapeXml(changeDateTime)}" changeSummary="${escapeXml(changeSummary)}" changedBy="${emittedAuthorIds[0]}"/>`);
     });
   } else {
     // Default changeLog entry (required)
-    lines.push(`    <changeLog id="log-1" changeDateTime="${creationDate}T00:00:00" changeSummary="Initial creation" changedBy="author-1"/>`);
+    lines.push(`    <changeLog id="log-1" changeDateTime="${creationDate}T00:00:00" changeSummary="Initial creation" changedBy="${emittedAuthorIds[0]}"/>`);
   }
 
   // author elements per idmXSD v2.0 - id required, contains person or organization
@@ -625,7 +677,7 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, da
     ];
 
     sorted.forEach((authorObj, index) => {
-      const authorId = authorObj?.id || `author-${index + 1}`;
+      const authorId = authorIdOf(authorObj, authorsArray.indexOf(authorObj));
       if (authorObj && typeof authorObj === 'object') {
         lines.push(`    <author id="${escapeXml(authorId)}">`);
         if (authorObj.type === 'person') {
@@ -667,7 +719,7 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, da
         }
         lines.push('    </author>');
       } else if (typeof authorObj === 'string') {
-        lines.push(`    <author id="author-${index + 1}">`);
+        lines.push(`    <author id="${escapeXml(authorId)}">`);
         lines.push(`      <person firstName="${escapeXml(authorObj)}"/>`);
         lines.push('    </author>');
       }
@@ -679,6 +731,12 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, da
     lines.push('    </author>');
   }
 
+  // Publisher (optional, after authors)
+  if (headerData?.publisher && (headerData.publisher.name || '').trim()) {
+    const loc = (headerData.publisher.location || '').trim();
+    lines.push(`    <publisher name="${escapeXml(headerData.publisher.name.trim())}"${loc ? ` location="${escapeXml(loc)}"` : ''}/>`);
+  }
+
   lines.push('  </authoring>');
 
   // Use Case (uc)
@@ -687,17 +745,18 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, da
   // UC specId
   lines.push('    <specId');
   lines.push(`      guid="${ucGuid}"`);
-  lines.push(`      shortTitle="${escapeXml(shortTitle)}"`);
-  lines.push(`      fullTitle="${escapeXml(title)}"`);
-  lines.push(`      idmCode="UC-${idmCode.replace('IDM-', '')}"`);
-  lines.push(`      documentStatus="${escapeXml(status)}"/>`);
+  lines.push(`      shortTitle="${escapeXml(headerData?.ucShortTitle || shortTitle)}"`);
+  lines.push(`      fullTitle="${escapeXml(headerData?.ucFullTitle || title)}"`);
+  lines.push(`      idmCode="${escapeXml(headerData?.ucIdmCode || `UC-${idmCode.replace('IDM-', '')}`)}"`);
+  lines.push(...optionalSpecIdAttrs({ version: headerData?.ucVersion }, '      '));
+  lines.push(`      documentStatus="${escapeXml(headerData?.ucDocumentStatus || status)}"/>`);
 
   // UC authoring per idmXSD v2.0
   lines.push(`    <authoring copyright="${escapeXml(copyright)}">`);
-  lines.push(`      <changeLog id="uc-log-1" changeDateTime="${creationDate}T00:00:00" changeSummary="Initial creation" changedBy="author-1"/>`);
+  lines.push(`      <changeLog id="uc-log-1" changeDateTime="${creationDate}T00:00:00" changeSummary="Initial creation" changedBy="${emittedAuthorIds[0]}"/>`);
   if (authorsArray.length > 0) {
     authorsArray.forEach((authorObj, index) => {
-      const authorId = authorObj?.id || `author-${index + 1}`;
+      const authorId = authorIdOf(authorObj, authorsArray.indexOf(authorObj));
       if (authorObj && typeof authorObj === 'object') {
         lines.push(`      <author id="${escapeXml(authorId)}">`);
         if (authorObj.type === 'person') {
@@ -721,7 +780,13 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, da
           }
         } else if (authorObj.type === 'organization') {
           lines.push(`        <organization name="${escapeXml(authorObj.name || '')}"/>`);
+        } else {
+          lines.push(`        <person firstName="${escapeXml(authorObj.givenName || authorObj.name || 'Unknown')}"/>`);
         }
+        lines.push('      </author>');
+      } else if (typeof authorObj === 'string') {
+        lines.push(`      <author id="${escapeXml(authorId)}">`);
+        lines.push(`        <person firstName="${escapeXml(authorObj)}"/>`);
         lines.push('      </author>');
       }
     });
@@ -803,13 +868,15 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, da
     lines.push('    </region>');
   });
 
-  // Standard Project Stages (required per idmXSD, 1..*)
-  // Use ISO 22263 stages from projectStagesIso, fall back to projectStages, then default
-  const isoStages = Array.isArray(headerData?.projectStagesIso) && headerData.projectStagesIso.length > 0
+  // Standard project phases (required per idmXSD, 1..*) - idmXSD v2.0 Rev 13: standardProjectPhase
+  // Use ISO 22263 phases from projectStagesIso, fall back to projectStages, then default
+  const isoStagesRaw = Array.isArray(headerData?.projectStagesIso) && headerData.projectStagesIso.length > 0
     ? headerData.projectStagesIso
     : (Array.isArray(headerData?.projectStages) && headerData.projectStages.length > 0
       ? headerData.projectStages
-      : ['design']); // Default required value
+      : []);
+  const isoStagesNorm = normalizeIso22263Phases(isoStagesRaw);
+  const isoStages = isoStagesNorm.length > 0 ? isoStagesNorm : ['design']; // Default required value
 
   // Valid standardProjectStage values per idmXSD V2 enum
   const validStagesV2 = ['inception', 'brief', 'design', 'production', 'maintenance', 'demolition'];
@@ -831,8 +898,9 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, da
     'construction': 'production'
   };
 
-  const stdStageElement = 'standardProjectStage';
-  const localStageElement = 'localProjectStage';
+  // idmXSD v2.0 Rev 13: "project phase" as in ISO 29481-1:2025 (was standardProjectStage/localProjectStage)
+  const stdStageElement = 'standardProjectPhase';
+  const localStageElement = 'localProjectPhase';
 
   const emittedStages = new Set();
   isoStages.forEach(stage => {
@@ -845,7 +913,7 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, da
     lines.push(`    </${stdStageElement}>`);
   });
 
-  // Additional Project Stages - AIA B101 (US)
+  // Local project phases - AIA B101 (US)
   if (Array.isArray(headerData?.projectStagesAia) && headerData.projectStagesAia.length > 0) {
     headerData.projectStagesAia.forEach((stage, index) => {
       lines.push(`    <${localStageElement}>`);
@@ -856,7 +924,7 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, da
     });
   }
 
-  // Additional Project Stages - RIBA Plan of Work (UK)
+  // Local project phases - RIBA Plan of Work (UK)
   if (Array.isArray(headerData?.projectStagesRiba) && headerData.projectStagesRiba.length > 0) {
     headerData.projectStagesRiba.forEach((stage, index) => {
       lines.push(`    <${localStageElement}>`);
@@ -867,6 +935,24 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, da
     });
   }
 
+  // Custom project phase classifications (user-defined local project phases)
+  (Array.isArray(headerData?.customProjectPhases) ? headerData.customProjectPhases : []).forEach((phase, index) => {
+    const phaseName = (phase?.phaseName || '').trim();
+    if (!phaseName) return;
+    const classificationName = (phase?.classificationName || '').trim();
+    lines.push(`    <${localStageElement}>`);
+    lines.push(`      <name>${escapeXml(phaseName)}</name>`);
+    if (classificationName) {
+      lines.push(`      <classification id="custom-phase-${index + 1}" name="${escapeXml(classificationName)}"/>`);
+    }
+    lines.push(`    </${localStageElement}>`);
+  });
+
+  // Target construction entities (uc/constructionEntity)
+  (Array.isArray(headerData?.constructionEntities) ? headerData.constructionEntities : [])
+    .map(c => String(c || '').trim()).filter(Boolean)
+    .forEach(name => lines.push(`    <constructionEntity name="${escapeXml(name)}"/>`));
+
   // Business rules (idmXSD v2.0) - after constructionEntity, before actor
   lines.push(...generateBusinessRulesXml(headerData?.businessRules, '    '));
 
@@ -876,14 +962,15 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, da
     headerData.actorsList.forEach((actor, index) => {
       const actorId = actor.id || `actor-${index + 1}`;
       const actorName = actor.name || 'Unnamed Actor';
-      const actorType = actor.actorType || 'group'; // 'group' or 'individual' per IDM 2.0
+      // idmXSD v2.0 Rev 13: an actor is an actor role; external="true" marks an external actor role
+      const externalAttr = actor.external ? ' external="true"' : '';
 
       const hasSubActors = actor.subActors && actor.subActors.length > 0;
       const hasRole = actor.role;
       const hasChildren = hasSubActors || hasRole;
 
       if (hasChildren) {
-        lines.push(`    <actor id="${escapeXml(actorId)}" name="${escapeXml(actorName)}" actorType="${escapeXml(actorType)}">`);
+        lines.push(`    <actor id="${escapeXml(actorId)}" name="${escapeXml(actorName)}"${externalAttr}>`);
 
         // classification for role (per idmXSD V2 - id and name required)
         if (hasRole) {
@@ -907,7 +994,7 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, da
 
         lines.push('    </actor>');
       } else {
-        lines.push(`    <actor id="${escapeXml(actorId)}" name="${escapeXml(actorName)}" actorType="${escapeXml(actorType)}"/>`);
+        lines.push(`    <actor id="${escapeXml(actorId)}" name="${escapeXml(actorName)}"${externalAttr}/>`);
       }
     });
   } else if (headerData?.actors && typeof headerData.actors === 'string') {
@@ -915,7 +1002,7 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, da
     const actorNames = headerData.actors.split(/[,;]/).map(s => s.trim()).filter(Boolean);
     if (actorNames.length > 0) {
       actorNames.forEach((name, index) => {
-        lines.push(`    <actor id="actor-${index + 1}" name="${escapeXml(name)}" actorType="group"/>`);
+        lines.push(`    <actor id="actor-${index + 1}" name="${escapeXml(name)}"/>`);
       });
     }
   }
@@ -955,6 +1042,29 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, da
     lines.push(`      <description title="${escapeXml(headerData.requiredCompetencies)}"/>`);
     lines.push('    </requiredCompetencies>');
   }
+
+  // Scope and benefit keywords (uc/scopeKeyword, uc/benefitKeyword)
+  const keywordList = (v) => (Array.isArray(v) ? v : String(v || '').split(','))
+    .map(k => String(k || '').trim()).filter(Boolean);
+  keywordList(headerData?.keywords).forEach(k => lines.push(`    <scopeKeyword>${escapeXml(k)}</scopeKeyword>`));
+  keywordList(headerData?.benefitKeywords).forEach(k => lines.push(`    <benefitKeyword>${escapeXml(k)}</benefitKeyword>`));
+
+  // References (uc/reference): one per line; a leading "[basis] " marks a basis standard
+  String(headerData?.references || '').split(/\r?\n/).map(r => r.trim()).filter(Boolean).forEach(ref => {
+    const isBasis = /^\[basis\]\s*/i.test(ref);
+    const citation = ref.replace(/^\[basis\]\s*/i, '');
+    lines.push(`    <reference basisStandard="${isBasis ? 'true' : 'false'}" fullCitation="${escapeXml(citation)}"/>`);
+  });
+
+  // Additional description: "name = value" lines become userDefinedProperty elements
+  String(headerData?.additionalDescription || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean).forEach(line => {
+    const m = line.match(/^([^=]+?)\s*=\s*(.*)$/);
+    const name = m ? m[1].trim() : 'Additional description';
+    const value = m ? m[2].trim() : line;
+    lines.push(`    <userDefinedProperty name="${escapeXml(name)}">`);
+    lines.push(`      <description title="${escapeXml(value)}"/>`);
+    lines.push('    </userDefinedProperty>');
+  });
 
   // Additional ISO 29481-1 elements mapped to userDefinedProperty per idmXSD V2
   // (preconditions, postconditions, triggeringEvents, requiredCapabilities, complianceCriteria
@@ -997,10 +1107,12 @@ export const generateIdmXml = ({ headerData, bpmnXml, erDataMap, erHierarchy, da
   // BCM specId
   lines.push('    <specId');
   lines.push(`      guid="${bcmGuid}"`);
-  lines.push(`      shortTitle="Process Map"`);
-  lines.push(`      fullTitle="Business Context Map"`);
-  lines.push(`      idmCode="BCM-${Date.now()}"`);
-  lines.push(`      documentStatus="${escapeXml(status)}"/>`);
+  lines.push(`      shortTitle="${escapeXml(headerData?.bcmShortTitle || 'Process Map')}"`);
+  lines.push(`      fullTitle="${escapeXml(headerData?.bcmFullTitle || 'Business Context Map')}"`);
+  // Stable code: kept from import, otherwise derived from the IDM code (was a timestamp per export)
+  lines.push(`      idmCode="${escapeXml(headerData?.bcmIdmCode || `BCM-${idmCode.replace(/^IDM-/i, '')}`)}"`);
+  lines.push(...optionalSpecIdAttrs({ version: headerData?.bcmVersion }, '      '));
+  lines.push(`      documentStatus="${escapeXml(headerData?.bcmDocumentStatus || status)}"/>`);
 
   // BCM authoring per idmXSD v2.0
   lines.push(`    <authoring copyright="${escapeXml(copyright)}">`);
@@ -1303,8 +1415,9 @@ const v1ErXml = (er, authorsList, creationDate, copyright, indent, isRoot = true
 
   // v1 element order: correspondingMvd → description → informationUnits → subERs
   // Always emit at least one correspondingMvd (empty if none stored)
-  if (er.correspondingMvd && er.correspondingMvd.length > 0) {
-    er.correspondingMvd.forEach(m => lines.push(`${indent}  <correspondingMvd basis="${escapeXmlV1(m.basis)}" name="${escapeXmlV1(m.name)}"/>`));
+  const evdsV1 = getCorrespondingEvds(er);
+  if (evdsV1.length > 0) {
+    evdsV1.forEach(m => lines.push(`${indent}  <correspondingMvd basis="${escapeXmlV1(m.basis)}" name="${escapeXmlV1(m.name)}"/>`));
   } else {
     lines.push(`${indent}  <correspondingMvd basis="" name="" />`);
   }

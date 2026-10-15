@@ -358,6 +358,267 @@ function processIUMappings(iu, entityCandidates, facets) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Hand-authored (non-IDS-imported) information units
+// ---------------------------------------------------------------------------
+
+// IDS 1.0 partOf relations (ids.xsd partOfType/@relation)
+const VALID_PARTOF_RELATIONS = new Set([
+  'IFCRELAGGREGATES',
+  'IFCRELASSIGNSTOGROUP',
+  'IFCRELCONTAINEDINSPATIALSTRUCTURE',
+  'IFCRELNESTS',
+  'IFCRELVOIDSELEMENT',
+  'IFCRELFILLSELEMENT',
+]);
+
+const IFC_ENTITY_RE = /^IFC[A-Z0-9_]+$/;
+
+function isIfcBasis(mapping) {
+  const schema = mapping.basis || mapping.schema || mapping.standard || '';
+  return /ifc/i.test(schema);
+}
+
+/** "IfcWall" → "IFCWALL"; null when the name is not a plain IFC entity name. */
+function toEntityOrNull(name) {
+  const upper = toIdsEntityName((name || '').trim());
+  return upper && IFC_ENTITY_RE.test(upper) ? upper : null;
+}
+
+/** "ObjectType = FireCompartment" → { name: 'ObjectType', value: 'FireCompartment' } */
+function parseAttrCondition(text) {
+  const m = (text || '').match(/^\s*([A-Za-z][A-Za-z0-9_]*)\s*=\s*(.+?)\s*$/);
+  return m ? { name: m[1], value: m[2].replace(/^["']|["']$/g, '') } : null;
+}
+
+/** First non-relationship IFC entity named in a free-text mapping description. */
+function parentEntityFrom(text) {
+  for (const tok of (text || '').match(/Ifc[A-Za-z0-9_]+/gi) || []) {
+    const ent = toEntityOrNull(tok);
+    if (ent && !ent.startsWith('IFCREL')) return ent;
+  }
+  return null;
+}
+
+/**
+ * IFC data type for a hand-authored property facet.
+ * Order: "IFC Data Type:" line in the definition → IU dataType when it is an
+ * IFC defined type (IfcAreaMeasure → IFCAREAMEASURE) → generic DATA_TYPE_MAP.
+ */
+function handAuthoredDataType(iu) {
+  const defMatch = (iu.definition || '').match(/IFC Data Type:\s*(\S+)/i);
+  if (defMatch) return defMatch[1].toUpperCase();
+  const dt = (iu.dataType || '').trim();
+  if (/^Ifc[A-Z][A-Za-z0-9]*$/.test(dt)) return dt.toUpperCase();
+  return DATA_TYPE_MAP[dt] || 'IFCLABEL';
+}
+
+/**
+ * Build one specification per IFC entity from hand-authored IUs.
+ *
+ * - A bare IFC entity mapping (IfcSpace) opens an entity context for the IU and
+ *   its sub-IUs; a description "Attr = Value" on it narrows the applicability.
+ * - "IfcX.Attr" → attribute requirement on IFCX.
+ * - "Pset_X.Prop" → property requirement on the context entity that matches the
+ *   property set (PSET_ENTITY_MAP), otherwise on every context entity.
+ * - IfcRel* mappings → partOf requirement; the parent entity is read from the
+ *   mapping description (e.g. "IfcZone"). Never an applicability entity.
+ * - Non-IFC mappings are ignored (IDS is IFC-bound).
+ */
+function buildEntitySpecs(er, regularIUs) {
+  const groups = new Map();   // key → spec under construction
+  const singleEntityOwners = new Set();   // IUs that map to exactly one IFC entity
+
+  const groupFor = (entity, ownerIU) => {
+    const key = entity || '';
+    if (!groups.has(key)) {
+      groups.set(key, {
+        entity,
+        ownerIUs: [],
+        attributeApplicability: [],
+        facets: [],
+        facetKeys: new Set(),
+      });
+    }
+    const g = groups.get(key);
+    if (ownerIU && !g.ownerIUs.includes(ownerIU)) g.ownerIUs.push(ownerIU);
+    return g;
+  };
+
+  const addFacet = (g, facet, key) => {
+    if (g.facetKeys.has(key)) return;
+    g.facetKeys.add(key);
+    g.facets.push(facet);
+  };
+
+  const visit = (iu, ctx) => {
+    if (!iu) return;
+    const mappings = (iu.correspondingExternalElements || iu.correspondingExternalElement || iu.externalElements || [])
+      .filter(isIfcBasis);
+
+    // 1. Entities this IU stands for (open a new context for sub-IUs)
+    const own = [];
+    for (const m of mappings) {
+      const element = (m.element || m.name || '').trim();
+      if (element.includes('.') || /^ifcrel/i.test(element) || /^ifcmaterial$/i.test(element)) continue;
+      const ent = toEntityOrNull(element);
+      if (!ent) continue;
+      own.push(ent);
+      const g = groupFor(ent, iu);
+      const cond = parseAttrCondition(m.description);
+      if (cond && !g.attributeApplicability.some(a => a.name === cond.name && a.examples === cond.value)) {
+        g.attributeApplicability.push({ name: cond.name, constraints: '', examples: cond.value });
+      }
+    }
+    if (own.length === 1) singleEntityOwners.add(iu);
+    const here = own.length > 0 ? own : ctx;
+
+    // 2. Requirements carried by this IU
+    for (const m of mappings) {
+      const element = (m.element || m.name || '').trim();
+      const isIfcAttribute = m.description === 'IFC Attribute';
+
+      if (/^ifcmaterial$/i.test(element)) {
+        // Material requirement on the context entity, or on the entity named by
+        // this IU's own "IfcX.Attr" mappings (e.g. IfcWindowType.ConstructionType)
+        const targets = here.length > 0 ? here : mappings
+          .map(o => (o.element || o.name || '').trim())
+          .filter(e => e.includes('.') && /^ifc/i.test(e))
+          .map(e => toEntityOrNull(e.substring(0, e.indexOf('.'))))
+          .filter(Boolean);
+        for (const ent of [...new Set(targets)]) {
+          addFacet(groupFor(ent, iu), {
+            type: 'material',
+            constraints: constraintStr(iu.constraints),
+            examples: '',
+            cardinality: resolveCardinality(iu),
+            uri: null,
+            instructions: extractInstructions(iu) || null,
+          }, 'material');
+        }
+        continue;
+      }
+
+      if (/^ifcrel/i.test(element) && !element.includes('.')) {
+        const relation = element.toUpperCase();
+        const parent = parentEntityFrom(m.description);
+        if (!VALID_PARTOF_RELATIONS.has(relation) || !parent) continue;
+        if (!iu.isMandatory) continue;      // partOf cardinality is required|prohibited only
+        for (const ent of here) {
+          if (ent === parent) continue;
+          addFacet(groupFor(ent), {
+            type: 'partOf',
+            relation,
+            parentEntity: parent,
+            parentPredefinedType: '',
+            cardinality: 'required',
+            instructions: extractInstructions(iu) || null,
+          }, `partOf|${relation}|${parent}`);
+        }
+        continue;
+      }
+
+      if (element.includes('.')) {
+        const dot = element.indexOf('.');
+        const left = element.substring(0, dot);
+        const right = element.substring(dot + 1);
+        const attrFacet = (name) => ({
+          type: 'attribute',
+          name,
+          cardinality: resolveCardinality(iu),
+          instructions: extractInstructions(iu),
+          constraints: constraintStr(iu.constraints),
+          examples: '',   // IDM examples are illustrative, not required values
+          dataTypeRaw: null,
+        });
+
+        if (isIfcAttribute || /^ifc/i.test(left)) {
+          const ent = toEntityOrNull(left);
+          if (!ent) continue;
+          addFacet(groupFor(ent, iu), attrFacet(right), `attr|${right}`);
+          continue;
+        }
+
+        // Property set / quantity set
+        const hint = PSET_ENTITY_MAP[left] || null;
+        let targets;
+        if (hint && here.includes(hint)) targets = [hint];
+        else if (here.length > 0) targets = here;
+        else if (hint) targets = [hint];
+        else targets = [null];
+        const uri = (m.description && m.description.startsWith('http')) ? m.description : (m.uri || '');
+        for (const ent of targets) {
+          addFacet(groupFor(ent, iu), {
+            type: 'property',
+            propertySet: left,
+            propertySets: [left],
+            baseName: right,
+            dataType: handAuthoredDataType(iu),
+            dataTypeRaw: null,
+            cardinality: resolveCardinality(iu),
+            instructions: extractInstructions(iu),
+            uri,
+            constraints: constraintStr(iu.constraints),
+            examples: '',   // IDM examples are illustrative, not required values
+          }, `prop|${left}|${right}`);
+        }
+        continue;
+      }
+
+      if (isIfcAttribute && here.length > 0) {
+        for (const ent of here) {
+          addFacet(groupFor(ent), {
+            type: 'attribute',
+            name: element,
+            cardinality: resolveCardinality(iu),
+            instructions: extractInstructions(iu),
+            constraints: constraintStr(iu.constraints),
+            examples: '',   // IDM examples are illustrative, not required values
+            dataTypeRaw: null,
+          }, `attr|${element}`);
+        }
+      }
+    }
+
+    for (const sub of (iu.subInformationUnits || iu.children || [])) visit(sub, here);
+  };
+
+  for (const iu of regularIUs) visit(iu, []);
+
+  const specs = [];
+  const erName = er.name || 'Unnamed';
+  for (const g of groups.values()) {
+    const owner = g.ownerIUs[0] || null;
+    // A mandatory IU that maps to exactly one IFC entity requires that entity to
+    // exist (applicability minOccurs="1"), even when it carries no further facets.
+    const requiresEntity = !!(owner && owner.isMandatory && singleEntityOwners.has(owner) && g.entity);
+    if (g.facets.length === 0 && !requiresEntity) continue;
+    const shared = owner && regularIUs.length > 0 &&
+      [...groups.values()].filter(o => o.ownerIUs[0] === owner).length > 1;
+    let name = owner ? `${erName}: ${owner.name || owner.id}` : erName;
+    if (g.entity && (shared || !owner)) name += ` (${g.entity})`;
+    const baseId = owner ? (owner.id || '') : (er.guid || er.id || '');
+    specs.push({
+      entities: g.entity ? [g.entity] : [],
+      predefinedType: '',
+      minOccurs: requiresEntity ? 1 : 0,
+      maxOccurs: 'unbounded',
+      specIfcVersion: null,
+      materialApplicability: [],
+      classificationApplicability: [],
+      propertyApplicability: [],
+      attributeApplicability: g.attributeApplicability,
+      partOfApplicability: [],
+      facets: g.facets,
+      entityRequirement: g.facets.length === 0,   // existence check only
+      name,
+      description: ((owner && owner.definition) || er.description || er.definition || '').split('\n')[0],
+      id: baseId && g.entity && shared ? `${baseId}-${g.entity}` : baseId,
+    });
+  }
+  return specs;
+}
+
 /**
  * Collect all ERs (with IUs) from the hierarchy, flattened
  */
@@ -384,7 +645,10 @@ function analyzeERForSpecs(er) {
   const regularIUs = [];
 
   for (const iu of ius) {
-    if (iu.dataType === 'Structured' && iu.subInformationUnits && iu.subInformationUnits.length > 0) {
+    // IDS-imported specs carry _idsApplicability; keep them on this path even when the
+    // source specification had no requirement facets other than an entity facet.
+    const hasSubs = iu.subInformationUnits && iu.subInformationUnits.length > 0;
+    if (iu.dataType === 'Structured' && (hasSubs || iu._idsApplicability)) {
       const entityCandidates = new Set();
       const facets = [];
 
@@ -421,7 +685,7 @@ function analyzeERForSpecs(er) {
       }
 
       // Process sub-IUs as facets (also contributes to entityCandidates via pset lookup)
-      for (const subIU of iu.subInformationUnits) {
+      for (const subIU of (iu.subInformationUnits || [])) {
         processIUMappings(subIU, entityCandidates, facets);
       }
 
@@ -453,6 +717,8 @@ function analyzeERForSpecs(er) {
           specInstructions: '_idsSpecInstructions' in iu ? iu._idsSpecInstructions : null,
           requirementsDescription: '_idsRequirementsDescription' in iu ? iu._idsRequirementsDescription : null,
           entityRequirementsInstructions: '_idsEntityRequirementsInstructions' in iu ? iu._idsEntityRequirementsInstructions : null,
+          // No other facets: the source requirements held only an entity facet
+          entityRequirement: facets.length === 0,
         });
       }
     } else {
@@ -460,27 +726,9 @@ function analyzeERForSpecs(er) {
     }
   }
 
-  // Legacy: pool remaining regular IUs into one spec
+  // Hand-authored IUs: one specification per IFC entity (see buildEntitySpecs)
   if (regularIUs.length > 0) {
-    const entityCandidates = new Set();
-    const facets = [];
-    for (const iu of regularIUs) {
-      processIUMappings(iu, entityCandidates, facets);
-    }
-    if (facets.length > 0) {
-      const entityArr = Array.from(entityCandidates);
-      specs.push({
-        entities: entityArr,
-        predefinedType: '',
-        minOccurs: 0,
-        specIfcVersion: null,
-        materialApplicability: [],
-        facets,
-        name: er.name || 'Unnamed',
-        description: ((er.description || er.definition || '')).split('\n')[0],
-        id: er.guid || er.id || '',
-      });
-    }
+    specs.push(...buildEntitySpecs(er, regularIUs));
   }
 
   return specs;
@@ -674,15 +922,17 @@ export function generateIdsXml({ headerData, erHierarchy: rawErHierarchy, ifcVer
       xml += `      </ids:applicability>\n`;
 
       // Requirements
-      if (spec.facets.length > 0 || spec.entityRequirementsInstructions) {
+      if (spec.facets.length > 0 || spec.entityRequirementsInstructions || spec.entityRequirement) {
         const reqDesc = spec.requirementsDescription;
         xml += `      <ids:requirements`;
         if (reqDesc) xml += ` description="${escapeXml(reqDesc)}"`;
         xml += `>\n`;
 
         // Entity in requirements (carries instructions for IFC authors; entity name mirrors applicability)
-        if (spec.entityRequirementsInstructions && spec.entities && spec.entities.length > 0) {
-          xml += `        <ids:entity instructions="${escapeXml(spec.entityRequirementsInstructions)}">\n`;
+        if ((spec.entityRequirementsInstructions || spec.entityRequirement) && spec.entities && spec.entities.length > 0) {
+          xml += spec.entityRequirementsInstructions
+            ? `        <ids:entity instructions="${escapeXml(spec.entityRequirementsInstructions)}">\n`
+            : `        <ids:entity>\n`;
           xml += `          <ids:name>\n`;
           if (spec.entities.length === 1) {
             xml += `            <ids:simpleValue>${spec.entities[0]}</ids:simpleValue>\n`;

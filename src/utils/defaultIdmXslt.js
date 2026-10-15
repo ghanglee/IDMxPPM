@@ -339,11 +339,11 @@ export const defaultIdmXslt = `<?xml version="1.0" encoding="UTF-8"?>
       </div>
     </xsl:if>
 
-    <!-- Project Stages -->
-    <xsl:if test="idm:standardProjectStage | standardProjectStage">
+    <!-- Project Phases (idmXSD v2.0 Rev 13: standardProjectPhase; standardProjectStage in earlier 2.0 drafts) -->
+    <xsl:if test="idm:standardProjectPhase | standardProjectPhase | idm:standardProjectStage | standardProjectStage">
       <div class="section">
-        <h3>Project Stages (ISO 22263)</h3>
-        <xsl:for-each select="idm:standardProjectStage | standardProjectStage">
+        <h3>Project Phases (ISO 22263)</h3>
+        <xsl:for-each select="idm:standardProjectPhase | standardProjectPhase | idm:standardProjectStage | standardProjectStage">
           <span class="tag"><xsl:value-of select="idm:name | name"/></span>
         </xsl:for-each>
       </div>
@@ -367,6 +367,9 @@ export const defaultIdmXslt = `<?xml version="1.0" encoding="UTF-8"?>
           <xsl:for-each select="idm:actor | actor">
             <li>
               <strong><xsl:value-of select="@name"/></strong>
+              <xsl:if test="@external = 'true' or @external = '1'">
+                <xsl:text> (external actor role)</xsl:text>
+              </xsl:if>
               <xsl:if test="idm:classification | classification">
                 <xsl:text> - </xsl:text>
                 <xsl:value-of select="idm:classification/@name | classification/@name"/>

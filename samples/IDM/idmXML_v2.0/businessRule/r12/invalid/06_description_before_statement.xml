@@ -29,9 +29,9 @@
     <region value="international">
       <type>USR</type>
     </region>
-    <standardProjectStage>
+    <standardProjectPhase>
       <name>design</name>
-    </standardProjectStage>
+    </standardProjectPhase>
     <businessRule id="BR-01" name="Minimum ceiling height of habitable rooms">
       <description title="Commentary"/>
       <statement>The clear ceiling height of a habitable room shall be at least 2.2 m.</statement>

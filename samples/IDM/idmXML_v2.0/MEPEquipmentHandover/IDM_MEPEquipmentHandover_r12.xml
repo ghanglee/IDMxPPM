@@ -37,7 +37,7 @@
     <region value="KR">
       <type>country</type>
     </region>
-    <standardProjectStage>
+    <standardProjectPhase>
       <name>production</name>
       <outcomes>
         <description title="Verified asset register accepted by the owner."/>
@@ -46,16 +46,16 @@
         <description title="MEP asset handover data as defined in the exchange requirement."/>
         <associatedEr ref="b7e41d09-2c6a-4f3b-8e52-000000000004"/>
       </informationRequirements>
-    </standardProjectStage>
-    <standardProjectStage>
+    </standardProjectPhase>
+    <standardProjectPhase>
       <name>maintenance</name>
       <outcomes>
         <description title="CMMS populated with equipment, warranties and planned maintenance tasks."/>
       </outcomes>
-    </standardProjectStage>
-    <localProjectStage>
+    </standardProjectPhase>
+    <localProjectPhase>
       <name>Completion and handover (준공 및 인계)</name>
-    </localProjectStage>
+    </localProjectPhase>
     <constructionEntity name="Hospital"/>
     <constructionEntity name="University campus building"/>
     <businessRule id="BR-HO-01" name="Asset tag format and uniqueness">
@@ -86,11 +86,11 @@
       <statement>Every equipment type shall have at least one planned maintenance task with a frequency greater than zero.</statement>
       <reference>ISO 19650-3:2020, 5.6 (illustrative)</reference>
     </businessRule>
-    <actor id="actor-mepc" name="MEP contractor" actorType="group">
+    <actor id="actor-mepc" name="MEP contractor">
       <subActor id="actor-mepc-cm" name="Commissioning manager"/>
       <subActor id="actor-mepc-im" name="Information manager"/>
     </actor>
-    <actor id="actor-own" name="Owner / facility manager" actorType="group">
+    <actor id="actor-own" name="Owner / facility manager">
       <subActor id="actor-own-fm" name="CMMS administrator"/>
     </actor>
     <benefits>
@@ -300,8 +300,8 @@ ASK {  # true = violation (format or duplicate)
       <associatedInformationUnit ref="IU-052"/>
       <description title="count(IU-05 per equipment type WHERE IU-052 &gt; 0) &gt;= 1"/>
     </constraint>
-    <correspondingMvd basis="COBie 2.4" name="COBie"/>
-    <correspondingMvd basis="IFC4.3" name="IFC4.3 Reference View"/>
+    <correspondingEvd basis="COBie 2.4" name="COBie"/>
+    <correspondingEvd basis="IFC4.3" name="IFC4.3 Reference View"/>
     <description title="Equipment asset data the MEP contractor delivers at handover."/>
     <informationUnit id="IU-01" name="Facility" dataType="IfcFacility" isMandatory="true" definition="The facility being handed over.">
       <correspondingExternalElement basis="COBie 2.4" name="Facility"/>

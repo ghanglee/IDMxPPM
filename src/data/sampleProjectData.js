@@ -260,10 +260,10 @@ This manual does not prescribe specific software tools, proprietary data formats
   requiredCapabilities: "",
   complianceCriteria: "",
   actorsList: [
-    // Pools (Participants) represent groups/organizations for external exchanges
+    // Pools (Participants) represent actors (actor roles)
     // Lanes within Pools represent individuals for internal exchanges
-    { id: "actor-Participant_Sender", name: "Sender", role: "", actorType: "group", bpmnId: "Participant_Sender", bpmnShapeName: "Sender", subActors: [] },
-    { id: "actor-Participant_Receiver", name: "Receiver", role: "", actorType: "group", bpmnId: "Participant_Receiver", bpmnShapeName: "Receiver", subActors: [] }
+    { id: "actor-Participant_Sender", name: "Sender", role: "", bpmnId: "Participant_Sender", bpmnShapeName: "Sender", subActors: [] },
+    { id: "actor-Participant_Receiver", name: "Receiver", role: "", bpmnId: "Participant_Receiver", bpmnShapeName: "Receiver", subActors: [] }
   ]
 };
 

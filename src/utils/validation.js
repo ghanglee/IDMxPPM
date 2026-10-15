@@ -155,14 +155,14 @@ export const validateIdmXsdCompliance = (headerData) => {
     });
   }
 
-  // standardProjectStage - required per idmXSD (1..*)
+  // standardProjectPhase - required per idmXSD (1..*)
   const projectStages = headerData?.projectStagesIso || headerData?.projectStages || [];
   if (!Array.isArray(projectStages) || projectStages.length === 0) {
     errors.push({
       category: 'useCase',
       field: 'projectStagesIso',
       path: 'useCase.projectStagesIso',
-      message: 'At least one ISO 22263 Project Stage is required for idmXSD compliance',
+      message: 'At least one ISO 22263 project phase is required for idmXSD compliance',
       severity: 'warning' // Warning because generator will add default
     });
   }
