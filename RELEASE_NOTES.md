@@ -1,6 +1,13 @@
 # IDMxPPM neo-Seoul — Release Notes
 
-## Unreleased — idmXSD v2.0 Revisions 13–14
+## v1.7.0 (2026-10-15)
+
+### Highlights
+
+- **idmXSD v2.0 Revisions 13–14** — Project phases, external actor roles and exchange view definitions (EVDs) follow ISO 29481-1:2025.
+- **New startup sample** — An extended Fire Safety Design Review project that covers the idmXSD v2.0 features up to Rev 14.
+- **IDS export rework** — One IDS specification per IFC entity, IFC data types, *part of* relations and applicability conditions.
+- **idmXML 2.0 round trip** — Use case fields, specId details, mapping descriptions and line breaks in definitions are no longer lost.
 
 ### Schema alignment (ISO 29481-1:2025)
 
