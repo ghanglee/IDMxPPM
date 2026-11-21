@@ -24,6 +24,8 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js')
     },
     titleBarStyle: 'hiddenInset',
+    // Pin the macOS window buttons inside the 30px title bar so they never reach the menu bar below
+    ...(process.platform === 'darwin' ? { trafficLightPosition: { x: 16, y: 8 } } : {}),
     backgroundColor: '#0f172a'
   });
 

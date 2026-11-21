@@ -14,8 +14,8 @@
 }
 
 .spec-name-bar-left {
-  /* Space for Mac window buttons (close, minimize, maximize) */
-  width: 78px;
+  /* Space for Mac window buttons (close, minimize, maximize); wider than the classic 78px for newer macOS */
+  width: 96px;
   flex-shrink: 0;
 }
 
