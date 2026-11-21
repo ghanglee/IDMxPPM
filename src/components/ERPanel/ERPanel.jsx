@@ -6,6 +6,12 @@ import { parseErElement } from '../../utils/idmXmlParser';
 import { collectConstraints, constraintsReferencingIUs, iuSubtreeIdsById, resolveIuTokens, iuNameMap } from '../../utils/constraintUtils';
 import { getCorrespondingEvds } from '../../utils/idmSchemaRev14';
 import {
+  BUILTIN_SCHEMAS, OTHER_SCHEMA, mergeSchemaOptions, detectCustomBases, countSchemaUsage, resolveMappingBasis,
+  searchCustomSchema, loadSchemaLibrary, saveSchemaLibrary, schemaKey
+} from '../../utils/mappingSchemas';
+import MappingSchemaModal from './MappingSchemaModal';
+import { createPortal } from 'react-dom';
+import {
   DataObjectIcon,
   InfoUnitIcon,
   AddIcon,
@@ -87,16 +93,8 @@ class SearchErrorBoundary extends Component {
 }
 
 // External schema options (with search support)
-const SCHEMA_OPTIONS = [
-  { value: 'bSDD', label: 'bSDD', searchable: true, apiEnabled: true },
-  { value: 'IFC 2x3', label: 'IFC 2x3', searchable: true },
-  { value: 'IFC 4x3 ADD2', label: 'IFC 4x3 ADD2', searchable: true },
-  { value: 'CityGML', label: 'CityGML', searchable: true },
-  { value: 'UniFormat', label: 'UniFormat', searchable: true },
-  { value: 'OmniClass', label: 'OmniClass', searchable: true },
-  { value: 'MasterFormat', label: 'MasterFormat', searchable: true },
-  { value: 'Other', label: 'Other', searchable: false }
-];
+// Built-in mapping schemas; custom schemas (project, library, detected) are merged in the component.
+const BUILTIN_SCHEMA_OPTIONS = BUILTIN_SCHEMAS;
 
 // Generate unique ID
 const uuid = () => crypto.randomUUID?.() || `IU-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -294,6 +292,9 @@ const ERPanel = ({
   onClearNewlyAddedErId,         // Callback to clear newly added ER ID after scrolling
   businessRules = [],            // uc/businessRule entries (headerData.businessRules), shown as a count
   onOpenBusinessRules,           // Callback to open the Business Rules dialog (optionally focused on an IU id)
+  mappingSchemas = [],           // Custom mapping schemas of the project (headerData.mappingSchemas)
+  onAddMappingSchema,            // (schema) => add a custom mapping schema to the project
+  onRemoveMappingSchema,         // (name) => remove a custom mapping schema from the project
 
   // Legacy props (for backward compatibility during migration)
   mode = 'detail',
@@ -314,6 +315,153 @@ const ERPanel = ({
   // Determine if using ER-first mode or legacy mode
   // ER-first mode is active when we have an ER hierarchy OR when a specific ER is selected
   const isErFirstMode = (erHierarchy?.length ?? 0) > 0 || selectedErId !== null;
+
+  // ── Mapping schemas: built-in + project + user library + detected from existing mappings ──
+  const [schemaLibrary, setSchemaLibrary] = useState(() => loadSchemaLibrary());
+  const [schemaModal, setSchemaModal] = useState(null); // { apply: (basis) => void } | null
+  const detectedSchemaNames = useMemo(() => detectCustomBases(erHierarchy), [erHierarchy]);
+  const SCHEMA_OPTIONS = useMemo(
+    () => mergeSchemaOptions(mappingSchemas, schemaLibrary, detectedSchemaNames),
+    [mappingSchemas, schemaLibrary, detectedSchemaNames]
+  );
+  const schemaOptionOf = useCallback((basis) => SCHEMA_OPTIONS.find(o => o.value === basis) || null, [SCHEMA_OPTIONS]);
+  const datalistIdOf = (opt) => (opt?.custom && opt.elements?.length ? `er-schema-els-${schemaKey(opt.value)}` : undefined);
+
+  const handleAddSchema = useCallback((schema, { saveToLibrary } = {}) => {
+    onAddMappingSchema?.(schema);
+    if (saveToLibrary) {
+      setSchemaLibrary(prev => {
+        const next = [...prev.filter(s => schemaKey(s.value) !== schemaKey(schema.value)), schema];
+        saveSchemaLibrary(next);
+        return next;
+      });
+    }
+    schemaModal?.apply?.(schema.value);
+    setSchemaModal(null);
+  }, [onAddMappingSchema, schemaModal]);
+
+  const handleRemoveSchema = useCallback((name, scope) => {
+    if (scope === 'library') {
+      setSchemaLibrary(prev => {
+        const next = prev.filter(s => schemaKey(s.value) !== schemaKey(name));
+        saveSchemaLibrary(next);
+        return next;
+      });
+    } else {
+      onRemoveMappingSchema?.(name);
+    }
+  }, [onRemoveMappingSchema]);
+
+  /**
+   * One external mapping row (basis selector, custom name, element name, search, remove).
+   * Shared by the IU card editor and the IU detail editor.
+   */
+  const renderMappingRow = (mapping, { update, remove, openSearch }) => {
+    const basis = resolveMappingBasis(mapping, SCHEMA_OPTIONS) || 'bSDD';
+    const opt = schemaOptionOf(basis);
+    // An unknown basis is shown as Other with the basis as the standard name (fallback; detected schemas normally cover it)
+    const isKnownBasis = !!opt;
+    const isOther = basis === OTHER_SCHEMA || !isKnownBasis;
+    const isSearchable = !isOther && !!opt?.searchable;
+    const isClassification = ['UniFormat', 'OmniClass', 'MasterFormat'].includes(basis);
+    const listId = datalistIdOf(opt) && `${datalistIdOf(opt)}-${mapping.id}`;
+    const onBasisChange = (newBasis) => {
+      if (newBasis === '__add_schema__') {
+        setSchemaModal({ mappingId: mapping.id, apply: (b) => update(mapping.id, { basis: b, customBasis: '' }) });
+        return;
+      }
+      const chosen = schemaOptionOf(newBasis);
+      if (chosen?.source === 'library' && onAddMappingSchema) {
+        // keep the project self-contained: copy the library schema into the project
+        const { source, custom, searchable, ...plain } = chosen;
+        onAddMappingSchema(plain);
+      }
+      if (newBasis === OTHER_SCHEMA) {
+        if (isKnownBasis) update(mapping.id, { basis: newBasis });
+      } else if (mapping.basis === OTHER_SCHEMA && schemaKey(mapping.customBasis) === schemaKey(newBasis)) {
+        update(mapping.id, { basis: newBasis, customBasis: '' });
+      } else {
+        update(mapping.id, { basis: newBasis, name: '', description: '', customBasis: '' });
+      }
+    };
+    return (
+      <div key={mapping.id} className={`er-mapping-row ${isOther ? 'er-mapping-row-other' : ''}`}>
+        <select
+          value={isKnownBasis ? basis : OTHER_SCHEMA}
+          onChange={(e) => onBasisChange(e.target.value)}
+          className="er-select-small er-select-schema"
+          title={opt?.description || opt?.value || ''}
+        >
+          {SCHEMA_OPTIONS.filter(o => o.value !== OTHER_SCHEMA).map(o => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+          <option value={OTHER_SCHEMA}>Other</option>
+          <option value="__add_schema__">+ Add schema…</option>
+        </select>
+        {isOther && (
+          <input
+            type="text"
+            value={mapping.customBasis || (isKnownBasis ? '' : mapping.basis)}
+            onChange={(e) => update(mapping.id, { basis: OTHER_SCHEMA, customBasis: e.target.value })}
+            placeholder="Standard name"
+            className="er-input-small er-input-custom-schema"
+          />
+        )}
+        <div className="er-mapping-value">
+          <input
+            type="text"
+            ref={(el) => { mappingInputRefs.current[mapping.id] = el; }}
+            value={mapping.name || ''}
+            list={listId}
+            onChange={(e) => {
+              const name = e.target.value;
+              const hit = opt?.elements?.find(x => x.name === name);
+              update(mapping.id, hit?.description && !mapping.description ? { name, description: hit.description } : { name });
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && isSearchable) {
+                e.preventDefault();
+                openSearch(basis);
+              }
+            }}
+            placeholder={opt?.placeholder || (isOther ? 'Element name' : (isSearchable ? 'Click search or enter manually' : 'Enter element name'))}
+            className="er-input-small er-input-mapping"
+            title={mapping.description || mapping.name || ''}
+          />
+          {mapping.description && isClassification && (
+            <span className="er-mapping-desc" title={mapping.description}>
+              {mapping.description}
+            </span>
+          )}
+        </div>
+        {isSearchable && (
+          <button
+            className="er-search-btn"
+            onClick={() => openSearch(basis)}
+            title={mapping.name ? 'Change mapping' : 'Search schema'}
+          >
+            <SearchIcon size={14} />
+          </button>
+        )}
+        <button className="er-remove-btn" onClick={() => remove(mapping.id)}>×</button>
+        {listId && (
+          <datalist id={listId}>
+            {opt.elements.map(x => <option key={x.name} value={x.name}>{x.description || ''}</option>)}
+          </datalist>
+        )}
+        {schemaModal?.mappingId === mapping.id && createPortal(
+          <MappingSchemaModal
+            options={SCHEMA_OPTIONS}
+            usageCount={(name) => countSchemaUsage(erHierarchy, name)}
+            onAdd={handleAddSchema}
+            onRemove={handleRemoveSchema}
+            onClose={() => setSchemaModal(null)}
+          />,
+          document.body
+        )}
+      </div>
+    );
+  };
 
   // ER-level constraints grouped by the information units they reference
   const constraintsByIu = useMemo(() => {
@@ -1961,7 +2109,11 @@ const ERPanel = ({
       let results = [];
       let searchError = null;
 
-      if (schemaOption?.apiEnabled && schema === 'bSDD') {
+      if (schemaOption?.custom) {
+        // Custom schema (e.g. BCF 3.0): local search in its element list
+        setMappingSearchNote(null);
+        results = searchCustomSchema(schemaOption, query, matchType);
+      } else if (schemaOption?.apiEnabled && schema === 'bSDD') {
         try {
           const onStep = (step) => {
             if (requestId === searchRequestIdRef.current) setMappingSearchStep(step);
@@ -2074,7 +2226,7 @@ const ERPanel = ({
         setMappingSearchStep(null);
       }
     }
-  }, [cancelSearch, startRateLimitCountdown]);
+  }, [cancelSearch, startRateLimitCountdown, SCHEMA_OPTIONS]);
 
   // Normalize a basis string to the closest SCHEMA_OPTIONS value.
   // Handles legacy strings like "IFC4x3 ADD2" → "IFC 4x3 ADD2" by comparing
@@ -2087,7 +2239,7 @@ const ERPanel = ({
     if (stripped === 'ifc2x3' || stripped === 'ifc2') return 'IFC 2x3';
     const match = SCHEMA_OPTIONS.find(s => s.value.replace(/\s/g, '').toLowerCase() === stripped);
     return match?.value || 'bSDD';
-  }, []);
+  }, [SCHEMA_OPTIONS]);
 
   // Open mapping search modal
   // If mappingId is provided, we're updating an existing mapping; otherwise adding a new one
@@ -2811,74 +2963,11 @@ const ERPanel = ({
                 <p className="er-empty-small">No mappings defined</p>
               ) : (
                 <div className="er-mapping-list">
-                  {(unit.correspondingExternalElements || []).map(mapping => {
-                    const schemaOption = SCHEMA_OPTIONS.find(s => s.value === mapping.basis);
-                    const isSearchable = mapping.basis !== 'Other';
-                    const isOther = mapping.basis === 'Other';
-                    const isClassification = ['UniFormat', 'OmniClass', 'MasterFormat'].includes(mapping.basis);
-
-                    return (
-                      <div key={mapping.id} className={`er-mapping-row ${isOther ? 'er-mapping-row-other' : ''}`}>
-                        <select
-                          value={mapping.basis || 'bSDD'}
-                          onChange={(e) => {
-                            const newBasis = e.target.value;
-                            if (newBasis === 'Other') {
-                              updateMapping(unit.id, mapping.id, { basis: newBasis });
-                            } else {
-                              updateMapping(unit.id, mapping.id, { basis: newBasis, name: '', description: '', customBasis: '' });
-                            }
-                          }}
-                          className="er-select-small er-select-schema"
-                        >
-                          {SCHEMA_OPTIONS.map(opt => (
-                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                          ))}
-                        </select>
-                        {isOther && (
-                          <input
-                            type="text"
-                            value={mapping.customBasis || ''}
-                            onChange={(e) => updateMapping(unit.id, mapping.id, { customBasis: e.target.value })}
-                            placeholder="Standard name"
-                            className="er-input-small er-input-custom-schema"
-                          />
-                        )}
-                        <div className="er-mapping-value">
-                          <input
-                            type="text"
-                            ref={(el) => { mappingInputRefs.current[mapping.id] = el; }}
-                            value={mapping.name || ''}
-                            onChange={(e) => updateMapping(unit.id, mapping.id, { name: e.target.value })}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' && isSearchable) {
-                                e.preventDefault();
-                                openMappingSearch(unit.id, mapping.basis, mapping.id);
-                              }
-                            }}
-                            placeholder={isOther ? "Element name" : (isSearchable ? "Click search or enter manually" : "Enter element name")}
-                            className="er-input-small er-input-mapping"
-                            title={mapping.description || mapping.name || ''}
-                          />
-                          {mapping.description && isClassification && (
-                            <span className="er-mapping-desc" title={mapping.description}>
-                              {mapping.description}
-                            </span>
-                          )}
-                        </div>
-                        {isSearchable && (
-                          <button
-                            className="er-search-btn"
-                            onClick={() => openMappingSearch(unit.id, mapping.basis, mapping.id)}
-                            title={mapping.name ? "Change mapping" : "Search schema"}
-                          >
-                            <SearchIcon size={14} />
-                          </button>
-                        )}
-                        <button className="er-remove-btn" onClick={() => removeMapping(unit.id, mapping.id)}>×</button>
-                      </div>
-                    );
-                  })}
+                  {(unit.correspondingExternalElements || []).map(mapping => renderMappingRow(mapping, {
+                    update: (id, u) => updateMapping(unit.id, id, u),
+                    remove: (id) => removeMapping(unit.id, id),
+                    openSearch: (b) => openMappingSearch(unit.id, b, mapping.id)
+                  }))}
                 </div>
               )}
             </div>
@@ -3523,96 +3612,25 @@ const ERPanel = ({
                       <p className="er-empty-small">No mappings defined</p>
                     ) : (
                       <div className="er-mapping-list">
-                        {(selectedItem.data?.correspondingExternalElements || []).map(mapping => {
-                          const schemaOption = SCHEMA_OPTIONS.find(s => s.value === mapping.basis);
-                          const isSearchable = mapping.basis !== 'Other';
-                          const isOther = mapping.basis === 'Other';
-                          const isClassification = ['UniFormat', 'OmniClass', 'MasterFormat'].includes(mapping.basis);
-
-                          const updateMappingInHierarchy = (mappingId, updates) => {
-                            setSelectedItem(prev => ({
-                              ...prev,
-                              data: {
-                                ...prev.data,
-                                correspondingExternalElements: (prev.data?.correspondingExternalElements || []).map(m =>
-                                  m.id === mappingId ? { ...m, ...updates } : m
-                                )
-                              }
-                            }));
-                          };
-
-                          const removeMappingFromHierarchy = (mappingId) => {
-                            setSelectedItem(prev => ({
-                              ...prev,
-                              data: {
-                                ...prev.data,
-                                correspondingExternalElements: (prev.data?.correspondingExternalElements || []).filter(m => m.id !== mappingId)
-                              }
-                            }));
-                          };
-
-                          return (
-                            <div key={mapping.id} className={`er-mapping-row ${isOther ? 'er-mapping-row-other' : ''}`}>
-                              <select
-                                value={mapping.basis || 'bSDD'}
-                                onChange={(e) => {
-                                  const newBasis = e.target.value;
-                                  if (newBasis === 'Other') {
-                                    updateMappingInHierarchy(mapping.id, { basis: newBasis });
-                                  } else {
-                                    updateMappingInHierarchy(mapping.id, { basis: newBasis, name: '', description: '', customBasis: '' });
-                                  }
-                                }}
-                                className="er-select-small er-select-schema"
-                              >
-                                {SCHEMA_OPTIONS.map(opt => (
-                                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                ))}
-                              </select>
-                              {isOther && (
-                                <input
-                                  type="text"
-                                  value={mapping.customBasis || ''}
-                                  onChange={(e) => updateMappingInHierarchy(mapping.id, { customBasis: e.target.value })}
-                                  placeholder="Standard name"
-                                  className="er-input-small er-input-custom-schema"
-                                />
-                              )}
-                              <div className="er-mapping-value">
-                                <input
-                                  type="text"
-                                  ref={(el) => { mappingInputRefs.current[mapping.id] = el; }}
-                                  value={mapping.name || ''}
-                                  onChange={(e) => updateMappingInHierarchy(mapping.id, { name: e.target.value })}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && isSearchable) {
-                                      e.preventDefault();
-                                      openMappingSearch(selectedItem.id, mapping.basis, mapping.id);
-                                    }
-                                  }}
-                                  placeholder={isOther ? "Element name" : (isSearchable ? "Click search or enter manually" : "Enter element name")}
-                                  className="er-input-small er-input-mapping"
-                                  title={mapping.description || mapping.name || ''}
-                                />
-                                {mapping.description && isClassification && (
-                                  <span className="er-mapping-desc" title={mapping.description}>
-                                    {mapping.description}
-                                  </span>
-                                )}
-                              </div>
-                              {isSearchable && (
-                                <button
-                                  className="er-search-btn"
-                                  onClick={() => openMappingSearch(selectedItem.id, mapping.basis, mapping.id)}
-                                  title={mapping.name ? "Change mapping" : "Search schema"}
-                                >
-                                  <SearchIcon size={14} />
-                                </button>
-                              )}
-                              <button className="er-remove-btn" onClick={() => removeMappingFromHierarchy(mapping.id)}>×</button>
-                            </div>
-                          );
-                        })}
+                        {(selectedItem.data?.correspondingExternalElements || []).map(mapping => renderMappingRow(mapping, {
+                          update: (mappingId, updates) => setSelectedItem(prev => ({
+                            ...prev,
+                            data: {
+                              ...prev.data,
+                              correspondingExternalElements: (prev.data?.correspondingExternalElements || []).map(m =>
+                                m.id === mappingId ? { ...m, ...updates } : m
+                              )
+                            }
+                          })),
+                          remove: (mappingId) => setSelectedItem(prev => ({
+                            ...prev,
+                            data: {
+                              ...prev.data,
+                              correspondingExternalElements: (prev.data?.correspondingExternalElements || []).filter(m => m.id !== mappingId)
+                            }
+                          })),
+                          openSearch: (b) => openMappingSearch(selectedItem.id, b, mapping.id)
+                        }))}
                       </div>
                     )}
                   </div>
@@ -3801,7 +3819,7 @@ const ERPanel = ({
                     >
                       {SCHEMA_OPTIONS.filter(opt => opt.searchable).map(opt => (
                         <option key={opt.value} value={opt.value}>
-                          {opt.label}{opt.value === 'bSDD' && bsddCacheInfo.state === 'ready' ? ' (cached)' : opt.apiEnabled ? ' (API)' : ''}
+                          {opt.label}{opt.value === 'bSDD' && bsddCacheInfo.state === 'ready' ? ' (cached)' : opt.apiEnabled ? ' (API)' : opt.custom ? ' (custom)' : ''}
                         </option>
                       ))}
                     </select>
@@ -4286,7 +4304,7 @@ const ERPanel = ({
                   >
                     {SCHEMA_OPTIONS.filter(opt => opt.searchable).map(opt => (
                       <option key={opt.value} value={opt.value}>
-                        {opt.label}{opt.value === 'bSDD' && bsddCacheInfo.state === 'ready' ? ' (cached)' : opt.apiEnabled ? ' (API)' : ''}
+                        {opt.label}{opt.value === 'bSDD' && bsddCacheInfo.state === 'ready' ? ' (cached)' : opt.apiEnabled ? ' (API)' : opt.custom ? ' (custom)' : ''}
                       </option>
                     ))}
                   </select>

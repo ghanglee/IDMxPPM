@@ -61,6 +61,8 @@ const canonicalizeSchema = (schema) => {
   return CANONICAL_SCHEMA_NAMES.find(s => s.replace(/\s/g, '').toLowerCase() === stripped) || null;
 };
 
+const NO_MAPPING_SCHEMAS = [];
+
 const normalizeMappingBases = (hierarchy) => {
   if (!Array.isArray(hierarchy)) return hierarchy;
   const fixIu = (iu) => ({
@@ -1446,6 +1448,23 @@ const App = () => {
   const [businessRulesConstraintKey, setBusinessRulesConstraintKey] = useState(null);
   const [businessRulesAddNew, setBusinessRulesAddNew] = useState(false);
   // Accepts null, an IU id, or { iuId, constraintKey, addNew }
+  // Custom mapping schemas of the project (headerData.mappingSchemas, saved in the .idm file)
+  const handleAddMappingSchema = useCallback((schema) => {
+    if (!schema?.value) return;
+    const key = (n) => String(n || '').replace(/\s+/g, '').toLowerCase();
+    setHeaderData(prev => {
+      const list = (prev.mappingSchemas || []).filter(s => key(s.value) !== key(schema.value));
+      return { ...prev, mappingSchemas: [...list, schema] };
+    });
+    setIsDirty(true);
+  }, []);
+
+  const handleRemoveMappingSchema = useCallback((name) => {
+    const key = (n) => String(n || '').replace(/\s+/g, '').toLowerCase();
+    setHeaderData(prev => ({ ...prev, mappingSchemas: (prev.mappingSchemas || []).filter(s => key(s.value) !== key(name)) }));
+    setIsDirty(true);
+  }, []);
+
   const handleOpenBusinessRules = useCallback((arg = null) => {
     const opts = arg && typeof arg === 'object' && !arg.nativeEvent ? arg : { iuId: typeof arg === 'string' ? arg : null };
     setBusinessRulesIuId(opts.iuId || null);
@@ -5626,6 +5645,9 @@ const App = () => {
                     onClearNewlyAddedErId={() => setNewlyAddedErId(null)}
                     businessRules={headerData.businessRules || []}
                     onOpenBusinessRules={handleOpenBusinessRules}
+                    mappingSchemas={headerData.mappingSchemas || NO_MAPPING_SCHEMAS}
+                    onAddMappingSchema={handleAddMappingSchema}
+                    onRemoveMappingSchema={handleRemoveMappingSchema}
                   />
                 )}
 
