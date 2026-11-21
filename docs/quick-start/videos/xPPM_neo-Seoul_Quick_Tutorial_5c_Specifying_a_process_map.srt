@@ -1,0 +1,96 @@
+1
+00:00:00,350 --> 00:00:05,321
+The process map shows who does what, in which order, and where information is exchanged.
+
+2
+00:00:06,221 --> 00:00:07,526
+First, the process.
+
+3
+00:00:07,526 --> 00:00:12,750
+A site quality inspector identifies a defect, and a BIM coordinator logs it.
+
+4
+00:00:12,750 --> 00:00:18,660
+The quality manager triages and assigns it to a trade subcontractor, who rectifies it.
+
+5
+00:00:18,660 --> 00:00:23,540
+The inspector verifies the work, and the defect is closed, or reopened.
+
+6
+00:00:23,540 --> 00:00:29,175
+Every day at five p.m., a defect status report goes to the owner's representative.
+
+7
+00:00:30,075 --> 00:00:30,795
+Now draw it.
+
+8
+00:00:30,795 --> 00:00:36,433
+The pools and lanes are already there: they were created from the actor roles of the use case.
+
+9
+00:00:36,433 --> 00:00:42,790
+The general contractor has three lanes; the subcontractor and the owner's representative have a pool each.
+
+10
+00:00:43,690 --> 00:00:49,388
+Select the start event in the inspector's lane, and append a task from its context pad.
+
+11
+00:00:49,388 --> 00:00:51,157
+Name it 1, Identify defect.
+
+12
+00:00:52,057 --> 00:00:57,904
+The inspector hands over a form, so add a data object from the palette, place it next to the task,
+
+13
+00:00:57,904 --> 00:00:59,993
+and name it Defect inspection form.
+
+14
+00:01:00,893 --> 00:01:05,811
+Then connect the task to the data object: the form is the output of the task.
+
+15
+00:01:05,811 --> 00:01:11,495
+Data objects mark where information is exchanged; they will become exchange requirements.
+
+16
+00:01:12,395 --> 00:01:15,411
+Drawing the whole process takes a while.
+
+17
+00:01:15,411 --> 00:01:23,553
+Close the project without saving, and open the catch-up file DMBCF_5c_process_map.idm with the complete map.
+
+18
+00:01:24,453 --> 00:01:25,723
+Here is the full map.
+
+19
+00:01:25,723 --> 00:01:32,922
+Three pools: the general contractor with three lanes, the trade subcontractor, and the external owner's representative.
+
+20
+00:01:33,822 --> 00:01:40,903
+Gateways make decisions: an invalid defect is rejected, and a failed verification reopens the defect.
+
+21
+00:01:40,903 --> 00:01:46,793
+Message flows connect the pools, and a timer starts the daily reporting at five p.m.
+
+22
+00:01:47,693 --> 00:01:51,777
+The eight data objects are the forms exchanged between activities.
+
+23
+00:01:51,777 --> 00:01:55,181
+In the next step, each becomes an exchange requirement.
+
+24
+00:01:56,081 --> 00:02:03,142
+Pools and lanes are linked to the actor roles of the use case: in Actor Roles, the tags Pool and Lane show the links.
+

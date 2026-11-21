@@ -1,0 +1,655 @@
+<!DOCTYPE html><html lang='en'><head><meta charset='utf-8'><title>Video plan — xPPM neo-Seoul quick tutorial</title><style>
+:root{--navy:#10243e;--sky:#0369a1;--ink:#0f172a;--mut:#475569;--line:#e2e8f0;--bg:#f8fafc;--warm:#fff7ed}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Fira Sans',sans-serif;color:var(--ink);background:var(--bg);line-height:1.55;font-size:16px}
+a{color:var(--sky)}
+header{background:linear-gradient(135deg,#0b1a2e,#173a63);color:#fff;padding:44px 0 36px}
+.wrap{max-width:1180px;margin:0 auto;padding:0 32px}
+header .k{color:#7dd3fc;letter-spacing:.12em;text-transform:uppercase;font-size:13px;font-weight:600}
+header h1{margin:8px 0 10px;font-size:38px;line-height:1.15}
+header p{margin:0;color:#cbd5e1;max-width:820px;font-size:18px}
+nav{position:sticky;top:0;z-index:5;background:#fff;border-bottom:1px solid var(--line)}
+nav .wrap{display:flex;gap:6px;align-items:center;padding-top:10px;padding-bottom:10px;flex-wrap:wrap}
+nav a{text-decoration:none;color:var(--navy);font-weight:600;font-size:14px;padding:4px 10px;border-radius:999px}
+nav a:hover{background:#e0f2fe}
+nav .n{display:inline-block;width:22px;height:22px;border-radius:11px;background:var(--navy);color:#fff;text-align:center;font-size:12px;line-height:22px;margin-right:4px}
+section{padding:34px 0;border-bottom:1px solid var(--line)}
+h2{font-size:26px;margin:0 0 6px}h2 .n{display:inline-block;width:36px;height:36px;border-radius:18px;background:var(--navy);color:#fff;text-align:center;line-height:36px;font-size:18px;margin-right:10px;vertical-align:2px}
+.lead{color:var(--mut);margin:0 0 18px;font-size:17px}
+.lesson{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:28px;align-items:start}
+.vid{position:relative}
+video{width:100%;border-radius:10px;background:#0b1a2e;display:block;aspect-ratio:16/9}
+.vmeta{font-size:13px;color:var(--mut);margin-top:6px}
+.vfail{display:none;background:var(--warm);border:1px solid #fdba74;border-radius:10px;padding:12px 14px;font-size:14px;margin-top:8px}
+ol.steps{margin:0;padding-left:22px}ol.steps li{margin:0 0 8px}
+.files{margin-top:14px;font-size:14px}.files b{display:block;color:var(--mut);font-size:12px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px}
+.files a{display:inline-block;margin:0 10px 4px 0}
+.tip{background:#ecfeff;border-left:4px solid #0891b2;padding:10px 14px;border-radius:0 8px 8px 0;font-size:15px;margin-top:14px}
+.try{background:var(--warm);border-left:4px solid #f97316;padding:10px 14px;border-radius:0 8px 8px 0;font-size:15px;margin-top:12px}
+.try .h,.tip .h{display:block;font-size:12px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px;font-weight:700}
+.map td:first-child code{white-space:nowrap}.map td:last-child code{word-break:break-all}
+.process{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0 4px}
+.process div{flex:1 1 120px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:14px}
+.process div b{display:block;color:var(--navy)}
+.process .rep{flex-basis:100%;background:var(--warm);border-color:#fdba74}
+table{border-collapse:collapse;width:100%;background:#fff;font-size:14px;margin-top:10px}
+th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}th{background:#f1f5f9;font-weight:600}
+code{background:#f1f5f9;padding:1px 5px;border-radius:4px;font-size:13px}
+.thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.thumbs a img{height:130px;border:1px solid var(--line);border-radius:4px;background:#fff}
+.form{width:100%;border:1px solid var(--line);border-radius:6px;box-shadow:0 4px 14px rgba(15,23,42,.08)}
+.chip{display:inline-block;background:#dbeafe;color:#1e40af;border-radius:5px;padding:0 6px;font-size:12px;font-weight:600;margin:1px}
+.rule{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-top:10px;font-size:14px}
+.rule .lv{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);font-weight:700}
+pre{background:#0f172a;color:#e2e8f0;border-radius:8px;padding:10px 12px;font-size:12.5px;overflow:auto;margin:6px 0 0}
+details{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-top:10px}
+details summary{cursor:pointer;font-weight:600}
+ol.outline{margin:6px 0 0;padding-left:24px;font-size:17px}ol.outline>li{margin:6px 0}
+ol.outline ol{list-style:lower-alpha;padding-left:24px;margin:4px 0}ol.outline ol ol{list-style:lower-roman}
+ol.outline a{text-decoration:none;color:var(--navy);font-weight:600}ol.outline a:hover{text-decoration:underline}
+ol.outline .d{color:var(--mut);font-size:13px;margin-left:6px;font-weight:400}
+.part{background:var(--navy);color:#fff;padding:18px 0}.part h2{margin:0;font-size:22px}.part p{margin:4px 0 0;color:#cbd5e1}
+.catch{background:#f0fdf4;border-left:4px solid #16a34a;padding:10px 14px;border-radius:0 8px 8px 0;font-size:15px;margin-top:12px}
+.catch .h{display:block;font-size:12px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px;font-weight:700}
+footer{color:var(--mut);font-size:13px;text-align:center;padding:24px}
+@media (max-width:860px){.lesson{grid-template-columns:1fr}}
+ main{max-width:1100px;margin:0 auto;padding:20px 32px} td,th{font-size:13px}</style></head><body><nav><div class='wrap'><a href='index.html'>← Quick tutorial</a></div></nav><main><h1 id="xppm-neo-seoul-quick-tutorial-video-plan-and-narration-scripts">xPPM neo-Seoul quick tutorial — video plan and narration scripts</h1>
+<p>Ten videos following the tutorial outline, 1920×1080, 30 fps, English voice-over (synthetic voice, Kokoro TTS) with burnt-in captions and <code>.srt</code> subtitles.
+Production: screen states captured from xPPM neo-Seoul 1.7.0 in a scripted browser session (device scale 2), slides rendered from HTML; cursor, click ripples, spotlight highlights and zooms added in post. Scripts: <code>video/qa.cjs</code> (1–4), <code>video/qb.cjs</code> (5a–5f), <code>video/render.py</code>.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Video</th>
+<th>Learning goals</th>
+<th>Duration</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Installing xPPM neo-Seoul</td>
+<td>Where to download; installer file names per platform; start screen</td>
+<td>0:35</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Starting a project</td>
+<td>Blank, sample and existing projects; what a blank project contains</td>
+<td>0:34</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Opening and saving a project</td>
+<td>Open formats; save the .idm project file; export idmXML 2.0 and HTML</td>
+<td>0:57</td>
+</tr>
+<tr>
+<td>4</td>
+<td>The interface</td>
+<td>The five parts of an IDM and where each is in the app; validate and save</td>
+<td>1:17</td>
+</tr>
+<tr>
+<td>5a</td>
+<td>Creating a header</td>
+<td>Header identifiers, version, status, authors; catch-up files</td>
+<td>0:52</td>
+</tr>
+<tr>
+<td>5b</td>
+<td>Specifying a use case</td>
+<td>Summary, aim and scope, uses, region; actor roles ↔ pools and lanes; external actor; phase</td>
+<td>1:14</td>
+</tr>
+<tr>
+<td>5c</td>
+<td>Specifying a process map</td>
+<td>The defect management process; append tasks; data objects; output associations</td>
+<td>2:03</td>
+</tr>
+<tr>
+<td>5d</td>
+<td>Specifying exchange requirements</td>
+<td>Forms → data objects → ERs; IUs from fields; data type, mandatory, definition; sub-IUs</td>
+<td>1:39</td>
+</tr>
+<tr>
+<td>5e</td>
+<td>Mapping information units to external elements</td>
+<td>External mappings; built-in schemas (IFC); BCF; custom schema from the BCF 3.0 preset</td>
+<td>1:56</td>
+</tr>
+<tr>
+<td>5f</td>
+<td>Specifying rules</td>
+<td>Business rule → constraint → expression; validate; export idmXML and HTML</td>
+<td>1:48</td>
+</tr>
+<tr>
+<td></td>
+<td><strong>Total</strong></td>
+<td></td>
+<td><strong>12:59</strong></td>
+</tr>
+</tbody>
+</table>
+<h2 id="video-1-installing-xppm-neo-seoul">Video 1 — Installing xPPM neo-Seoul</h2>
+<table>
+<thead>
+<tr>
+<th>Shot</th>
+<th>On screen</th>
+<th>Narration</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>slide</td>
+<td>Welcome to the xPPM neo-Seoul quick tutorial. In about twenty minutes, you will learn how to author an information delivery manual, an IDM, from a blank project.</td>
+</tr>
+<tr>
+<td>2</td>
+<td>slide</td>
+<td>Open the releases page of the xPPM neo-Seoul repository on GitHub, and download the file for your computer: a disk image for macOS, an installer or a portable program for Windows, or an AppImage for Linux.</td>
+</tr>
+<tr>
+<td>3</td>
+<td>app view + highlight</td>
+<td>Install it as usual and start xPPM neo-Seoul. The start screen appears. In the next video, we start a project.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="video-2-starting-a-project">Video 2 — Starting a project</h2>
+<table>
+<thead>
+<tr>
+<th>Shot</th>
+<th>On screen</th>
+<th>Narration</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>slide</td>
+<td>There are three ways to start.</td>
+</tr>
+<tr>
+<td>2</td>
+<td>app view + highlight</td>
+<td>Blank Project starts an empty IDM. Use it to author a new IDM; we will use it in part five.</td>
+</tr>
+<tr>
+<td>3</td>
+<td>app view + highlight</td>
+<td>Sample Project opens a complete example IDM, useful to explore the app.</td>
+</tr>
+<tr>
+<td>4</td>
+<td>app view + highlight</td>
+<td>Open Project opens an IDM you already have: a project file, an idmXML file, an IDS, or a BPMN diagram.</td>
+</tr>
+<tr>
+<td>5</td>
+<td>click, app view</td>
+<td>Click Blank Project. The new IDM has a header, a use case, and a process map with one pool and a start event.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="video-3-opening-and-saving-a-project">Video 3 — Opening and saving a project</h2>
+<table>
+<thead>
+<tr>
+<th>Shot</th>
+<th>On screen</th>
+<th>Narration</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>slide</td>
+<td>Opening and saving a project.</td>
+</tr>
+<tr>
+<td>2</td>
+<td>click</td>
+<td>To open a file, click Open Project, on the start screen or in the left bar, and choose its format.</td>
+</tr>
+<tr>
+<td>3</td>
+<td>app view + highlight</td>
+<td>The IDM Project format is the app's own project file. idmXML 2.0 is the exchange format of ISO 29481-3. You can also open idmXML 1.0, IDS, BPMN and reviewed HTML files.</td>
+</tr>
+<tr>
+<td>4</td>
+<td>click</td>
+<td>To save, click Save and Export in the left bar.</td>
+</tr>
+<tr>
+<td>5</td>
+<td>app view (zoom) + highlight</td>
+<td>Save the IDM Project file to keep working on it later. It keeps everything, including the layout of the process map.</td>
+</tr>
+<tr>
+<td>6</td>
+<td>app view (zoom) + highlight</td>
+<td>Export idmXML 2.0 to exchange the IDM with other tools, following ISO 29481-3. Export an HTML document to share a readable version with reviewers.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="video-4-the-interface">Video 4 — The interface</h2>
+<table>
+<thead>
+<tr>
+<th>Shot</th>
+<th>On screen</th>
+<th>Narration</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>slide</td>
+<td>Before we build an IDM, let us look at what an IDM consists of, and where each part is in the app.</td>
+</tr>
+<tr>
+<td>2</td>
+<td>slide</td>
+<td>An IDM has five parts: a header, a use case, a process map, exchange requirements with their information units, and rules. ISO 29481-1 defines the method, and ISO 29481-3 the data schema.</td>
+</tr>
+<tr>
+<td>3</td>
+<td>app view + highlight</td>
+<td>The bar on the left opens the parts. The first button opens the IDM header: identifiers, authors and revisions.</td>
+</tr>
+<tr>
+<td>4</td>
+<td>click, app view + highlight</td>
+<td>The second opens the use case: purpose, uses, region, actor roles, and project phases.</td>
+</tr>
+<tr>
+<td>5</td>
+<td>app view + highlight</td>
+<td>The process map is always in the middle: a BPMN editor with a palette for events, tasks, gateways, data objects, pools and lanes.</td>
+</tr>
+<tr>
+<td>6</td>
+<td>click, app view + highlight</td>
+<td>The third button opens the exchange requirements. Select one to see its information units on the right, and select an information unit to edit it.</td>
+</tr>
+<tr>
+<td>7</td>
+<td>click, app view + highlight</td>
+<td>Rules opens the business rules and constraints. The same dialog is available from the use case.</td>
+</tr>
+<tr>
+<td>8</td>
+<td>app view + highlight</td>
+<td>Finally, Validate checks the IDM against ISO 29481-3, and Save and Export saves it. Now let us build an IDM ourselves.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="video-5a-creating-a-header">Video 5a — Creating a header</h2>
+<table>
+<thead>
+<tr>
+<th>Shot</th>
+<th>On screen</th>
+<th>Narration</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>slide</td>
+<td>In part five, you build a complete IDM for defect management, step by step, starting from a blank project. After each step, a catch-up file lets you continue from the same point.</td>
+</tr>
+<tr>
+<td>2</td>
+<td>click</td>
+<td>Click Blank Project. The IDM header is open on the left.</td>
+</tr>
+<tr>
+<td>3</td>
+<td>click, typing</td>
+<td>Enter the full title, Defect Management Using BCF, and the short title, DMBCF.</td>
+</tr>
+<tr>
+<td>4</td>
+<td>click, app view (zoom) + highlight</td>
+<td>Keep version one point zero, and set the status to working draft.</td>
+</tr>
+<tr>
+<td>5</td>
+<td>click, typing</td>
+<td>Add an author: click Person, open the new entry, and enter the given and family name.</td>
+</tr>
+<tr>
+<td>6</td>
+<td>app view + highlight</td>
+<td>The creation date is filled in automatically, and the revision history records later changes. The header is done. The catch-up file for this step is DMBCF_5a_header.idm.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="video-5b-specifying-a-use-case">Video 5b — Specifying a use case</h2>
+<table>
+<thead>
+<tr>
+<th>Shot</th>
+<th>On screen</th>
+<th>Narration</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>slide</td>
+<td>The use case says what the IDM is for, who takes part, and where and when it applies.</td>
+</tr>
+<tr>
+<td>2</td>
+<td>click, typing</td>
+<td>Open the use case. Write a short summary of the information exchange.</td>
+</tr>
+<tr>
+<td>3</td>
+<td>click, typing</td>
+<td>Under aim and scope, state the purpose and what is out of scope.</td>
+</tr>
+<tr>
+<td>4</td>
+<td>click, typing</td>
+<td>Add the use. Choose User-defined Use, type Construction Quality Management, and click Add. You can also pick a use from the NBIMS-US list.</td>
+</tr>
+<tr>
+<td>5</td>
+<td>click, app view + highlight</td>
+<td>Select the target region, Korea, and remove International. The language is English.</td>
+</tr>
+<tr>
+<td>6</td>
+<td>app view, click, typing</td>
+<td>Under actor roles, the blank project already has one actor, linked to its pool. Rename it General contractor. Click Sub-actor: the pool is divided into lanes. Name them Site quality inspector and BIM coordinator.</td>
+</tr>
+<tr>
+<td>7</td>
+<td>click, typing</td>
+<td>Click Add Actor for the owner's representative. The app also adds a pool for it. Tick External: it receives the daily report, but its own process is outside the IDM.</td>
+</tr>
+<tr>
+<td>8</td>
+<td>click, app view + highlight</td>
+<td>Finally, tick the ISO 22263 project phase, production. The catch-up file DMBCF_5b_use_case.idm contains the complete use case, with all actors, keywords and references.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="video-5c-specifying-a-process-map">Video 5c — Specifying a process map</h2>
+<table>
+<thead>
+<tr>
+<th>Shot</th>
+<th>On screen</th>
+<th>Narration</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>slide</td>
+<td>The process map shows who does what, in which order, and where information is exchanged.</td>
+</tr>
+<tr>
+<td>2</td>
+<td>slide</td>
+<td>First, the process. A site quality inspector identifies a defect, and a BIM coordinator logs it. The quality manager triages and assigns it to a trade subcontractor, who rectifies it. The inspector verifies the work, and the defect is closed, or reopened. Every day at five p.m., a defect status report goes to the owner's representative.</td>
+</tr>
+<tr>
+<td>3</td>
+<td>app view + highlight</td>
+<td>Now draw it. The pools and lanes are already there: they were created from the actor roles of the use case. The general contractor has three lanes; the subcontractor and the owner's representative have a pool each.</td>
+</tr>
+<tr>
+<td>4</td>
+<td>click, app view (zoom)</td>
+<td>Select the start event in the inspector's lane, and append a task from its context pad. Name it 1, Identify defect.</td>
+</tr>
+<tr>
+<td>5</td>
+<td>click, app view (zoom) + highlight</td>
+<td>The inspector hands over a form, so add a data object from the palette, place it next to the task, and name it Defect inspection form.</td>
+</tr>
+<tr>
+<td>6</td>
+<td>click, app view (zoom) + highlight</td>
+<td>Then connect the task to the data object: the form is the output of the task. Data objects mark where information is exchanged; they will become exchange requirements.</td>
+</tr>
+<tr>
+<td>7</td>
+<td>click</td>
+<td>Drawing the whole process takes a while. Close the project without saving, and open the catch-up file DMBCF_5c_process_map.idm with the complete map.</td>
+</tr>
+<tr>
+<td>8</td>
+<td>app view + highlight</td>
+<td>Here is the full map. Three pools: the general contractor with three lanes, the trade subcontractor, and the external owner's representative.</td>
+</tr>
+<tr>
+<td>9</td>
+<td>app view + highlight</td>
+<td>Gateways make decisions: an invalid defect is rejected, and a failed verification reopens the defect. Message flows connect the pools, and a timer starts the daily reporting at five p.m.</td>
+</tr>
+<tr>
+<td>10</td>
+<td>app view + highlight</td>
+<td>The eight data objects are the forms exchanged between activities. In the next step, each becomes an exchange requirement.</td>
+</tr>
+<tr>
+<td>11</td>
+<td>click, app view + highlight</td>
+<td>Pools and lanes are linked to the actor roles of the use case: in Actor Roles, the tags Pool and Lane show the links.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="video-5d-specifying-exchange-requirements">Video 5d — Specifying exchange requirements</h2>
+<table>
+<thead>
+<tr>
+<th>Shot</th>
+<th>On screen</th>
+<th>Narration</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>slide</td>
+<td>An exchange requirement defines the information that one exchange must carry.</td>
+</tr>
+<tr>
+<td>2</td>
+<td>slide</td>
+<td>In this process, the information is exchanged as forms: an inspection form, a log entry, a triage record, an assignment notice, and so on. Each form becomes one exchange requirement.</td>
+</tr>
+<tr>
+<td>3</td>
+<td>slide</td>
+<td>Here is the defect inspection form. Each field will become an information unit: inspection number, date, inspector, location with storey, space and grid, and so on.</td>
+</tr>
+<tr>
+<td>4</td>
+<td>click, typing</td>
+<td>Double-click the data object Defect inspection form. Choose Create New ER, keep the name, and click Create ER.</td>
+</tr>
+<tr>
+<td>5</td>
+<td>click</td>
+<td>The new exchange requirement opens on the right. Click plus IU to add an information unit.</td>
+</tr>
+<tr>
+<td>6</td>
+<td>click, typing</td>
+<td>Name it Inspection number. Keep String or Text as the data type, tick Mandatory, and write a definition.</td>
+</tr>
+<tr>
+<td>7</td>
+<td>app view (zoom), click, app view (zoom) + highlight</td>
+<td>Add two more units, Location and Storey. Then select Storey and click the indent button: Storey becomes a sub-unit of Location.</td>
+</tr>
+<tr>
+<td>8</td>
+<td>app view (zoom), click</td>
+<td>Synonyms, examples and figures can be added in the same editor. Repeating this for all eight forms takes time, so open the catch-up file DMBCF_5d_exchange_requirements.idm.</td>
+</tr>
+<tr>
+<td>9</td>
+<td>app view + highlight</td>
+<td>In the catch-up file, a root exchange requirement, Defect management information, groups eight sub-ERs, one per form. Each data object is linked to its ER.</td>
+</tr>
+<tr>
+<td>10</td>
+<td>click, app view (zoom)</td>
+<td>Select the defect inspection form: ten information units, with data types, mandatory flags and definitions. Location has three sub-units.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="video-5e-mapping-information-units-to-external-elements">Video 5e — Mapping information units to external elements</h2>
+<table>
+<thead>
+<tr>
+<th>Shot</th>
+<th>On screen</th>
+<th>Narration</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>slide</td>
+<td>A mapping tells software developers where an information unit is stored in a data format that tools already support.</td>
+</tr>
+<tr>
+<td>2</td>
+<td>slide</td>
+<td>Each information unit can have one or more corresponding external elements. Built-in schemas include bSDD, IFC and CityGML, and you can add your own.</td>
+</tr>
+<tr>
+<td>3</td>
+<td>click</td>
+<td>Open the defect inspection form, expand Location, and select Storey.</td>
+</tr>
+<tr>
+<td>4</td>
+<td>click, typing, app view (zoom)</td>
+<td>Click Add Mapping, choose IFC 4x3 ADD2, and search for IfcBuildingStorey. The search lists the attributes the entity defines itself; pick one and click Apply.</td>
+</tr>
+<tr>
+<td>5</td>
+<td>click, typing, app view (zoom) + highlight</td>
+<td>The storey name is inherited from IfcRoot, so edit the path directly: IfcBuildingStorey dot Name. The path is free text; search only helps you find it.</td>
+</tr>
+<tr>
+<td>6</td>
+<td>slide</td>
+<td>BCF, the BIM Collaboration Format of buildingSMART, exchanges issues as topics, with viewpoints that point to model elements. It is a natural format for defects, so we map the defect information to BCF.</td>
+</tr>
+<tr>
+<td>7</td>
+<td>click</td>
+<td>Open the defect log entry, expand Defect, and select Title.</td>
+</tr>
+<tr>
+<td>8</td>
+<td>click</td>
+<td>BCF 3.0 is not built in. Click Add Mapping, and in the basis list choose Add schema. Start from the BCF 3.0 preset, with its 120 element paths, and click Add schema.</td>
+</tr>
+<tr>
+<td>9</td>
+<td>click, typing, app view (zoom) + highlight</td>
+<td>Now search the BCF elements for Title, and apply Markup slash Topic slash Title.</td>
+</tr>
+<tr>
+<td>10</td>
+<td>click</td>
+<td>The catch-up file DMBCF_5e_mappings.idm has all 64 mappings. Close the project without saving and open it.</td>
+</tr>
+<tr>
+<td>11</td>
+<td>click, app view (zoom) + highlight</td>
+<td>Information that BCF does not define, such as severity, travels as a label from the project extensions file. Some information is not exchanged at all.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="video-5f-specifying-rules">Video 5f — Specifying rules</h2>
+<table>
+<thead>
+<tr>
+<th>Shot</th>
+<th>On screen</th>
+<th>Narration</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>slide</td>
+<td>Rules state what the exchanged information must satisfy.</td>
+</tr>
+<tr>
+<td>2</td>
+<td>slide</td>
+<td>A business rule is a statement in natural language. A constraint restricts information units. An expression states the constraint in a rule language that software can check.</td>
+</tr>
+<tr>
+<td>3</td>
+<td>click</td>
+<td>Open the use case, and click Business rules.</td>
+</tr>
+<tr>
+<td>4</td>
+<td>click, typing</td>
+<td>Click Add. Name the rule Safety-critical defects, and write the statement: a defect flagged as safety-critical shall have the priority P1, Critical. Click Done.</td>
+</tr>
+<tr>
+<td>5</td>
+<td>click</td>
+<td>Now add a constraint for this rule. Define it in the triage record, where the information units are.</td>
+</tr>
+<tr>
+<td>6</td>
+<td>click</td>
+<td>Click Select IUs, and choose Safety-critical and Priority.</td>
+</tr>
+<tr>
+<td>7</td>
+<td>click, typing</td>
+<td>Write the constraint, using Insert IU reference to refer to information units by their id: if Safety-critical is true, then Priority equals P1, Critical.</td>
+</tr>
+<tr>
+<td>8</td>
+<td>app view (zoom) + highlight, click, app view (zoom)</td>
+<td>A formal expression in SHACL, SPARQL, Python or another rule language can be added with Add expression. Click Done.</td>
+</tr>
+<tr>
+<td>9</td>
+<td>click</td>
+<td>The catch-up file DMBCF_5f_rules_complete.idm is the finished IDM, with fourteen rules and their constraints. Open it.</td>
+</tr>
+<tr>
+<td>10</td>
+<td>click, app view (zoom)</td>
+<td>Click Validate. The IDM is checked against ISO 29481-3: no errors, no warnings.</td>
+</tr>
+<tr>
+<td>11</td>
+<td>click</td>
+<td>Finally, Save and Export. Export idmXML 2.0 to exchange the IDM with other tools, and an HTML document to share it with reviewers.</td>
+</tr>
+<tr>
+<td>12</td>
+<td>slide</td>
+<td>This is the exported HTML document. You have built a complete IDM: header, use case, process map, exchange requirements, mappings, and rules. Thank you for watching.</td>
+</tr>
+</tbody>
+</table></main></body></html>

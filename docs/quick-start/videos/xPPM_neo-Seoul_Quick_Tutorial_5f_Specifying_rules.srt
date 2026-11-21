@@ -1,0 +1,100 @@
+1
+00:00:00,350 --> 00:00:03,486
+Rules state what the exchanged information must satisfy.
+
+2
+00:00:04,386 --> 00:00:07,516
+A business rule is a statement in natural language.
+
+3
+00:00:07,516 --> 00:00:10,033
+A constraint restricts information units.
+
+4
+00:00:10,033 --> 00:00:14,882
+An expression states the constraint in a rule language that software can check.
+
+5
+00:00:15,782 --> 00:00:18,193
+Open the use case, and click Business rules.
+
+6
+00:00:19,682 --> 00:00:20,321
+Click Add.
+
+7
+00:00:20,321 --> 00:00:27,601
+Name the rule Safety-critical defects, and write the statement: a defect flagged as safety-critical shall have the
+
+8
+00:00:27,601 --> 00:00:29,006
+priority P1, Critical.
+
+9
+00:00:29,006 --> 00:00:29,709
+Click Done.
+
+10
+00:00:31,282 --> 00:00:33,250
+Now add a constraint for this rule.
+
+11
+00:00:33,250 --> 00:00:36,850
+Define it in the triage record, where the information units are.
+
+12
+00:00:37,750 --> 00:00:41,163
+Click Select IUs, and choose Safety-critical and Priority.
+
+13
+00:00:45,550 --> 00:00:53,284
+Write the constraint, using Insert IU reference to refer to information units by their id: if Safety-critical is
+
+14
+00:00:53,284 --> 00:00:56,046
+true, then Priority equals P1, Critical.
+
+15
+00:00:56,946 --> 00:01:03,577
+A formal expression in SHACL, SPARQL, Python or another rule language can be added with Add expression.
+
+16
+00:01:03,577 --> 00:01:04,285
+Click Done.
+
+17
+00:01:05,185 --> 00:01:13,890
+The catch-up file DMBCF_5f_rules_complete.idm is the finished IDM, with fourteen rules and their constraints.
+
+18
+00:01:13,890 --> 00:01:14,529
+Open it.
+
+19
+00:01:15,429 --> 00:01:16,918
+Click Validate.
+
+20
+00:01:16,918 --> 00:01:23,173
+The IDM is checked against ISO 29481-3: no errors, no warnings.
+
+21
+00:01:24,073 --> 00:01:26,330
+Finally, Save and Export.
+
+22
+00:01:26,330 --> 00:01:35,721
+Export idmXML 2.0 to exchange the IDM with other tools, and an HTML document to share it with reviewers.
+
+23
+00:01:36,621 --> 00:01:39,071
+This is the exported HTML document.
+
+24
+00:01:39,071 --> 00:01:46,424
+You have built a complete IDM: header, use case, process map, exchange requirements, mappings, and rules.
+
+25
+00:01:46,424 --> 00:01:48,034
+Thank you for watching.
+

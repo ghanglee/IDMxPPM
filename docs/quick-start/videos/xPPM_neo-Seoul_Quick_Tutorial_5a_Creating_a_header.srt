@@ -1,0 +1,40 @@
+1
+00:00:00,350 --> 00:00:07,338
+In part five, you build a complete IDM for defect management, step by step, starting from a blank project.
+
+2
+00:00:07,338 --> 00:00:12,019
+After each step, a catch-up file lets you continue from the same point.
+
+3
+00:00:12,919 --> 00:00:14,331
+Click Blank Project.
+
+4
+00:00:14,331 --> 00:00:16,802
+The IDM header is open on the left.
+
+5
+00:00:17,702 --> 00:00:23,846
+Enter the full title, Defect Management Using BCF, and the short title, DMBCF.
+
+6
+00:00:24,746 --> 00:00:28,650
+Keep version one point zero, and set the status to working draft.
+
+7
+00:00:29,550 --> 00:00:34,627
+Add an author: click Person, open the new entry, and enter the given and family name.
+
+8
+00:00:39,650 --> 00:00:46,588
+The creation date is filled in automatically, and the revision history records later changes.
+
+9
+00:00:46,588 --> 00:00:48,006
+The header is done.
+
+10
+00:00:48,006 --> 00:00:52,109
+The catch-up file for this step is DMBCF_5a_header.idm.
+

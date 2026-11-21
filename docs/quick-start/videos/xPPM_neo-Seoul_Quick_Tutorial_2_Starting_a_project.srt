@@ -1,0 +1,28 @@
+1
+00:00:00,350 --> 00:00:01,950
+There are three ways to start.
+
+2
+00:00:02,850 --> 00:00:05,340
+Blank Project starts an empty IDM.
+
+3
+00:00:05,340 --> 00:00:09,442
+Use it to author a new IDM; we will use it in part five.
+
+4
+00:00:10,342 --> 00:00:15,377
+Sample Project opens a complete example IDM, useful to explore the app.
+
+5
+00:00:16,277 --> 00:00:26,154
+Open Project opens an IDM you already have: a project file, an idmXML file, an IDS, or a BPMN diagram.
+
+6
+00:00:27,054 --> 00:00:28,370
+Click Blank Project.
+
+7
+00:00:28,370 --> 00:00:34,158
+The new IDM has a header, a use case, and a process map with one pool and a start event.
+

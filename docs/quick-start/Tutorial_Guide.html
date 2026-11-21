@@ -1,0 +1,1191 @@
+<!DOCTYPE html><html lang='en'><head><meta charset='utf-8'><title>Tutorial guide — xPPM neo-Seoul quick tutorial</title><style>
+:root{--navy:#10243e;--sky:#0369a1;--ink:#0f172a;--mut:#475569;--line:#e2e8f0;--bg:#f8fafc;--warm:#fff7ed}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Fira Sans',sans-serif;color:var(--ink);background:var(--bg);line-height:1.55;font-size:16px}
+a{color:var(--sky)}
+header{background:linear-gradient(135deg,#0b1a2e,#173a63);color:#fff;padding:44px 0 36px}
+.wrap{max-width:1180px;margin:0 auto;padding:0 32px}
+header .k{color:#7dd3fc;letter-spacing:.12em;text-transform:uppercase;font-size:13px;font-weight:600}
+header h1{margin:8px 0 10px;font-size:38px;line-height:1.15}
+header p{margin:0;color:#cbd5e1;max-width:820px;font-size:18px}
+nav{position:sticky;top:0;z-index:5;background:#fff;border-bottom:1px solid var(--line)}
+nav .wrap{display:flex;gap:6px;align-items:center;padding-top:10px;padding-bottom:10px;flex-wrap:wrap}
+nav a{text-decoration:none;color:var(--navy);font-weight:600;font-size:14px;padding:4px 10px;border-radius:999px}
+nav a:hover{background:#e0f2fe}
+nav .n{display:inline-block;width:22px;height:22px;border-radius:11px;background:var(--navy);color:#fff;text-align:center;font-size:12px;line-height:22px;margin-right:4px}
+section{padding:34px 0;border-bottom:1px solid var(--line)}
+h2{font-size:26px;margin:0 0 6px}h2 .n{display:inline-block;width:36px;height:36px;border-radius:18px;background:var(--navy);color:#fff;text-align:center;line-height:36px;font-size:18px;margin-right:10px;vertical-align:2px}
+.lead{color:var(--mut);margin:0 0 18px;font-size:17px}
+.lesson{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:28px;align-items:start}
+.vid{position:relative}
+video{width:100%;border-radius:10px;background:#0b1a2e;display:block;aspect-ratio:16/9}
+.vmeta{font-size:13px;color:var(--mut);margin-top:6px}
+.vfail{display:none;background:var(--warm);border:1px solid #fdba74;border-radius:10px;padding:12px 14px;font-size:14px;margin-top:8px}
+ol.steps{margin:0;padding-left:22px}ol.steps li{margin:0 0 8px}
+.files{margin-top:14px;font-size:14px}.files b{display:block;color:var(--mut);font-size:12px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px}
+.files a{display:inline-block;margin:0 10px 4px 0}
+.tip{background:#ecfeff;border-left:4px solid #0891b2;padding:10px 14px;border-radius:0 8px 8px 0;font-size:15px;margin-top:14px}
+.try{background:var(--warm);border-left:4px solid #f97316;padding:10px 14px;border-radius:0 8px 8px 0;font-size:15px;margin-top:12px}
+.try .h,.tip .h{display:block;font-size:12px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px;font-weight:700}
+.map td:first-child code{white-space:nowrap}.map td:last-child code{word-break:break-all}
+.process{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0 4px}
+.process div{flex:1 1 120px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:14px}
+.process div b{display:block;color:var(--navy)}
+.process .rep{flex-basis:100%;background:var(--warm);border-color:#fdba74}
+table{border-collapse:collapse;width:100%;background:#fff;font-size:14px;margin-top:10px}
+th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}th{background:#f1f5f9;font-weight:600}
+code{background:#f1f5f9;padding:1px 5px;border-radius:4px;font-size:13px}
+.thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.thumbs a img{height:130px;border:1px solid var(--line);border-radius:4px;background:#fff}
+.form{width:100%;border:1px solid var(--line);border-radius:6px;box-shadow:0 4px 14px rgba(15,23,42,.08)}
+.chip{display:inline-block;background:#dbeafe;color:#1e40af;border-radius:5px;padding:0 6px;font-size:12px;font-weight:600;margin:1px}
+.rule{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-top:10px;font-size:14px}
+.rule .lv{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);font-weight:700}
+pre{background:#0f172a;color:#e2e8f0;border-radius:8px;padding:10px 12px;font-size:12.5px;overflow:auto;margin:6px 0 0}
+details{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-top:10px}
+details summary{cursor:pointer;font-weight:600}
+ol.outline{margin:6px 0 0;padding-left:24px;font-size:17px}ol.outline>li{margin:6px 0}
+ol.outline ol{list-style:lower-alpha;padding-left:24px;margin:4px 0}ol.outline ol ol{list-style:lower-roman}
+ol.outline a{text-decoration:none;color:var(--navy);font-weight:600}ol.outline a:hover{text-decoration:underline}
+ol.outline .d{color:var(--mut);font-size:13px;margin-left:6px;font-weight:400}
+.part{background:var(--navy);color:#fff;padding:18px 0}.part h2{margin:0;font-size:22px}.part p{margin:4px 0 0;color:#cbd5e1}
+.catch{background:#f0fdf4;border-left:4px solid #16a34a;padding:10px 14px;border-radius:0 8px 8px 0;font-size:15px;margin-top:12px}
+.catch .h{display:block;font-size:12px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px;font-weight:700}
+footer{color:var(--mut);font-size:13px;text-align:center;padding:24px}
+@media (max-width:860px){.lesson{grid-template-columns:1fr}}
+ main{max-width:1100px;margin:0 auto;padding:20px 32px} td,th{font-size:13px}</style></head><body><nav><div class='wrap'><a href='index.html'>← Quick tutorial</a></div></nav><main><h1 id="xppm-neo-seoul-quick-tutorial-about-20-minutes">xPPM neo-Seoul quick tutorial (about 20 minutes)</h1>
+<p>A hands-on introduction to authoring an Information Delivery Manual (IDM, ISO 29481-1 / ISO 29481-3) with
+xPPM neo-Seoul. Parts 1–4 introduce the app. In part 5 you build a complete IDM from a blank project. The example is
+construction <strong>defect management</strong>: identification, logging, triage, assignment, resolution, verification and closure,
+supported by reporting and analysis. The forms of the process become exchange requirements (ERs), their fields become
+information units (IUs), the IUs are mapped to external elements (IFC and the <strong>BIM Collaboration Format, BCF 3.0</strong>),
+and business rules state what the exchanged information must satisfy.</p>
+<p>All project data (Riverside Medical Office Building, Example Builders Co., Ltd., people, e-mail addresses at
+example.com, IFC GlobalIds) is fictitious. Regulatory references are illustrative.</p>
+<h2 id="outline">Outline</h2>
+<ol>
+<li>Installing xPPM neo-Seoul</li>
+<li>How to start a project</li>
+<li>How to open and save a project</li>
+<li>Basic interfaces — a. Header, b. Use case, c. Process map (PM), d. Exchange requirement (ER), e. Rule</li>
+<li>Learning through an example</li>
+<li>a. Creating a header</li>
+<li>b. Specifying a use case</li>
+<li>c. Specifying a PM — i. overview of the defect management process; ii. how to depict it as a PM</li>
+<li>d. Specifying an ER — i. the forms exchanged between activities; ii. converting the forms into data objects and ERs; iii. specifying required information items as information units of an ER</li>
+<li>e. Mapping information units to external elements — i. what is BCF; ii. mapping defect information items to BCF elements</li>
+<li>f. Specifying rules</li>
+</ol>
+<h2 id="downloads">Downloads</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>What it is</th>
+<th>Used in</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>catch-up/DMBCF_5a_header.idm … DMBCF_5f_rules_complete.idm</code></td>
+<td>The IDM at the end of each step of part 5 (open with <strong>Open Project › IDM Project (.idm)</strong>)</td>
+<td>3, 5a–5f</td>
+</tr>
+<tr>
+<td><code>IDM_DefectManagementBCF.idm</code></td>
+<td>The finished IDM (same as <code>DMBCF_5f_rules_complete.idm</code>)</td>
+<td>3, 5f</td>
+</tr>
+<tr>
+<td><code>IDM_DefectManagementBCF.xml</code></td>
+<td>The finished IDM as idmXML 2.0 (ISO 29481-3, idmXSD 2.0 Rev 14), valid against the schema</td>
+<td>5f</td>
+</tr>
+<tr>
+<td><code>forms/01 … 08 *.pdf</code></td>
+<td>Eight filled-in sample forms, one per process step; grey field codes are the IU ids</td>
+<td>5c, 5d</td>
+</tr>
+<tr>
+<td><code>bcf/RMOB_Defects_2026-11-13.bcfzip</code></td>
+<td>BCF 3.0 file with 8 defect topics (valid against the BCF-XML 3.0 schemas)</td>
+<td>5e</td>
+</tr>
+<tr>
+<td><code>bcf/RMOB_Defect_Register_2026-11-13.csv</code></td>
+<td>The same topics as a flat register</td>
+<td>5e</td>
+</tr>
+<tr>
+<td><code>exports/</code></td>
+<td>What xPPM neo-Seoul exports from the finished IDM: idmXML and HTML</td>
+<td>3, 5f</td>
+</tr>
+<tr>
+<td><code>videos/</code></td>
+<td>Ten videos (MP4, 1920×1080) with English voice-over, burnt-in captions and <code>.srt</code> subtitles</td>
+<td>all</td>
+</tr>
+</tbody>
+</table>
+<h2 id="step-by-step">Step by step</h2>
+<h3 id="1-installing-xppm-neo-seoul">1 Installing xPPM neo-Seoul</h3>
+<p>Download the file for your computer from <a href="https://github.com/ghanglee/IDMxPPM/releases">https://github.com/ghanglee/IDMxPPM/releases</a> (<code>&lt;version&gt;</code> is the release number, e.g. 1.7.0):</p>
+<table>
+<thead>
+<tr>
+<th>Computer</th>
+<th>File</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>macOS, Apple silicon</td>
+<td><code>xPPM neo-Seoul-&lt;version&gt;-arm64.dmg</code></td>
+</tr>
+<tr>
+<td>macOS, Intel</td>
+<td><code>xPPM neo-Seoul-&lt;version&gt;.dmg</code></td>
+</tr>
+<tr>
+<td>Windows, installer</td>
+<td><code>xPPM neo-Seoul Setup &lt;version&gt;.exe</code></td>
+</tr>
+<tr>
+<td>Windows, portable</td>
+<td><code>xPPM neo-Seoul &lt;version&gt;.exe</code></td>
+</tr>
+<tr>
+<td>Linux</td>
+<td><code>xPPM neo-Seoul-&lt;version&gt;.AppImage</code></td>
+</tr>
+</tbody>
+</table>
+<p>Install it as usual and start the app. The start screen appears.</p>
+<h3 id="2-how-to-start-a-project">2 How to start a project</h3>
+<ul>
+<li><strong>Blank Project</strong> starts an empty IDM (used in part 5): a header, a use case, and a process map with one pool and a start event.</li>
+<li><strong>Sample Project</strong> opens a complete example IDM to explore.</li>
+<li><strong>Open Project</strong> opens an existing IDM project (.idm), idmXML 2.0 or 1.0, IDS, BPMN or reviewed HTML file.</li>
+</ul>
+<h3 id="3-how-to-open-and-save-a-project">3 How to open and save a project</h3>
+<ol>
+<li><strong>Open Project</strong> (start screen, or left bar when no project is open) and choose the format. With a project open, use <strong>Close Project</strong> first.</li>
+<li><strong>Save &amp; Export</strong> › <strong>IDM Project (.idm)</strong> keeps everything, including the process map layout. Save it while you work.</li>
+<li><strong>idmXML 2.0</strong> is the ISO 29481-3 exchange format for other tools; <strong>HTML document</strong> is a readable version for reviewers.</li>
+</ol>
+<h3 id="4-basic-interfaces">4 Basic interfaces</h3>
+<table>
+<thead>
+<tr>
+<th>Part</th>
+<th>Where</th>
+<th>What you edit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>a. Header</td>
+<td>left bar, first button</td>
+<td>identifiers, title, version, status, authors, revisions</td>
+</tr>
+<tr>
+<td>b. Use case</td>
+<td>left bar, second button</td>
+<td>summary, aim and scope, uses, region, language, actor roles, project phases</td>
+</tr>
+<tr>
+<td>c. Process map</td>
+<td>middle (always)</td>
+<td>BPMN: pools, lanes, events, tasks, gateways, data objects, message flows</td>
+</tr>
+<tr>
+<td>d. Exchange requirements</td>
+<td>left bar, third button</td>
+<td>ER hierarchy; information units with data type, definition, examples, mappings</td>
+</tr>
+<tr>
+<td>e. Rules</td>
+<td>left bar / use case › Business rules</td>
+<td>business rules, constraints, formal expressions</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Validate</strong> checks the IDM against ISO 29481-3. <strong>Save &amp; Export</strong> saves and exports it.</p>
+<h3 id="5-learning-through-an-example">5 Learning through an example</h3>
+<h4 id="the-process-at-a-glance">The process at a glance</h4>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Who (actor role / lane)</th>
+<th>Process map task</th>
+<th>Form = data object = ER</th>
+<th>BCF result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1 Identification</td>
+<td>General contractor / Site quality inspector</td>
+<td>1 Identify defect</td>
+<td>Defect inspection form (ER01)</td>
+<td>— (paper or mobile form)</td>
+</tr>
+<tr>
+<td>2 Logging</td>
+<td>General contractor / BIM coordinator</td>
+<td>2 Log defect as BCF topic</td>
+<td>Defect log entry (BCF topic) (ER02)</td>
+<td>new Topic, TopicStatus = Open, viewpoint + snapshot</td>
+</tr>
+<tr>
+<td>3 Triage</td>
+<td>General contractor / Quality manager</td>
+<td>3 Triage defect, gateway <em>Valid defect?</em></td>
+<td>Triage record (ER03)</td>
+<td>Priority, Labels, triage Comment; Rejected if not valid</td>
+</tr>
+<tr>
+<td>4 Assignment</td>
+<td>General contractor / Quality manager</td>
+<td>4 Assign defect to responsible party</td>
+<td>Defect assignment notice (ER04)</td>
+<td>AssignedTo, DueDate, TopicStatus = Assigned</td>
+</tr>
+<tr>
+<td>5 Resolution</td>
+<td>Trade subcontractor</td>
+<td>5 Rectify defect and report</td>
+<td>Rectification report (ER05)</td>
+<td>Comment with after-photo viewpoint, TopicStatus = Resolved</td>
+</tr>
+<tr>
+<td>6 Verification</td>
+<td>General contractor / Site quality inspector</td>
+<td>6 Verify rectification, gateway <em>Rectification accepted?</em></td>
+<td>Verification record (ER06)</td>
+<td>Comment; Reopened if failed (loop back to step 4)</td>
+</tr>
+<tr>
+<td>7 Closure</td>
+<td>General contractor / BIM coordinator</td>
+<td>7 Close defect</td>
+<td>Defect closure record (ER07)</td>
+<td>TopicStatus = Closed</td>
+</tr>
+<tr>
+<td>Reporting and analysis</td>
+<td>General contractor / Quality manager → Owner's representative (external)</td>
+<td>timer <em>Every day 17:00</em>, Report and analyse defects</td>
+<td>Defect status report (ER08)</td>
+<td>aggregated from all topics</td>
+</tr>
+</tbody>
+</table>
+<h4 id="5a-creating-a-header">5a Creating a header</h4>
+<ol>
+<li><strong>Blank Project</strong>. The IDM header opens on the left.</li>
+<li>Full title <em>Defect Management Using BCF</em>, short title <em>DMBCF</em>; version 1.0; status <em>WD</em> (working draft).</li>
+<li><strong>Person</strong> adds an author; enter the given and family name.</li>
+</ol>
+<p>Catch-up file: <code>catch-up/DMBCF_5a_header.idm</code>.</p>
+<h4 id="5b-specifying-a-use-case">5b Specifying a use case</h4>
+<ol>
+<li><strong>Use Case</strong>: summary; aim and scope, including what is out of scope (claims, warranty).</li>
+<li>Use: <strong>User-defined Use</strong> <em>Construction Quality Management</em>. Region <em>Korea</em>; language English.</li>
+<li>Actor roles: rename the first actor <em>General contractor</em>; <strong>Sub-actor</strong> adds lanes <em>Site quality inspector</em>, <em>BIM coordinator</em> (and <em>Quality manager</em>).</li>
+<li><strong>Add Actor</strong> <em>Trade subcontractor</em> and <em>Owner's representative</em>; each gets a pool. Tick <strong>External</strong> for the owner's representative: it receives the daily report, but its own process is outside the IDM.</li>
+<li>Project phase ISO 22263 <em>production</em>.</li>
+</ol>
+<p>Catch-up file: <code>catch-up/DMBCF_5b_use_case.idm</code> (with all actors, keywords and references).</p>
+<h4 id="5c-specifying-a-process-map">5c Specifying a process map</h4>
+<p>i. The process: see the table above. ii. Depicting it:</p>
+<ol>
+<li>The pools and lanes already exist from the actor roles.</li>
+<li>Select the start event in the inspector's lane and append a task from its context pad: <em>1 Identify defect</em>.</li>
+<li>Add a data object from the palette, <em>Defect inspection form</em>, and connect the task to it (the form is the task's output).</li>
+<li>Complete the map, or open the catch-up file: seven tasks, gateways <em>Valid defect?</em> (→ rejected) and <em>Rectification accepted?</em> (→ reopen to task 4), message flows to the subcontractor and the owner's representative, a timer <em>Every day 17:00</em>, eight data objects.</li>
+</ol>
+<p>Catch-up file: <code>catch-up/DMBCF_5c_process_map.idm</code>.</p>
+<h4 id="5d-specifying-exchange-requirements">5d Specifying exchange requirements</h4>
+<p>i. The forms: <code>forms/01 … 08</code> — one per step. ii. One form = one data object = one ER. iii. One field = one IU.</p>
+<ol>
+<li>Double-click the data object <em>Defect inspection form</em> › <strong>Create New ER</strong>.</li>
+<li><strong>+ IU</strong> <em>Inspection number</em> (String, mandatory) with a definition; add <em>Location</em> and <em>Storey</em>.</li>
+<li>Select <em>Storey</em> and <strong>Indent</strong> it under <em>Location</em> (sub-IU).</li>
+<li>The catch-up file has the root ER <em>Defect management information</em> with eight sub-ERs (Appendix A).</li>
+</ol>
+<p>Catch-up file: <code>catch-up/DMBCF_5d_exchange_requirements.idm</code>.</p>
+<h4 id="5e-mapping-information-units-to-external-elements">5e Mapping information units to external elements</h4>
+<p>i. BCF (buildingSMART BIM Collaboration Format) exchanges issues as <em>topics</em> with <em>viewpoints</em> pointing to model elements; one topic per defect. ii. Mapping:</p>
+<ol>
+<li>Select <em>Storey</em> › <strong>+ Add Mapping</strong> › <em>IFC 4x3 ADD2</em>; search <em>IfcBuildingStorey</em>; edit the path to <code>IfcBuildingStorey.Name</code> (the name is inherited from IfcRoot).</li>
+<li>Select <em>Title</em> under <em>Defect</em> in the defect log entry › <strong>+ Add Mapping</strong> › <strong>+ Add schema…</strong> › preset <em>BCF 3.0</em> (120 element paths) › <strong>Add schema</strong>.</li>
+<li>Search <em>Title</em> and apply <code>Markup/Topic/Title</code>.</li>
+<li>Severity has no BCF field: it travels as a label (<code>Markup/Topic/Labels/Label</code>) from <code>extensions.xml</code>. Root cause is not exchanged.</li>
+</ol>
+<p>Catch-up file: <code>catch-up/DMBCF_5e_mappings.idm</code> (all 64 mappings, Appendix A).</p>
+<h4 id="5f-specifying-rules">5f Specifying rules</h4>
+<ol>
+<li><strong>Use Case</strong> › <strong>Business rules…</strong> › <strong>+ Add</strong>: <em>Safety-critical defects</em> — “A defect that is flagged as safety-critical shall have the priority P1 - Critical.” <strong>Done</strong>.</li>
+<li>Constraints › <strong>+ Add</strong>: defined in ER <em>Triage record</em>; <strong>Select IUs</strong> <em>Safety-critical</em>, <em>Priority</em>.</li>
+<li>Description: <code>IU-TRI-05 = true IMPLIES IU-TRI-03 = 'P1 - Critical'</code>. <strong>+ Add expression</strong> adds a formal expression (SHACL, SPARQL, Python, Schematron, RuleML, LegalRuleML).</li>
+<li>Open the finished IDM, <strong>Validate</strong> (0 errors, 0 warnings), and <strong>Save &amp; Export</strong> idmXML 2.0 and HTML. Compare with <code>exports/</code>.</li>
+</ol>
+<p>Catch-up file: <code>catch-up/DMBCF_5f_rules_complete.idm</code> (14 business rules, Appendix B).</p>
+<h2 id="design-notes-for-instructors">Design notes for instructors</h2>
+<ul>
+<li><em>One form = one data object = one ER.</em> Learners derive ERs from documents they know; the root ER groups them.</li>
+<li><em>BCF as exchange view definition.</em> BCF carries the defect record across tools; IDM adds what BCF leaves open:
+  which fields are mandatory, which vocabularies are allowed (extensions.xml), which status transitions are valid,
+  and which response times apply.</li>
+<li><em>Mapping notation.</em> <code>basis="BCF 3.0"</code>, <code>name</code> = XPath-like path in <code>markup.bcf</code> (<code>Markup/Topic/...</code>), in the
+  viewpoint file (<code>VisualizationInfo/...</code>) or in <code>extensions.xml</code>. In the app, BCF 3.0 appears as a schema of its own in the basis list (detected from the mappings). Use <strong>+ Add schema…</strong> in a basis list to add BCF 3.0 from the preset with its 120 element paths: the schema can then be searched and mapping fields suggest element names.</li>
+<li><em>Rules at three levels.</em> Business rule (natural language, owner: the quality plan) → constraint (restriction on IUs)
+  → expression (machine-checkable, any rule language). The <code>true = violation</code> convention is used in Python/SPARQL.</li>
+<li><em>Known limits.</em> The app stores one use classification for all uses; standard phase outcomes are not edited in the
+  app.</li>
+</ul>
+<h2 id="appendix-a-exchange-requirements-information-units-and-bcf-30-mapping">Appendix A — Exchange requirements, information units and BCF 3.0 mapping</h2>
+<h3 id="er01-defect-inspection-form-step-1-identification">ER01 Defect inspection form — step: 1 Identification</h3>
+<p>Information the site quality inspector records on site when a defect is identified (paper or mobile form).</p>
+<table>
+<thead>
+<tr>
+<th>IU</th>
+<th>Name</th>
+<th>Data type</th>
+<th>M/O</th>
+<th>BCF 3.0 element</th>
+<th>Other mapping</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>IU-INS-01</td>
+<td>Inspection number</td>
+<td>String / Text</td>
+<td>M</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td>IU-INS-02</td>
+<td>Inspected on</td>
+<td>Date / Time</td>
+<td>M</td>
+<td><code>Markup/Topic/CreationDate</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-INS-03</td>
+<td>Inspected by</td>
+<td>String / Text</td>
+<td>M</td>
+<td><code>Markup/Topic/CreationAuthor</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-INS-04</td>
+<td>Location</td>
+<td>String / Text</td>
+<td>M</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td>IU-INS-041</td>
+<td>&nbsp;&nbsp;Storey</td>
+<td>String / Text</td>
+<td>M</td>
+<td><code>Markup/Header/Files/File/@IfcSpatialStructureElement</code></td>
+<td>IFC4.3: <code>IfcBuildingStorey.Name</code></td>
+</tr>
+<tr>
+<td>IU-INS-042</td>
+<td>&nbsp;&nbsp;Space</td>
+<td>String / Text</td>
+<td>M</td>
+<td>—</td>
+<td>IFC4.3: <code>IfcSpace.Name</code></td>
+</tr>
+<tr>
+<td>IU-INS-043</td>
+<td>&nbsp;&nbsp;Grid reference</td>
+<td>String / Text</td>
+<td>O</td>
+<td>—</td>
+<td>IFC4.3: <code>IfcGridAxis.AxisTag</code></td>
+</tr>
+<tr>
+<td>IU-INS-05</td>
+<td>Affected element</td>
+<td>String / Text</td>
+<td>O</td>
+<td><code>VisualizationInfo/Components/Selection/Component/@IfcGuid</code></td>
+<td>IFC4.3: <code>IfcRoot.GlobalId</code></td>
+</tr>
+<tr>
+<td>IU-INS-06</td>
+<td>Defect description</td>
+<td>String / Text</td>
+<td>M</td>
+<td><code>Markup/Topic/Description</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-INS-07</td>
+<td>Trade</td>
+<td>String / Text</td>
+<td>M</td>
+<td><code>Markup/Topic/Labels/Label</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-INS-08</td>
+<td>Photograph</td>
+<td>Image</td>
+<td>M</td>
+<td><code>Markup/Topic/Viewpoints/ViewPoint/Snapshot</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-INS-09</td>
+<td>Possible safety hazard</td>
+<td>Boolean</td>
+<td>M</td>
+<td><code>Markup/Topic/Labels/Label</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-INS-10</td>
+<td>Inspection reference</td>
+<td>String / Text</td>
+<td>O</td>
+<td><code>Markup/Topic/ReferenceLinks/ReferenceLink</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="er02-defect-log-entry-bcf-topic-step-2-logging">ER02 Defect log entry (BCF topic) — step: 2 Logging</h3>
+<p>The defect as a BCF topic in the project issue register, linked to the coordination model by a viewpoint.</p>
+<table>
+<thead>
+<tr>
+<th>IU</th>
+<th>Name</th>
+<th>Data type</th>
+<th>M/O</th>
+<th>BCF 3.0 element</th>
+<th>Other mapping</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>IU-LOG-01</td>
+<td>Defect</td>
+<td>Structured (list, graph, table, JSON)</td>
+<td>M</td>
+<td><code>Markup/Topic</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-LOG-011</td>
+<td>&nbsp;&nbsp;Topic GUID</td>
+<td>String / Text</td>
+<td>M</td>
+<td><code>Markup/Topic/@Guid</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-LOG-012</td>
+<td>&nbsp;&nbsp;Defect number</td>
+<td>String / Text</td>
+<td>M</td>
+<td><code>Markup/Topic/@ServerAssignedId</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-LOG-013</td>
+<td>&nbsp;&nbsp;Title</td>
+<td>String / Text</td>
+<td>M</td>
+<td><code>Markup/Topic/Title</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-LOG-014</td>
+<td>&nbsp;&nbsp;Topic type</td>
+<td>String / Text</td>
+<td>M</td>
+<td><code>Markup/Topic/@TopicType</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-LOG-015</td>
+<td>&nbsp;&nbsp;Status</td>
+<td>String / Text</td>
+<td>M</td>
+<td><code>Markup/Topic/@TopicStatus</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-LOG-016</td>
+<td>&nbsp;&nbsp;Description</td>
+<td>String / Text</td>
+<td>M</td>
+<td><code>Markup/Topic/Description</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-LOG-017</td>
+<td>&nbsp;&nbsp;Created on</td>
+<td>Date / Time</td>
+<td>M</td>
+<td><code>Markup/Topic/CreationDate</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-LOG-018</td>
+<td>&nbsp;&nbsp;Created by</td>
+<td>String / Text</td>
+<td>M</td>
+<td><code>Markup/Topic/CreationAuthor</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-LOG-019</td>
+<td>&nbsp;&nbsp;Labels</td>
+<td>String / Text</td>
+<td>O</td>
+<td><code>Markup/Topic/Labels/Label</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-LOG-02</td>
+<td>Model reference</td>
+<td>String / Text</td>
+<td>M</td>
+<td><code>Markup/Header/Files/File</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-LOG-03</td>
+<td>Viewpoint</td>
+<td>3D Model</td>
+<td>M</td>
+<td><code>Markup/Topic/Viewpoints/ViewPoint</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-LOG-031</td>
+<td>&nbsp;&nbsp;Camera</td>
+<td>Structured (list, graph, table, JSON)</td>
+<td>M</td>
+<td><code>VisualizationInfo/PerspectiveCamera</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-LOG-032</td>
+<td>&nbsp;&nbsp;Selected components</td>
+<td>String / Text</td>
+<td>M</td>
+<td><code>VisualizationInfo/Components/Selection/Component/@IfcGuid</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-LOG-033</td>
+<td>&nbsp;&nbsp;Snapshot</td>
+<td>Image</td>
+<td>M</td>
+<td><code>Markup/Topic/Viewpoints/ViewPoint/Snapshot</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-LOG-04</td>
+<td>Source inspection form</td>
+<td>Document (PDF, DOCX, etc.)</td>
+<td>M</td>
+<td><code>Markup/Topic/DocumentReferences/DocumentReference</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-LOG-05</td>
+<td>Related defects</td>
+<td>String / Text</td>
+<td>O</td>
+<td><code>Markup/Topic/RelatedTopics/RelatedTopic/@Guid</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-LOG-06</td>
+<td>Construction stage</td>
+<td>String / Text</td>
+<td>O</td>
+<td><code>Markup/Topic/Stage</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="er03-triage-record-step-3-triage">ER03 Triage record — step: 3 Triage</h3>
+<p>Decision of the quality manager on validity, severity, priority and category of a logged defect.</p>
+<table>
+<thead>
+<tr>
+<th>IU</th>
+<th>Name</th>
+<th>Data type</th>
+<th>M/O</th>
+<th>BCF 3.0 element</th>
+<th>Other mapping</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>IU-TRI-01</td>
+<td>Triage decision</td>
+<td>String / Text</td>
+<td>M</td>
+<td><code>Markup/Topic/@TopicStatus</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-TRI-02</td>
+<td>Severity</td>
+<td>String / Text</td>
+<td>M</td>
+<td><code>Markup/Topic/Labels/Label</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-TRI-03</td>
+<td>Priority</td>
+<td>String / Text</td>
+<td>M</td>
+<td><code>Markup/Topic/Priority</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-TRI-04</td>
+<td>Defect category</td>
+<td>String / Text</td>
+<td>M</td>
+<td><code>Markup/Topic/Labels/Label</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-TRI-05</td>
+<td>Safety-critical</td>
+<td>Boolean</td>
+<td>M</td>
+<td><code>Markup/Topic/Labels/Label</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-TRI-06</td>
+<td>Duplicate of</td>
+<td>String / Text</td>
+<td>O</td>
+<td><code>Markup/Topic/RelatedTopics/RelatedTopic/@Guid</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-TRI-07</td>
+<td>Triage comment</td>
+<td>Structured (list, graph, table, JSON)</td>
+<td>M</td>
+<td><code>Markup/Topic/Comments/Comment</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-TRI-071</td>
+<td>&nbsp;&nbsp;Triaged on</td>
+<td>Date / Time</td>
+<td>M</td>
+<td><code>Markup/Topic/Comments/Comment/Date</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-TRI-072</td>
+<td>&nbsp;&nbsp;Triaged by</td>
+<td>String / Text</td>
+<td>M</td>
+<td><code>Markup/Topic/Comments/Comment/Author</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-TRI-073</td>
+<td>&nbsp;&nbsp;Rationale</td>
+<td>String / Text</td>
+<td>M</td>
+<td><code>Markup/Topic/Comments/Comment/Comment</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-TRI-08</td>
+<td>Root cause (preliminary)</td>
+<td>String / Text</td>
+<td>O</td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="er04-defect-assignment-notice-step-4-assignment">ER04 Defect assignment notice — step: 4 Assignment</h3>
+<p>Instruction from the general contractor to the responsible trade subcontractor to rectify a defect by a due date.</p>
+<table>
+<thead>
+<tr>
+<th>IU</th>
+<th>Name</th>
+<th>Data type</th>
+<th>M/O</th>
+<th>BCF 3.0 element</th>
+<th>Other mapping</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>IU-ASG-01</td>
+<td>Notice number</td>
+<td>String / Text</td>
+<td>M</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td>IU-ASG-02</td>
+<td>Responsible party</td>
+<td>String / Text</td>
+<td>M</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td>IU-ASG-03</td>
+<td>Assignee</td>
+<td>String / Text</td>
+<td>M</td>
+<td><code>Markup/Topic/AssignedTo</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-ASG-04</td>
+<td>Due date</td>
+<td>Date / Time</td>
+<td>M</td>
+<td><code>Markup/Topic/DueDate</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-ASG-05</td>
+<td>Required action</td>
+<td>String / Text</td>
+<td>M</td>
+<td><code>Markup/Topic/Comments/Comment/Comment</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-ASG-06</td>
+<td>Issued on</td>
+<td>Date / Time</td>
+<td>M</td>
+<td><code>Markup/Topic/Comments/Comment/Date</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-ASG-07</td>
+<td>Back-charge applicable</td>
+<td>Boolean</td>
+<td>O</td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="er05-rectification-report-step-5-resolution">ER05 Rectification report — step: 5 Resolution</h3>
+<p>Report of the trade subcontractor that the defect has been rectified, with evidence.</p>
+<table>
+<thead>
+<tr>
+<th>IU</th>
+<th>Name</th>
+<th>Data type</th>
+<th>M/O</th>
+<th>BCF 3.0 element</th>
+<th>Other mapping</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>IU-RES-01</td>
+<td>Rectification description</td>
+<td>String / Text</td>
+<td>M</td>
+<td><code>Markup/Topic/Comments/Comment/Comment</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-RES-02</td>
+<td>Completed on</td>
+<td>Date / Time</td>
+<td>M</td>
+<td><code>Markup/Topic/Comments/Comment/Date</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-RES-03</td>
+<td>Completed by</td>
+<td>String / Text</td>
+<td>M</td>
+<td><code>Markup/Topic/Comments/Comment/Author</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-RES-04</td>
+<td>After photograph</td>
+<td>Image</td>
+<td>M</td>
+<td><code>Markup/Topic/Comments/Comment/Viewpoint/@Guid</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-RES-05</td>
+<td>Cause found</td>
+<td>String / Text</td>
+<td>O</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td>IU-RES-06</td>
+<td>Requested status</td>
+<td>String / Text</td>
+<td>M</td>
+<td><code>Markup/Topic/@TopicStatus</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="er06-verification-record-step-6-verification">ER06 Verification record — step: 6 Verification</h3>
+<p>Result of the re-inspection of a rectified defect by the site quality inspector.</p>
+<table>
+<thead>
+<tr>
+<th>IU</th>
+<th>Name</th>
+<th>Data type</th>
+<th>M/O</th>
+<th>BCF 3.0 element</th>
+<th>Other mapping</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>IU-VER-01</td>
+<td>Verified on</td>
+<td>Date / Time</td>
+<td>M</td>
+<td><code>Markup/Topic/Comments/Comment/Date</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-VER-02</td>
+<td>Verified by</td>
+<td>String / Text</td>
+<td>M</td>
+<td><code>Markup/Topic/Comments/Comment/Author</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-VER-03</td>
+<td>Verification result</td>
+<td>String / Text</td>
+<td>M</td>
+<td><code>Markup/Topic/Comments/Comment/Comment</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-VER-04</td>
+<td>Remarks</td>
+<td>String / Text</td>
+<td>O</td>
+<td><code>Markup/Topic/Comments/Comment/Comment</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-VER-05</td>
+<td>Verification photograph</td>
+<td>Image</td>
+<td>O</td>
+<td><code>Markup/Topic/Comments/Comment/Viewpoint/@Guid</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-VER-06</td>
+<td>Failed verifications</td>
+<td>Numeric</td>
+<td>M</td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="er07-defect-closure-record-step-7-closure">ER07 Defect closure record — step: 7 Closure</h3>
+<p>Formal closure of the defect by the BIM coordinator after a passed verification.</p>
+<table>
+<thead>
+<tr>
+<th>IU</th>
+<th>Name</th>
+<th>Data type</th>
+<th>M/O</th>
+<th>BCF 3.0 element</th>
+<th>Other mapping</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>IU-CLO-01</td>
+<td>Final status</td>
+<td>String / Text</td>
+<td>M</td>
+<td><code>Markup/Topic/@TopicStatus</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-CLO-02</td>
+<td>Closed on</td>
+<td>Date / Time</td>
+<td>M</td>
+<td><code>Markup/Topic/ModifiedDate</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-CLO-03</td>
+<td>Closed by</td>
+<td>String / Text</td>
+<td>M</td>
+<td><code>Markup/Topic/ModifiedAuthor</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-CLO-04</td>
+<td>Days to close</td>
+<td>Numeric</td>
+<td>M</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td>IU-CLO-05</td>
+<td>Closure sign-off</td>
+<td>Document (PDF, DOCX, etc.)</td>
+<td>O</td>
+<td><code>Markup/Topic/DocumentReferences/DocumentReference</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="er08-defect-status-report-step-reporting-and-analysis">ER08 Defect status report — step: Reporting and analysis</h3>
+<p>Daily summary and analysis of all defect topics for the owner's representative.</p>
+<table>
+<thead>
+<tr>
+<th>IU</th>
+<th>Name</th>
+<th>Data type</th>
+<th>M/O</th>
+<th>BCF 3.0 element</th>
+<th>Other mapping</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>IU-RPT-01</td>
+<td>Reporting date</td>
+<td>Date / Time</td>
+<td>M</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td>IU-RPT-02</td>
+<td>Defect register extract</td>
+<td>Structured (list, graph, table, JSON)</td>
+<td>M</td>
+<td><code>BCF file (.bcfzip)</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-RPT-03</td>
+<td>Defects by status</td>
+<td>Structured (list, graph, table, JSON)</td>
+<td>M</td>
+<td><code>Markup/Topic/@TopicStatus</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-RPT-04</td>
+<td>Defects by priority</td>
+<td>Structured (list, graph, table, JSON)</td>
+<td>M</td>
+<td><code>Markup/Topic/Priority</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-RPT-05</td>
+<td>Defects by trade</td>
+<td>Structured (list, graph, table, JSON)</td>
+<td>M</td>
+<td><code>Markup/Topic/Labels/Label</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-RPT-06</td>
+<td>Overdue defects</td>
+<td>Structured (list, graph, table, JSON)</td>
+<td>M</td>
+<td><code>Markup/Topic/DueDate</code></td>
+<td></td>
+</tr>
+<tr>
+<td>IU-RPT-07</td>
+<td>Average days to close</td>
+<td>Numeric</td>
+<td>M</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td>IU-RPT-08</td>
+<td>Prepared by</td>
+<td>String / Text</td>
+<td>M</td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h2 id="appendix-b-business-rules-and-constraints">Appendix B — Business rules and constraints</h2>
+<table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>Statement</th>
+<th>Constraint(s)</th>
+<th>IUs</th>
+<th>Formal expressions</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>BR-DM-01</strong> Unique defect identification</td>
+<td>Every defect shall have a globally unique identifier and a project defect number that is never reused.</td>
+<td>C-DM-01 (ER02)</td>
+<td>IU-LOG-011, IU-LOG-012</td>
+<td>Python</td>
+</tr>
+<tr>
+<td><strong>BR-DM-02</strong> Defect location</td>
+<td>Every defect shall be located by storey and space and, where it affects a modelled element, by the IFC GlobalId of that element.</td>
+<td>C-DM-02 (ER01)<br>C-DM-03 (ER02)</td>
+<td>IU-INS-041, IU-INS-042, IU-INS-05<br>IU-LOG-032, IU-LOG-033</td>
+<td>description only<br>Schematron</td>
+</tr>
+<tr>
+<td><strong>BR-DM-03</strong> Photographic evidence</td>
+<td>Every defect found in an inspection shall include at least one photograph of the defect, carried as the snapshot of the first viewpoint of the BCF topic.</td>
+<td>C-DM-03 (ER02)</td>
+<td>IU-LOG-032, IU-LOG-033</td>
+<td>Schematron</td>
+</tr>
+<tr>
+<td><strong>BR-DM-04</strong> Controlled vocabularies</td>
+<td>The topic type, topic status, priority, labels and users of a defect shall be values defined in the project BCF extensions (extensions.xml).</td>
+<td>C-DM-04 (ER02)</td>
+<td>IU-LOG-014, IU-LOG-015, IU-LOG-019</td>
+<td>Schematron</td>
+</tr>
+<tr>
+<td><strong>BR-DM-05</strong> Defect status lifecycle</td>
+<td>The status of a defect shall change only along the transitions of the defect status lifecycle.</td>
+<td>C-DM-05 (ER02)</td>
+<td>IU-LOG-015</td>
+<td>Python</td>
+</tr>
+<tr>
+<td><strong>BR-DM-06</strong> Triage deadline</td>
+<td>A logged defect shall be triaged within 2 working days of its creation date.</td>
+<td>C-DM-06 (ER03)</td>
+<td>IU-LOG-017, IU-TRI-071</td>
+<td>Python</td>
+</tr>
+<tr>
+<td><strong>BR-DM-07</strong> Rectification period by priority</td>
+<td>The due date of a defect shall be no later than 1 day (P1 - Critical), 7 days (P2 - High), 14 days (P3 - Medium) or 30 days (P4 - Low) after triage.</td>
+<td>C-DM-07 (ER04)</td>
+<td>IU-TRI-03, IU-TRI-071, IU-ASG-04</td>
+<td>Python, SPARQL</td>
+</tr>
+<tr>
+<td><strong>BR-DM-08</strong> Safety-critical defects</td>
+<td>A defect that is flagged as safety-critical shall have the priority P1 - Critical.</td>
+<td>C-DM-08 (ER03)</td>
+<td>IU-TRI-05, IU-TRI-03</td>
+<td>SHACL</td>
+</tr>
+<tr>
+<td><strong>BR-DM-09</strong> Single responsible assignee</td>
+<td>An assigned defect shall have exactly one assignee, who is a registered project user of the responsible party.</td>
+<td>C-DM-09 (ER04)</td>
+<td>IU-ASG-03, IU-ASG-02</td>
+<td>Schematron</td>
+</tr>
+<tr>
+<td><strong>BR-DM-10</strong> Evidence of rectification</td>
+<td>A defect shall be set to Resolved only with a rectification description and at least one photograph taken after rectification.</td>
+<td>C-DM-10 (ER05)</td>
+<td>IU-RES-01, IU-RES-04, IU-RES-06</td>
+<td>description only</td>
+</tr>
+<tr>
+<td><strong>BR-DM-11</strong> Independent verification</td>
+<td>The person who verifies a rectification shall not be the assignee of the defect.</td>
+<td>C-DM-11 (root ER)</td>
+<td>IU-VER-02, IU-ASG-03</td>
+<td>RuleML</td>
+</tr>
+<tr>
+<td><strong>BR-DM-12</strong> Closure after passed verification</td>
+<td>A defect shall be closed only after a verification with the result Passed; a rejected defect shall record the reason for rejection.</td>
+<td>C-DM-12 (root ER)</td>
+<td>IU-CLO-01, IU-VER-03, IU-TRI-01, IU-TRI-073</td>
+<td>LegalRuleML</td>
+</tr>
+<tr>
+<td><strong>BR-DM-13</strong> Escalation of repeated failures</td>
+<td>A defect whose rectification fails verification more than twice shall be escalated to the project manager.</td>
+<td>C-DM-13 (ER06)</td>
+<td>IU-VER-06</td>
+<td>description only</td>
+</tr>
+<tr>
+<td><strong>BR-DM-14</strong> Daily defect status report</td>
+<td>A defect status report shall be issued every working day with the number of defects by status, priority and trade, the list of overdue defects and the average time to close.</td>
+<td>C-DM-14 (ER08)</td>
+<td>IU-RPT-01, IU-RPT-03, IU-RPT-04, IU-RPT-05, IU-RPT-06, IU-RPT-07</td>
+<td>SPARQL</td>
+</tr>
+</tbody>
+</table>
+<h2 id="appendix-c-project-bcf-vocabulary-extensionsxml">Appendix C — Project BCF vocabulary (extensions.xml)</h2>
+<ul>
+<li><strong>TopicTypes</strong>: Defect, Clash, Request, Remark</li>
+<li><strong>TopicStatuses</strong>: Open, Assigned, In progress, Resolved, Reopened, Closed, Rejected</li>
+<li><strong>Priorities</strong>: P1 - Critical, P2 - High, P3 - Medium, P4 - Low</li>
+<li><strong>TopicLabels</strong>: Trade: Doors and hardware, Trade: Finishes, Trade: Fire stopping, Trade: Metalwork, Trade: MEP, Category: Workmanship, Category: Material, Category: Damage, Category: Missing work, Category: Safety, Severity: Critical, Severity: Major, Severity: Minor, Severity: Cosmetic, Safety, Escalated</li>
+<li><strong>Users</strong>: minji.park@example.com, daniel.kim@example.com, seojun.lee@example.com, jiho.choi@example.com, yuna.han@example.com, hyunwoo.kang@example.com, hana.jung@example.com</li>
+<li><strong>Stages</strong>: Structure, Envelope, Fit-out, Commissioning, Handover</li>
+<li><strong>SnippetTypes</strong>: IFC4X3</li>
+</ul></main></body></html>

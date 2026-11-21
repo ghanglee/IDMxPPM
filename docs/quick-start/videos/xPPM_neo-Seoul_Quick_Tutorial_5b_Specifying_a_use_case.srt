@@ -1,0 +1,72 @@
+1
+00:00:00,350 --> 00:00:05,513
+The use case says what the IDM is for, who takes part, and where and when it applies.
+
+2
+00:00:06,413 --> 00:00:07,452
+Open the use case.
+
+3
+00:00:07,452 --> 00:00:10,338
+Write a short summary of the information exchange.
+
+4
+00:00:13,013 --> 00:00:16,426
+Under aim and scope, state the purpose and what is out of scope.
+
+5
+00:00:17,663 --> 00:00:18,436
+Add the use.
+
+6
+00:00:18,436 --> 00:00:23,401
+Choose User-defined Use, type Construction Quality Management, and click Add.
+
+7
+00:00:23,401 --> 00:00:26,431
+You can also pick a use from the NBIMS-US list.
+
+8
+00:00:27,331 --> 00:00:30,997
+Select the target region, Korea, and remove International.
+
+9
+00:00:30,997 --> 00:00:32,515
+The language is English.
+
+10
+00:00:33,415 --> 00:00:38,809
+Under actor roles, the blank project already has one actor, linked to its pool.
+
+11
+00:00:38,809 --> 00:00:40,790
+Rename it General contractor.
+
+12
+00:00:40,790 --> 00:00:44,067
+Click Sub-actor: the pool is divided into lanes.
+
+13
+00:00:44,067 --> 00:00:47,687
+Name them Site quality inspector and BIM coordinator.
+
+14
+00:00:48,587 --> 00:00:51,736
+Click Add Actor for the owner's representative.
+
+15
+00:00:51,736 --> 00:00:53,880
+The app also adds a pool for it.
+
+16
+00:00:53,880 --> 00:00:59,509
+Tick External: it receives the daily report, but its own process is outside the IDM.
+
+17
+00:01:00,409 --> 00:01:05,121
+Finally, tick the ISO 22263 project phase, production.
+
+18
+00:01:05,121 --> 00:01:14,980
+The catch-up file DMBCF_5b_use_case.idm contains the complete use case, with all actors, keywords and references.
+

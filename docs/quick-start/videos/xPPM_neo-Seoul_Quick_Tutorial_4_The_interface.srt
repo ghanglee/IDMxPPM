@@ -1,0 +1,56 @@
+1
+00:00:00,350 --> 00:00:06,686
+Before we build an IDM, let us look at what an IDM consists of, and where each part is in the app.
+
+2
+00:00:07,586 --> 00:00:18,640
+An IDM has five parts: a header, a use case, a process map, exchange requirements with their information units, and rules.
+
+3
+00:00:18,640 --> 00:00:24,439
+ISO 29481-1 defines the method, and ISO 29481-3 the data schema.
+
+4
+00:00:25,339 --> 00:00:27,860
+The bar on the left opens the parts.
+
+5
+00:00:27,860 --> 00:00:33,041
+The first button opens the IDM header: identifiers, authors and revisions.
+
+6
+00:00:33,941 --> 00:00:39,935
+The second opens the use case: purpose, uses, region, actor roles, and project phases.
+
+7
+00:00:40,835 --> 00:00:48,470
+The process map is always in the middle: a BPMN editor with a palette for events, tasks, gateways, data objects,
+
+8
+00:00:48,470 --> 00:00:49,561
+pools and lanes.
+
+9
+00:00:50,461 --> 00:00:53,308
+The third button opens the exchange requirements.
+
+10
+00:00:53,308 --> 00:00:58,887
+Select one to see its information units on the right, and select an information unit to edit it.
+
+11
+00:00:59,787 --> 00:01:02,731
+Rules opens the business rules and constraints.
+
+12
+00:01:02,731 --> 00:01:05,675
+The same dialog is available from the use case.
+
+13
+00:01:06,575 --> 00:01:14,278
+Finally, Validate checks the IDM against ISO 29481-3, and Save and Export saves it.
+
+14
+00:01:14,278 --> 00:01:17,434
+Now let us build an IDM ourselves.
+

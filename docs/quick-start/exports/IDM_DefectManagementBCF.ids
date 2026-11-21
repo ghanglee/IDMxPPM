@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ids:ids xmlns:ids="http://standards.buildingsmart.org/IDS" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://standards.buildingsmart.org/IDS http://standards.buildingsmart.org/IDS/1.0/ids.xsd">
+  <ids:info>
+    <ids:title>Defect Management Using BCF</ids:title>
+    <ids:copyright>Copyright 2026 Building Informatics Group (BIG), Yonsei University. Tutorial sample; fictitious project data; not normative.</ids:copyright>
+    <ids:version>1.0</ids:version>
+    <ids:description>Defect Management Using BCF</ids:description>
+    <ids:author>glee@yonsei.ac.kr</ids:author>
+    <ids:date>2026-11-21</ids:date>
+  </ids:info>
+  <ids:specifications>
+    <ids:specification name="Defect inspection form: Storey" ifcVersion="IFC4X3_ADD2" identifier="IU-INS-041" description="Name of the building storey.">
+      <ids:applicability minOccurs="0" maxOccurs="unbounded">
+        <ids:entity>
+          <ids:name>
+            <ids:simpleValue>IFCBUILDINGSTOREY</ids:simpleValue>
+          </ids:name>
+        </ids:entity>
+      </ids:applicability>
+      <ids:requirements>
+        <ids:attribute cardinality="required" instructions="Defect location">
+          <ids:name>
+            <ids:simpleValue>Name</ids:simpleValue>
+          </ids:name>
+        </ids:attribute>
+      </ids:requirements>
+    </ids:specification>
+    <ids:specification name="Defect inspection form: Space" ifcVersion="IFC4X3_ADD2" identifier="IU-INS-042" description="Name or number of the space or zone.">
+      <ids:applicability minOccurs="0" maxOccurs="unbounded">
+        <ids:entity>
+          <ids:name>
+            <ids:simpleValue>IFCSPACE</ids:simpleValue>
+          </ids:name>
+        </ids:entity>
+      </ids:applicability>
+      <ids:requirements>
+        <ids:attribute cardinality="required" instructions="Defect location">
+          <ids:name>
+            <ids:simpleValue>Name</ids:simpleValue>
+          </ids:name>
+        </ids:attribute>
+      </ids:requirements>
+    </ids:specification>
+    <ids:specification name="Defect inspection form: Grid reference" ifcVersion="IFC4X3_ADD2" identifier="IU-INS-043" description="Nearest grid intersection, e.g. C/4.">
+      <ids:applicability minOccurs="0" maxOccurs="unbounded">
+        <ids:entity>
+          <ids:name>
+            <ids:simpleValue>IFCGRIDAXIS</ids:simpleValue>
+          </ids:name>
+        </ids:entity>
+      </ids:applicability>
+      <ids:requirements>
+        <ids:attribute cardinality="optional" instructions="Nearest grid intersection, e.g. C/4.">
+          <ids:name>
+            <ids:simpleValue>AxisTag</ids:simpleValue>
+          </ids:name>
+        </ids:attribute>
+      </ids:requirements>
+    </ids:specification>
+    <ids:specification name="Defect inspection form: Affected element" ifcVersion="IFC4X3_ADD2" identifier="IU-INS-05" description="Tag or IFC GlobalId of the building element that has the defect, if it is modelled.">
+      <ids:applicability minOccurs="0" maxOccurs="unbounded">
+        <ids:entity>
+          <ids:name>
+            <ids:simpleValue>IFCROOT</ids:simpleValue>
+          </ids:name>
+        </ids:entity>
+      </ids:applicability>
+      <ids:requirements>
+        <ids:attribute cardinality="optional" instructions="Defect location">
+          <ids:name>
+            <ids:simpleValue>GlobalId</ids:simpleValue>
+          </ids:name>
+        </ids:attribute>
+      </ids:requirements>
+    </ids:specification>
+  </ids:specifications>
+</ids:ids>

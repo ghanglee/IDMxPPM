@@ -1,0 +1,84 @@
+1
+00:00:00,350 --> 00:00:05,150
+An exchange requirement defines the information that one exchange must carry.
+
+2
+00:00:06,050 --> 00:00:13,131
+In this process, the information is exchanged as forms: an inspection form, a log entry, a triage record,
+
+3
+00:00:13,131 --> 00:00:15,289
+an assignment notice, and so on.
+
+4
+00:00:15,289 --> 00:00:18,189
+Each form becomes one exchange requirement.
+
+5
+00:00:19,089 --> 00:00:21,398
+Here is the defect inspection form.
+
+6
+00:00:21,398 --> 00:00:28,061
+Each field will become an information unit: inspection number, date, inspector, location with storey,
+
+7
+00:00:28,061 --> 00:00:29,777
+space and grid, and so on.
+
+8
+00:00:30,677 --> 00:00:34,320
+Double-click the data object Defect inspection form.
+
+9
+00:00:34,320 --> 00:00:38,314
+Choose Create New ER, keep the name, and click Create ER.
+
+10
+00:00:39,877 --> 00:00:42,822
+The new exchange requirement opens on the right.
+
+11
+00:00:42,822 --> 00:00:45,338
+Click plus IU to add an information unit.
+
+12
+00:00:46,238 --> 00:00:47,950
+Name it Inspection number.
+
+13
+00:00:47,950 --> 00:00:53,022
+Keep String or Text as the data type, tick Mandatory, and write a definition.
+
+14
+00:00:54,988 --> 00:00:57,629
+Add two more units, Location and Storey.
+
+15
+00:00:57,629 --> 00:01:03,308
+Then select Storey and click the indent button: Storey becomes a sub-unit of Location.
+
+16
+00:01:04,208 --> 00:01:09,065
+Synonyms, examples and figures can be added in the same editor.
+
+17
+00:01:09,065 --> 00:01:17,392
+Repeating this for all eight forms takes time, so open the catch-up file DMBCF_5d_exchange_requirements.idm.
+
+18
+00:01:18,292 --> 00:01:26,428
+In the catch-up file, a root exchange requirement, Defect management information, groups eight sub-ERs, one per form.
+
+19
+00:01:26,428 --> 00:01:29,001
+Each data object is linked to its ER.
+
+20
+00:01:29,901 --> 00:01:37,152
+Select the defect inspection form: ten information units, with data types, mandatory flags and definitions.
+
+21
+00:01:37,152 --> 00:01:39,117
+Location has three sub-units.
+

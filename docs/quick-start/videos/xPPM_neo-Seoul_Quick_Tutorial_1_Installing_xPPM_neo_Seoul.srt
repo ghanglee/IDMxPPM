@@ -1,0 +1,32 @@
+1
+00:00:00,350 --> 00:00:03,476
+Welcome to the xPPM neo-Seoul quick tutorial.
+
+2
+00:00:03,476 --> 00:00:11,465
+In about twenty minutes, you will learn how to author an information delivery manual, an IDM, from a blank project.
+
+3
+00:00:12,365 --> 00:00:17,144
+Open the releases page of the xPPM neo-Seoul repository on GitHub,
+
+4
+00:00:17,144 --> 00:00:25,253
+and download the file for your computer: a disk image for macOS, an installer or a portable program for Windows,
+
+5
+00:00:25,253 --> 00:00:27,063
+or an AppImage for Linux.
+
+6
+00:00:27,963 --> 00:00:31,252
+Install it as usual and start xPPM neo-Seoul.
+
+7
+00:00:31,252 --> 00:00:33,079
+The start screen appears.
+
+8
+00:00:33,079 --> 00:00:35,857
+In the next video, we start a project.
+
