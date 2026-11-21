@@ -88,10 +88,13 @@ Download the latest release from the [GitHub Releases page](https://github.com/g
 
 | Platform | File | Notes |
 |----------|------|-------|
-| macOS (Apple Silicon) | `IDMxPPM - Neo Seoul-arm64.dmg` | M1/M2/M3/M4 Macs |
-| macOS (Intel) | `IDMxPPM - Neo Seoul-x64.dmg` | Intel-based Macs |
-| Windows | `IDMxPPM - Neo Seoul Setup x.x.x.exe` | 64-bit Windows |
-| Linux | `IDMxPPM - Neo Seoul-x.x.x.AppImage` | 64-bit Linux |
+| macOS (Apple Silicon) | `xPPM neo-Seoul-<version>-arm64.dmg` | M1/M2/M3/M4 Macs |
+| macOS (Intel) | `xPPM neo-Seoul-<version>.dmg` | Intel-based Macs |
+| Windows (installer) | `xPPM neo-Seoul Setup <version>.exe` | 64-bit Windows |
+| Windows (portable) | `xPPM neo-Seoul <version>.exe` | 64-bit Windows, no installation |
+| Linux | `xPPM neo-Seoul-<version>.AppImage` | 64-bit Linux |
+
+`<version>` is the release number, for example `1.7.0`.
 
 ### Build from Source
 

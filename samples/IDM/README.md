@@ -15,6 +15,7 @@ Keep local copies in this folder; it is ignored by git except for its README.
 | `businessRule/r12/` | Rev 12 business-rule samples (minimal, full, WindowCost) and eight invalid cases; see its README |
 | `MEPEquipmentHandover/` | 7 business rules, 7 constraints (SPARQL expression), COBie and IFC mappings, 2 EVDs, 2 pools / 3 lanes; `.xml` and `.idm` |
 | `CostEstimation_WindowsDoors/` | `idmWindowCostEstimation.idm` (app project; the former startup sample) |
+| `DefectManagementBCF/` | **Tutorial sample** (Rev 14) "Defect Management Using BCF": 3 pools / 3 lanes (external owner's representative), steps 1-7 with reopen loop and weekly reporting timer, 8 data objects linked to 8 ERs (one per form, 74 IUs), 60 IU mappings to BCF 3.0 elements, 14 business rules (2 with images), 14 constraints with Python, Schematron, SHACL, SPARQL, RuleML and LegalRuleML expressions, 2 cross-ER constraints on the root ER; `.xml` and `.idm`. Forms, BCF file and videos: `_local/video_tutorials/v1.7/DefectManagementBCF/` |
 
 All idmXML 2.0 files in this folder (except `invalid/`) validate against the Rev 14 schema in
 `_local/references/idm schemas/idmXSD_v2/` with libxml2, Xerces and xmlschema; `tests/run_tests.py` checks them.
